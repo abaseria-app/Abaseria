@@ -56,6 +56,8 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
           spentCentavos: t.receiptTotalCentavos ?? own.total,
         };
       })
+      // A trip ended with nothing logged and no receipt is a false start; counting it would drag the average down.
+      .filter((t) => t.itemCount > 0 || t.fromReceipt)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }, [trips, items]);
 
