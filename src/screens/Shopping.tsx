@@ -10,9 +10,10 @@ import { ItemEditor, type ItemSubmit } from './ItemEditor';
 interface Props {
   tripId: number;
   onFinish: () => void;
+  onHome: () => void;
 }
 
-export function Shopping({ tripId, onFinish }: Props) {
+export function Shopping({ tripId, onFinish, onHome }: Props) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId]);
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).toArray(), [tripId]) ?? [];
   const [capture, setCapture] = useState<null | 'tag' | 'typed'>(null);
@@ -133,7 +134,10 @@ export function Shopping({ tripId, onFinish }: Props) {
     <main className="screen shop">
       <header className={`total-card ${over ? 'over' : ''}`}>
         <div className="total-top">
-          <span className="label">{S.shop.total} · {trip ? storeName(trip) : ''}</span>
+          <span className="label">
+            <button className="home-link" onClick={onHome} aria-label={S.shop.home}>‹ {S.shop.home}</button>
+            {' · '}{trip ? storeName(trip) : ''}
+          </span>
           <span className="label">{S.shop.items(live.length)}</span>
         </div>
         <div className="total-num" aria-live="polite">{formatPeso(total)}</div>

@@ -6,12 +6,11 @@ import { logEvent } from '../lib/events';
 
 interface Props {
   testMode: boolean;
-  toast: string | null;
   onStarted: (tripId: number) => void;
-  onSettings: () => void;
+  onBack: () => void;
 }
 
-export function StartTrip({ testMode, toast, onStarted, onSettings }: Props) {
+export function StartTrip({ testMode, onStarted, onBack }: Props) {
   const [chains, setChains] = useState<string[]>([...STORE_CHAINS]);
   const [chain, setChain] = useState<string | null>(null);
   const [custom, setCustom] = useState('');
@@ -73,10 +72,10 @@ export function StartTrip({ testMode, toast, onStarted, onSettings }: Props) {
   return (
     <main className="screen start">
       <header className="topbar">
-        <h1>{S.appName}</h1>
-        <button className="link" onClick={onSettings}>{S.start.settings}</button>
+        <button className="link" onClick={onBack}>{S.start.back}</button>
+        <h1>{S.start.title}</h1>
+        <span className="spacer" />
       </header>
-      {toast && <p className="toast">{toast}</p>}
 
       <h2>{S.start.whereLabel}</h2>
       <div className="chips stores">

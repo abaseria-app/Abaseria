@@ -144,3 +144,29 @@ h2 { font-size: 1.05rem; margin: 18px 0 10px; }
 table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
 th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--line); font-size: .95rem; }
 .about { margin-top: 28px; }
+
+/* Home dashboard */
+.home-link { background: none; border: 0; color: inherit; font: inherit; padding: 6px 0; min-height: 40px; text-transform: inherit; letter-spacing: inherit; }
+.active-trip { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: #fff8db; border: 2px solid #f2e3a0; border-radius: var(--radius); padding: 12px 14px; margin: 8px 0 4px; min-height: 64px; }
+.active-trip small { display: block; color: var(--muted); font-variant-numeric: tabular-nums; }
+.active-trip .go { color: var(--green-2); font-weight: 700; white-space: nowrap; }
+.period-tabs { margin-top: 12px; }
+.period-tabs button { min-height: 48px; }
+.spend-card { background: var(--green); color: #fff; border-radius: 20px; padding: 16px 18px 12px; margin: 8px 0 4px; }
+.spend-card .label { color: #cfe3d5; }
+.spend-num { font-size: clamp(2.6rem, 12vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0; }
+.spend-sub { margin: 0; color: #e3efe6; }
+.spend-change { margin: 4px 0 12px; font-weight: 600; color: #e3efe6; }
+.spend-change.up::before { content: '▲ '; color: var(--gold); }
+.spend-change.down::before { content: '▼ '; color: #9be3b0; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-bottom: 18px; }
+.bars.nmany { gap: 2px; }
+.bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-width: 0; }
+.bar-fill { width: 100%; min-height: 2px; background: var(--gold); border-radius: 4px 4px 0 0; }
+.bar-label { position: absolute; bottom: -18px; font-size: .7rem; color: #cfe3d5; white-space: nowrap; }
+.trip-list { list-style: none; padding: 0; margin: 0; }
+.trip-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.trip-list li span { display: flex; flex-direction: column; min-width: 0; }
+.trip-list small { color: var(--muted); }
+.trip-list li > strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hint.small { font-size: .8rem; }

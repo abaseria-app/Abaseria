@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getSetting, requestPersistentStorage, setSetting } from './lib/db';
 import { warmOcr } from './lib/ocr';
 import { S } from './strings';
+import { Home } from './screens/Home';
 import { StartTrip } from './screens/StartTrip';
 import { Shopping } from './screens/Shopping';
 import { Cashier } from './screens/Cashier';
@@ -9,7 +10,7 @@ import { Settings } from './screens/Settings';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
 
-type Route = 'loading' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results';
+type Route = 'loading' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('loading');
@@ -24,10 +25,11 @@ export default function App() {
     (async () => {
       setTestMode((await getSetting('testMode')) === '1');
       const active = Number(await getSetting('activeTripId'));
+      // Reopening the app mid-trip goes straight back to the list.
       if (active) {
         setTripId(active);
         setRoute('shop');
-      } else setRoute('start');
+      } else setRoute('home');
     })();
   }, []);
 
@@ -40,12 +42,21 @@ export default function App() {
   switch (route) {
     case 'loading':
       return <main className="screen" />;
+    case 'home':
+      return (
+        <Home
+          activeTripId={tripId}
+          toast={toast}
+          onStart={() => setRoute('start')}
+          onContinue={() => setRoute('shop')}
+          onSettings={() => setRoute('settings')}
+        />
+      );
     case 'start':
       return (
         <StartTrip
           testMode={testMode}
-          toast={toast}
-          onSettings={() => setRoute('settings')}
+          onBack={() => setRoute('home')}
           onStarted={async (id) => {
             await setSetting('activeTripId', String(id));
             setTripId(id);
@@ -54,7 +65,7 @@ export default function App() {
         />
       );
     case 'shop':
-      return <Shopping tripId={tripId!} onFinish={() => setRoute('cashier')} />;
+      return <Shopping tripId={tripId!} onFinish={() => setRoute('cashier')} onHome={() => setRoute('home')} />;
     case 'cashier':
       return (
         <Cashier
@@ -63,7 +74,7 @@ export default function App() {
           onEnded={() => {
             setTripId(null);
             setToast(S.cashier.thanks);
-            setRoute('start');
+            setRoute('home');
           }}
         />
       );
@@ -77,7 +88,7 @@ export default function App() {
           }}
           onOcrCheck={() => setRoute('ocrcheck')}
           onResults={() => setRoute('results')}
-          onBack={() => setRoute('start')}
+          onBack={() => setRoute('home')}
         />
       );
     case 'ocrcheck':

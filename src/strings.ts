@@ -2,6 +2,30 @@
 export const S = {
   appName: 'Abeseria',
 
+  home: {
+    periods: { week: 'Week', month: 'Month', year: 'Year', ytd: 'YTD' } as Record<string, string>,
+    spentLabel: {
+      week: 'Spent this week',
+      month: 'Spent this month',
+      year: 'Spent in the last 12 months',
+      ytd: 'Spent this year so far',
+    } as Record<string, string>,
+    prevName: { week: 'last week', month: 'last month', year: 'the 12 months before', ytd: 'this time last year' } as Record<string, string>,
+    tripsLine: (n: number, avg: string) => (n === 0 ? 'No trips yet' : `${n} ${n === 1 ? 'trip' : 'trips'} · ${avg} average`),
+    more: (amt: string, pct: number | null, prev: string) => `${amt} more than ${prev}${pct != null ? ` (+${pct}%)` : ''}`,
+    less: (amt: string, pct: number | null, prev: string) => `${amt} less than ${prev}${pct != null ? ` (${pct}%)` : ''}`,
+    same: (prev: string) => `Same as ${prev}`,
+    noPrev: (prev: string) => `Nothing logged ${prev}`,
+    tripsTitle: 'Trips',
+    noTrips: 'Your trips show up here after you tap End trip at the counter.',
+    receipt: 'receipt',
+    sourceNote: 'Totals use the receipt amount when you entered one, otherwise the app’s tally.',
+    inProgress: (store: string) => `Trip in progress at ${store}`,
+    continueTrip: 'Continue trip',
+    startShopping: 'Start shopping',
+    settings: 'Settings',
+  },
+
   start: {
     title: 'New trip',
     whereLabel: 'Where are you shopping?',
@@ -17,11 +41,12 @@ export const S = {
     startButton: 'Start shopping',
     pickStore: 'Pick a store first',
     settings: 'Settings',
-    resume: 'Continue current trip',
+    back: 'Back',
   },
 
   shop: {
     total: 'Total',
+    home: 'Home',
     budget: 'Budget',
     left: 'left',
     over: 'over',
