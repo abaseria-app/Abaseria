@@ -4,6 +4,9 @@ import { S } from '../strings';
 import { db, getSetting, setSetting, storeName } from '../lib/db';
 import { formatPeso } from '../lib/money';
 import { PERIODS, rangeFor, summarize, type Period } from '../lib/periods';
+import { categoryBreakdown, type Breakdown, type SliceId } from '../lib/breakdown';
+import { CATEGORY_BY_ID } from '../lib/categories';
+import type { Item } from '../lib/db';
 
 interface Props {
   activeTripId: number | null;
@@ -35,20 +38,23 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
 
   // Finished trips only. A trip costs its receipt total when the shopper entered one, otherwise the app's tally.
   const spend = useMemo(() => {
-    const tally = new Map<number, { total: number; count: number }>();
+    const tally = new Map<number, { total: number; count: number; items: Item[] }>();
     for (const i of items) {
       if (i.removed) continue;
-      const t = tally.get(i.tripId) ?? { total: 0, count: 0 };
+      const t = tally.get(i.tripId) ?? { total: 0, count: 0, items: [] };
       t.total += i.lineTotalCentavos;
       t.count += 1;
+      t.items.push(i);
       tally.set(i.tripId, t);
     }
     return trips
       .filter((t) => t.endedAt)
       .map((t) => {
-        const own = tally.get(t.id!) ?? { total: 0, count: 0 };
+        const own = tally.get(t.id!) ?? { total: 0, count: 0, items: [] };
         return {
           id: t.id!,
+          items: own.items,
+          receiptCentavos: t.receiptTotalCentavos,
           store: storeName(t),
           startedAt: t.startedAt,
           itemCount: own.count,
@@ -67,7 +73,8 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
     const ms = Date.parse(t.startedAt);
     return ms >= range.start.getTime() && ms < range.end.getTime();
   });
-  const maxBar = Math.max(1, ...summary.buckets.map((b) => b.total));
+  const breakdown = categoryBreakdown(spend, range.start, range.end);
+  const itemsInPeriod = inPeriod.reduce((n, t) => n + t.itemCount, 0);
   const diff = summary.total - summary.prevTotal;
   const prevName = S.home.prevName[period];
 
@@ -114,16 +121,26 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
                 : S.home.same(prevName)}
         </p>
 
-        <div className={`bars n${summary.buckets.length > 12 ? 'many' : 'few'}`} aria-hidden="true">
-          {summary.buckets.map((b, i) => (
-            <div key={i} className="bar-col" title={`${b.label}: ${formatPeso(b.total)}`}>
-              <div className="bar-fill" style={{ height: `${(b.total / maxBar) * 100}%` }} />
-              <span className="bar-label">
-                {summary.buckets.length > 12 ? (i % 7 === 0 ? b.label : '') : b.label}
-              </span>
-            </div>
-          ))}
-        </div>
+      </section>
+
+      <section className="pie-card">
+        <h2>{S.home.byCategory}</h2>
+        <Donut breakdown={breakdown} center={breakdown.total ? S.home.itemsCenter(itemsInPeriod) : S.home.nothingYet} />
+        {breakdown.slices.length > 0 && (
+          <ul className="legend">
+            {breakdown.slices.map((sl) => (
+              <li key={sl.id}>
+                <span className="dot" style={{ background: sliceColor(sl.id) }} />
+                <span className="legend-name">
+                  {sliceLabel(sl.id)}
+                  {sl.id === 'unitemized' && <small>{S.home.unitemizedHint}</small>}
+                </span>
+                <span className="legend-amt">{formatPeso(sl.centavos)}</span>
+                <span className="legend-pct">{Math.round((sl.centavos / breakdown.total) * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <h2>{S.home.tripsTitle}</h2>
@@ -153,5 +170,47 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
         </button>
       </div>
     </main>
+  );
+}
+
+const UNITEMIZED_COLOR = '#d6d3d1';
+const sliceColor = (id: SliceId) => (id === 'unitemized' ? UNITEMIZED_COLOR : CATEGORY_BY_ID[id].color);
+const sliceLabel = (id: SliceId) => (id === 'unitemized' ? S.home.unitemized : CATEGORY_BY_ID[id].label);
+
+/** Donut chart drawn as stroked circle arcs, starting at 12 o'clock and going clockwise. */
+function Donut({ breakdown, center }: { breakdown: Breakdown; center: string }) {
+  const r = 60;
+  const c = 2 * Math.PI * r;
+  const gap = breakdown.slices.length > 1 ? 1.5 : 0;
+  let offset = 0;
+  return (
+    <div className="donut">
+      <svg viewBox="0 0 160 160" role="img" aria-label={breakdown.slices.map((s) => `${sliceLabel(s.id)} ${formatPeso(s.centavos)}`).join(', ') || center}>
+        <circle cx="80" cy="80" r={r} fill="none" stroke="#ebe9e2" strokeWidth="22" />
+        {breakdown.slices.map((s) => {
+          const len = (s.centavos / breakdown.total) * c;
+          const el = (
+            <circle
+              key={s.id}
+              cx="80"
+              cy="80"
+              r={r}
+              fill="none"
+              stroke={sliceColor(s.id)}
+              strokeWidth="22"
+              strokeDasharray={`${Math.max(0, len - gap)} ${c}`}
+              strokeDashoffset={-offset}
+              transform="rotate(-90 80 80)"
+            />
+          );
+          offset += len;
+          return el;
+        })}
+      </svg>
+      <div className="donut-center">
+        {breakdown.total > 0 && <strong>{formatPeso(breakdown.total)}</strong>}
+        <span>{center}</span>
+      </div>
+    </div>
   );
 }

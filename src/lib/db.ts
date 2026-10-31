@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { PriceType } from './money';
+import type { CategoryId } from './categories';
 
 export const STORE_CHAINS = [
   '7-Eleven',
@@ -53,6 +54,8 @@ export interface Item {
   isPromo: boolean;
   quantity: number;
   lineTotalCentavos: number;
+  /** Missing on items saved before categories existed; categoryOf() guesses from the name. */
+  category?: CategoryId | null;
   captureMethod: CaptureMethod;
   removed: boolean;
   createdAt: string;

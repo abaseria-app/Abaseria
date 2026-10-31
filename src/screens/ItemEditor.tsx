@@ -3,6 +3,7 @@ import { S } from '../strings';
 import { formatPeso, lineTotal, parsePesoInput, type PriceType } from '../lib/money';
 import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
+import { CATEGORIES, guessCategory, type CategoryId } from '../lib/categories';
 
 export interface ItemSubmit {
   label: string;
@@ -13,6 +14,8 @@ export interface ItemSubmit {
   quantity: number;
   isPromo: boolean;
   lineTotalCentavos: number;
+  category: CategoryId;
+  categoryGuessed: boolean;
   chosenRank: number | 'typed';
   editedAfterChoice: boolean;
 }
@@ -48,6 +51,9 @@ export function ItemEditor(p: Props) {
     init?.bundlePriceCentavos != null ? plain(init.bundlePriceCentavos) : top?.bundleQty ? plain(top.centavos) : '',
   );
   const [qty, setQty] = useState(init?.quantity ?? 1);
+  // The guess follows the name until the shopper taps a category themselves.
+  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? null);
+  const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
 
@@ -90,6 +96,8 @@ export function ItemEditor(p: Props) {
       quantity: qty,
       isPromo: promo,
       lineTotalCentavos: total,
+      category,
+      categoryGuessed: pickedCategory == null,
       chosenRank: chosen != null ? chosen + 1 : 'typed',
       editedAfterChoice: chosen != null && edited,
     });
@@ -147,6 +155,21 @@ export function ItemEditor(p: Props) {
           ))}
         </div>
       )}
+
+      <div className="chips cat-chips" role="radiogroup" aria-label={S.item.category}>
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            role="radio"
+            aria-checked={category === c.id}
+            className={`chip cat ${category === c.id ? 'on' : ''}`}
+            style={{ ['--cat' as string]: c.color }}
+            onClick={() => setPickedCategory(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
 
       {priceType === 'each' && (showPriceInput || chosen != null || init) && (
         <label className="field">

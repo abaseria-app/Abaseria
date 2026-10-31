@@ -1,4 +1,5 @@
 import { db, storeName, type AppEvent, type Item, type Trip } from './db';
+import { categoryOf } from './categories';
 
 // Written down before any data comes in, so a result can't be reinterpreted after the fact.
 export const PASS_LINE = {
@@ -176,7 +177,7 @@ export async function exportCsvFiles(): Promise<'shared' | 'downloaded'> {
     items.map((i) => ({
       item_id: i.id, trip_id: i.tripId, label: i.label, price_type: i.priceType, unit_price: i.unitPriceCentavos / 100,
       bundle_qty: i.bundleQty ?? '', bundle_price: pesos(i.bundlePriceCentavos), promo: i.isPromo, quantity: i.quantity,
-      line_total: i.lineTotalCentavos / 100, capture_method: i.captureMethod, removed: i.removed, created_at: i.createdAt,
+      line_total: i.lineTotalCentavos / 100, category: categoryOf(i), capture_method: i.captureMethod, removed: i.removed, created_at: i.createdAt,
     })),
   );
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');

@@ -60,12 +60,13 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
       isPromo: v.isPromo,
       quantity: v.quantity,
       lineTotalCentavos: v.lineTotalCentavos,
+      category: v.category,
       captureMethod: method,
       removed: false,
       createdAt: new Date().toISOString(),
     });
     navigator.vibrate?.(30);
-    await logEvent('item_added', tripId, { item_id: id, capture_method: method, ms_since_open: ms, line_total: v.lineTotalCentavos });
+    await logEvent('item_added', tripId, { item_id: id, capture_method: method, ms_since_open: ms, line_total: v.lineTotalCentavos, category: v.category, category_guessed: v.categoryGuessed });
     setCapture(null);
   }
 
@@ -81,6 +82,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
       isPromo: v.isPromo,
       quantity: v.quantity,
       lineTotalCentavos: v.lineTotalCentavos,
+      category: v.category,
     });
     await logEvent('item_edited', tripId, { item_id: editing.id, before, after: { label: v.label, price: v.unitPriceCentavos, qty: v.quantity, total: v.lineTotalCentavos } });
     setEditing(null);
