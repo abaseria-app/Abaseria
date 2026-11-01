@@ -19,6 +19,10 @@ export interface ItemSubmit {
   categoryGuessed: boolean;
   chosenRank: number | 'typed';
   editedAfterChoice: boolean;
+  /** True when the shopper changed any price field by hand. */
+  priceTouched: boolean;
+  /** Filled in by the capture screen, not the editor. */
+  barcode?: string | null;
 }
 
 interface Props {
@@ -28,6 +32,11 @@ interface Props {
   nameGuess?: string | null;
   promoHint?: boolean;
   initial?: Item;
+  /** Name already known for this barcode; used instead of the tag's guess. */
+  knownName?: string | null;
+  /** Shown above the form, e.g. where a recalled price came from. */
+  recallNote?: string | null;
+  barcode?: string | null;
   recent: string[];
   fallbackName: string;
   notice?: string | null;
@@ -35,6 +44,7 @@ interface Props {
   onCancel: () => void;
   onRemove?: () => void;
   onRetake?: () => void;
+  retakeLabel?: string;
 }
 
 const plain = (c: number) => (c / 100).toFixed(2);
@@ -48,7 +58,7 @@ const priceTypeFor = (c: PriceCandidate | undefined): PriceType =>
 export function ItemEditor(p: Props) {
   const top = p.candidates?.[0];
   const init = p.initial;
-  const [label, setLabel] = useState(init?.label ?? p.nameGuess ?? '');
+  const [label, setLabel] = useState(init?.label ?? p.knownName ?? p.nameGuess ?? '');
   const [chosen, setChosen] = useState<number | null>(top ? 0 : null);
   const [edited, setEdited] = useState(false);
   const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? priceTypeFor(top));
@@ -122,6 +132,7 @@ export function ItemEditor(p: Props) {
       categoryGuessed: pickedCategory == null,
       chosenRank: chosen != null ? chosen + 1 : 'typed',
       editedAfterChoice: chosen != null && edited,
+      priceTouched: edited,
     });
   }
 
@@ -134,6 +145,8 @@ export function ItemEditor(p: Props) {
       </div>
 
       {p.notice && <p className="notice">{p.notice}</p>}
+      {p.recallNote && <p className="notice">{p.recallNote}</p>}
+      {p.barcode && <p className="hint small">{S.item.barcodeLine(p.barcode)}</p>}
 
       {p.candidates && p.candidates.length > 0 && (
         <section>
@@ -162,7 +175,7 @@ export function ItemEditor(p: Props) {
       )}
 
       {p.onRetake && (!p.candidates || p.candidates.length === 0) && (
-        <button className="btn secondary" onClick={p.onRetake}>{S.capture.retake}</button>
+        <button className="btn secondary" onClick={p.onRetake}>{p.retakeLabel ?? S.capture.retake}</button>
       )}
 
       <label className="field">
@@ -201,7 +214,7 @@ export function ItemEditor(p: Props) {
             ['perkg', S.item.soldPerKg],
           ] as Array<[PriceType, string]>
         ).map(([t, text]) => (
-          <button key={t} role="radio" aria-checked={priceType === t} className={priceType === t ? 'on' : ''} onClick={() => setPriceType(t)}>
+          <button key={t} role="radio" aria-checked={priceType === t} className={priceType === t ? 'on' : ''} onClick={() => { setPriceType(t); setEdited(true); }}>
             {text}
           </button>
         ))}
