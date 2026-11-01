@@ -16,6 +16,7 @@ export interface TripRow {
   days_since_prev_trip: number | '';
   store: string;
   branch_id: string;
+  cancelled: boolean;
   started_at: string;
   ended_at: string;
   minutes: number | '';
@@ -68,6 +69,7 @@ export function buildTripRows(trips: Trip[], items: Item[], events: AppEvent[]):
       days_since_prev_trip: prev ? Math.round(((Date.parse(t.startedAt) - Date.parse(prev)) / 86_400_000) * 10) / 10 : '',
       store: storeName(t),
       branch_id: t.branchUuid ?? '',
+      cancelled: !!t.cancelledAt,
       started_at: t.startedAt,
       ended_at: t.endedAt ?? '',
       minutes: t.endedAt ? Math.round((Date.parse(t.endedAt) - Date.parse(t.startedAt)) / 6000) / 10 : '',
@@ -135,7 +137,7 @@ export function computeResults(rows: Record<string, string>[]): TestResults {
   const byTester = new Map<string, Record<string, string>[]>();
   for (const r of rows) {
     const t = r.tester_id?.trim();
-    if (!t) continue;
+    if (!t || r.cancelled === 'true') continue;
     byTester.set(t, [...(byTester.get(t) ?? []), r]);
   }
   const perTester: TestResults['perTester'] = [];
@@ -213,5 +215,5 @@ export const TRIP_HEADERS: string[] = [
   'budget', 'items_logged', 'items_by_tag', 'items_typed', 'app_total', 'receipt_total', 'receipt_item_count',
   'coverage_pct', 'matched', 'median_sec_per_tag_item', 'abandons',
   // Added with branches; last so older combine sheets keep their column positions.
-  'branch_id',
+  'branch_id', 'cancelled',
 ];

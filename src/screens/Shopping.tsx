@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { S } from '../strings';
-import { db, recentLabels, storeName, type Item } from '../lib/db';
+import { db, recentLabels, setSetting, storeName, type Item } from '../lib/db';
 import { formatKg, formatPeso, lineTotal } from '../lib/money';
 import { logEvent } from '../lib/events';
 import { Capture } from './Capture';
@@ -11,15 +11,17 @@ interface Props {
   tripId: number;
   onFinish: () => void;
   onHome: () => void;
+  onCancelled: () => void;
 }
 
-export function Shopping({ tripId, onFinish, onHome }: Props) {
+export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId]);
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).toArray(), [tripId]) ?? [];
   const [capture, setCapture] = useState<null | 'tag' | 'typed'>(null);
   const [editing, setEditing] = useState<Item | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [undo, setUndo] = useState<Item | null>(null);
+  const [askCancel, setAskCancel] = useState(false);
   const wasOver = useRef(false);
 
   const live = items.filter((i) => !i.removed).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -96,6 +98,13 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
     await logEvent('item_removed', tripId, { item_id: item.id, line_total: item.lineTotalCentavos });
     setEditing(null);
     setUndo(item);
+  }
+
+  async function cancelTrip() {
+    await db.trips.update(tripId, { cancelledAt: new Date().toISOString() });
+    await logEvent('trip_cancelled', tripId, { items: live.length, total });
+    await setSetting('activeTripId', '');
+    onCancelled();
   }
 
   async function restore() {
@@ -183,6 +192,18 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
           </li>
         ))}
       </ul>
+
+      {askCancel ? (
+        <div className="confirm card">
+          <p>{S.shop.cancelAsk(live.length)}</p>
+          <div className="seg">
+            <button onClick={() => setAskCancel(false)}>{S.shop.cancelNo}</button>
+            <button className="danger" onClick={cancelTrip}>{S.shop.cancelYes}</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn danger-link cancel-trip" onClick={() => setAskCancel(true)}>{S.shop.cancelTrip}</button>
+      )}
 
       {undo && (
         <div className="snackbar">

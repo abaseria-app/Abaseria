@@ -82,6 +82,14 @@ export const S = {
     items: (n: number) => (n === 1 ? '1 item' : `${n} items`),
     empty: 'Scan the barcode of your first item.',
     snap: 'Scan item',
+    cancelTrip: 'Cancel trip',
+    cancelAsk: (n: number) =>
+      n === 0
+        ? 'Cancel this trip?'
+        : `Cancel this trip? The ${n === 1 ? 'item' : `${n} items`} you logged won’t count toward your spending or saved prices.`,
+    cancelYes: 'Yes, cancel trip',
+    cancelNo: 'Keep shopping',
+    cancelled: 'Trip cancelled.',
     type: 'Type it',
     finish: 'Done shopping',
     overBanner: (amt: string) => `You're ${amt} over budget.`,
