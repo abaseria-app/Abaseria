@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'Abeseria',
         short_name: 'Abeseria',
         description: 'Grocery tally: snap the shelf tag, watch your total.',
-        theme_color: '#14532d',
+        theme_color: '#1a3555',
         background_color: '#f6f5f0',
         display: 'standalone',
         orientation: 'portrait',
