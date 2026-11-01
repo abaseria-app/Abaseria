@@ -25,7 +25,8 @@ export const CATEGORIES: Category[] = [
   // A step darker than #16a34a: white on the old green was 3.3:1.
   { id: 'vegetables', label: 'Vegetables & fruit', color: '#15803d', ink: WHITE },
   { id: 'pantry', label: 'Pantry', color: '#d4a017', ink: NAVY },
-  { id: 'dry', label: 'Dry goods', color: '#7c5c3b', ink: WHITE },
+  // Dark purple from the app's button borders; no other category is purple.
+  { id: 'dry', label: 'Dry goods', color: '#4b1f6f', ink: WHITE },
   { id: 'household', label: 'Household', color: '#2563eb', ink: WHITE },
   { id: 'other', label: 'Other', color: '#9ca3af', ink: NAVY },
 ];
