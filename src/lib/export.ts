@@ -179,6 +179,7 @@ export async function exportCsvFiles(): Promise<'shared' | 'downloaded'> {
     items.map((i) => ({
       item_id: i.id, trip_id: i.tripId, label: i.label, price_type: i.priceType, unit_price: i.unitPriceCentavos / 100,
       bundle_qty: i.bundleQty ?? '', bundle_price: pesos(i.bundlePriceCentavos), promo: i.isPromo, quantity: i.quantity,
+      weight_kg: i.weightGrams != null ? i.weightGrams / 1000 : '',
       line_total: i.lineTotalCentavos / 100, category: categoryOf(i), capture_method: i.captureMethod, removed: i.removed, created_at: i.createdAt,
     })),
   );

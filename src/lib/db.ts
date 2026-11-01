@@ -71,6 +71,8 @@ export interface Item {
   bundlePriceCentavos: number | null;
   isPromo: boolean;
   quantity: number;
+  /** Per-kilo items only: amount bought in grams. unitPriceCentavos is then the price per kilo. */
+  weightGrams?: number | null;
   lineTotalCentavos: number;
   /** Missing on items saved before categories existed; categoryOf() guesses from the name. */
   category?: CategoryId | null;
