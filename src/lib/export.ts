@@ -15,6 +15,7 @@ export interface TripRow {
   prompted: boolean;
   days_since_prev_trip: number | '';
   store: string;
+  branch_id: string;
   started_at: string;
   ended_at: string;
   minutes: number | '';
@@ -66,6 +67,7 @@ export function buildTripRows(trips: Trip[], items: Item[], events: AppEvent[]):
       prompted: t.prompted,
       days_since_prev_trip: prev ? Math.round(((Date.parse(t.startedAt) - Date.parse(prev)) / 86_400_000) * 10) / 10 : '',
       store: storeName(t),
+      branch_id: t.branchUuid ?? '',
       started_at: t.startedAt,
       ended_at: t.endedAt ?? '',
       minutes: t.endedAt ? Math.round((Date.parse(t.endedAt) - Date.parse(t.startedAt)) / 6000) / 10 : '',
@@ -209,4 +211,6 @@ export const TRIP_HEADERS: string[] = [
   'trip_id', 'tester_id', 'trip_index', 'prompted', 'days_since_prev_trip', 'store', 'started_at', 'ended_at', 'minutes',
   'budget', 'items_logged', 'items_by_tag', 'items_typed', 'app_total', 'receipt_total', 'receipt_item_count',
   'coverage_pct', 'matched', 'median_sec_per_tag_item', 'abandons',
+  // Added with branches; last so older combine sheets keep their column positions.
+  'branch_id',
 ];

@@ -11,6 +11,7 @@ The test answers one question: **will people keep logging past item 15?**
 - **Offline.** The app, OCR engine and language data are cached by a service worker. After one visit with signal, it works in a mall basement.
 - **Money** is integer centavos everywhere. Bundles ("3 for ₱100") are supported. Per-kilo isn't: supermarket weighed items carry a sticker with the total.
 - **Everything stays on the phone** (IndexedDB). No login, no backend, no ads, no analytics.
+- **Store picker.** New trip takes one location reading and preselects the nearest saved branch. Two stores within 100 m of each other means the shopper taps. The first time at a store, the shopper adds it and the phone's position becomes the branch location.
 
 ## What gets measured
 
@@ -58,6 +59,8 @@ Pushing to `main` runs tests, builds, and publishes to GitHub Pages through `.gi
 | `src/lib/ocr.ts` | Tesseract setup, guide-box crop, contrast stretch |
 | `src/lib/money.ts` | Centavo formatting and line totals |
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
-| `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings) |
+| `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
+| `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
+| `supabase/` | Shared price database schema and setup steps (not connected to the app yet) |
 | `src/strings.ts` | Every user-facing string, ready for translation |
 | `scripts/copy-ocr.mjs` | Copies the OCR engine into `public/` so nothing loads from a CDN |
