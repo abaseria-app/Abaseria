@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { S } from '../strings';
-import { formatPeso, lineTotal, parsePesoInput, type PriceType } from '../lib/money';
+import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type PriceType } from '../lib/money';
 import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
 import { CATEGORIES, guessCategory, type CategoryId } from '../lib/categories';
@@ -12,6 +12,7 @@ export interface ItemSubmit {
   bundleQty: number | null;
   bundlePriceCentavos: number | null;
   quantity: number;
+  weightGrams: number | null;
   isPromo: boolean;
   lineTotalCentavos: number;
   category: CategoryId;
@@ -38,14 +39,23 @@ interface Props {
 
 const plain = (c: number) => (c / 100).toFixed(2);
 
+/** A tag price read as per kilo or per 100 g, as a per-kilo price. Null for ordinary prices. */
+const perKgCentavos = (c: PriceCandidate | undefined) =>
+  c?.unit === 'kg' ? c.centavos : c?.unit === '100g' ? c.centavos * 10 : null;
+const priceTypeFor = (c: PriceCandidate | undefined): PriceType =>
+  c?.bundleQty ? 'bundle' : perKgCentavos(c) != null ? 'perkg' : 'each';
+
 export function ItemEditor(p: Props) {
   const top = p.candidates?.[0];
   const init = p.initial;
   const [label, setLabel] = useState(init?.label ?? p.nameGuess ?? '');
   const [chosen, setChosen] = useState<number | null>(top ? 0 : null);
   const [edited, setEdited] = useState(false);
-  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? (top?.bundleQty ? 'bundle' : 'each'));
-  const [priceText, setPriceText] = useState(init ? plain(init.unitPriceCentavos) : top && !top.bundleQty ? plain(top.centavos) : '');
+  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? priceTypeFor(top));
+  const [priceText, setPriceText] = useState(
+    init ? plain(init.unitPriceCentavos) : top && !top.bundleQty ? plain(perKgCentavos(top) ?? top.centavos) : '',
+  );
+  const [weightText, setWeightText] = useState(init?.weightGrams ? String(init.weightGrams / 1000) : '');
   const [bundleQty, setBundleQty] = useState(String(init?.bundleQty ?? top?.bundleQty ?? 3));
   const [bundlePriceText, setBundlePriceText] = useState(
     init?.bundlePriceCentavos != null ? plain(init.bundlePriceCentavos) : top?.bundleQty ? plain(top.centavos) : '',
@@ -60,13 +70,20 @@ export function ItemEditor(p: Props) {
   const unitPrice = parsePesoInput(priceText);
   const bPrice = parsePesoInput(bundlePriceText);
   const bQty = Number(bundleQty) || 0;
-  const valid = priceType === 'each' ? unitPrice != null && unitPrice > 0 : bPrice != null && bPrice > 0 && bQty >= 2;
+  const grams = parseKgInput(weightText);
+  const priceOk = unitPrice != null && unitPrice > 0;
+  const valid =
+    priceType === 'each'
+      ? priceOk
+      : priceType === 'perkg'
+        ? priceOk && grams != null
+        : bPrice != null && bPrice > 0 && bQty >= 2;
   const total = useMemo(
     () =>
       valid
-        ? lineTotal({ priceType, unitPriceCentavos: unitPrice ?? 0, quantity: qty, bundleQty: bQty, bundlePriceCentavos: bPrice })
+        ? lineTotal({ priceType, unitPriceCentavos: unitPrice ?? 0, quantity: qty, bundleQty: bQty, bundlePriceCentavos: bPrice, weightGrams: grams })
         : null,
-    [valid, priceType, unitPrice, qty, bQty, bPrice],
+    [valid, priceType, unitPrice, qty, bQty, bPrice, grams],
   );
   const chosenCandidate = chosen != null ? p.candidates?.[chosen] : undefined;
 
@@ -74,10 +91,14 @@ export function ItemEditor(p: Props) {
     const c = p.candidates![i];
     setChosen(i);
     setEdited(false);
+    const kg = perKgCentavos(c);
     if (c.bundleQty) {
       setPriceType('bundle');
       setBundleQty(String(c.bundleQty));
       setBundlePriceText(plain(c.centavos));
+    } else if (kg != null) {
+      setPriceType('perkg');
+      setPriceText(plain(kg));
     } else {
       setPriceType('each');
       setPriceText(plain(c.centavos));
@@ -86,14 +107,15 @@ export function ItemEditor(p: Props) {
 
   function submit() {
     if (!valid || total == null) return;
-    const unit = priceType === 'each' ? unitPrice! : Math.round(bPrice! / bQty);
+    const unit = priceType === 'bundle' ? Math.round(bPrice! / bQty) : unitPrice!;
     p.onSubmit({
       label: label.trim() || p.fallbackName,
       priceType,
       unitPriceCentavos: unit,
       bundleQty: priceType === 'bundle' ? bQty : null,
       bundlePriceCentavos: priceType === 'bundle' ? bPrice : null,
-      quantity: qty,
+      quantity: priceType === 'perkg' ? 1 : qty,
+      weightGrams: priceType === 'perkg' ? grams : null,
       isPromo: promo,
       lineTotalCentavos: total,
       category,
@@ -128,15 +150,14 @@ export function ItemEditor(p: Props) {
               onClick={() => {
                 setChosen(null);
                 setShowPriceInput(true);
-                setPriceType('each');
+                setPriceType((t) => (t === 'bundle' ? 'each' : t));
                 setPriceText('');
               }}
             >
               {S.item.typePrice}
             </button>
           </div>
-          {chosenCandidate?.unit === 'kg' && <p className="warn">{S.item.perKgWarning}</p>}
-          {chosenCandidate?.unit === '100g' && <p className="warn">{S.item.per100gWarning}</p>}
+          {chosenCandidate?.unit === '100g' && <p className="notice">{S.item.fromPer100g(formatPeso(chosenCandidate.centavos))}</p>}
         </section>
       )}
 
@@ -171,9 +192,24 @@ export function ItemEditor(p: Props) {
         ))}
       </div>
 
-      {priceType === 'each' && (showPriceInput || chosen != null || init) && (
+      <p className="label">{S.item.soldAs}</p>
+      <div className="seg" role="radiogroup" aria-label={S.item.soldAs}>
+        {(
+          [
+            ['each', S.item.soldEach],
+            ['bundle', S.item.soldBundle],
+            ['perkg', S.item.soldPerKg],
+          ] as Array<[PriceType, string]>
+        ).map(([t, text]) => (
+          <button key={t} role="radio" aria-checked={priceType === t} className={priceType === t ? 'on' : ''} onClick={() => setPriceType(t)}>
+            {text}
+          </button>
+        ))}
+      </div>
+
+      {(priceType === 'perkg' || (priceType === 'each' && (showPriceInput || chosen != null || init))) && (
         <label className="field">
-          <span className="label">{S.item.priceLabel}</span>
+          <span className="label">{priceType === 'perkg' ? S.item.pricePerKgLabel : S.item.priceLabel}</span>
           <input
             inputMode="decimal"
             value={priceText}
@@ -187,10 +223,31 @@ export function ItemEditor(p: Props) {
         </label>
       )}
 
-      <label className="toggle">
-        <input type="checkbox" checked={priceType === 'bundle'} onChange={(e) => setPriceType(e.target.checked ? 'bundle' : 'each')} />
-        <span>{S.item.bundle}</span>
-      </label>
+      {priceType === 'perkg' && (
+        <>
+          <label className="field">
+            <span className="label">{S.item.weightLabel}</span>
+            <input
+              inputMode="decimal"
+              value={weightText}
+              placeholder={S.item.weightPlaceholder}
+              onChange={(e) => {
+                setWeightText(e.target.value);
+                setEdited(true);
+              }}
+            />
+            <span className="hint">{grams != null ? formatKg(grams) : S.item.weightHint}</span>
+          </label>
+          <div className="chips">
+            {S.item.quickWeights.map(([text, g]) => (
+              <button key={g} className={`chip ${grams === g ? 'on' : ''}`} onClick={() => setWeightText(String(g / 1000))}>
+                {text}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {priceType === 'bundle' && (
         <div className="row bundle-row">
           <input aria-label={S.item.bundleQty} inputMode="numeric" value={bundleQty} onChange={(e) => { setBundleQty(e.target.value.replace(/\D/g, '')); setEdited(true); }} />
@@ -199,6 +256,7 @@ export function ItemEditor(p: Props) {
         </div>
       )}
 
+      {priceType !== 'perkg' && (
       <div className="row qty-row">
         <span className="label">{S.item.qty}</span>
         <div className="stepper">
@@ -207,6 +265,7 @@ export function ItemEditor(p: Props) {
           <button aria-label="plus" onClick={() => setQty((q) => q + 1)}>+</button>
         </div>
       </div>
+      )}
 
       <label className="toggle">
         <input type="checkbox" checked={promo} onChange={(e) => setPromo(e.target.checked)} />
@@ -219,7 +278,7 @@ export function ItemEditor(p: Props) {
           <strong>{total != null ? formatPeso(total) : '—'}</strong>
         </div>
         <button className="btn primary" disabled={!valid} onClick={submit}>
-          {valid ? p.submitLabel : S.item.needPrice}
+          {valid ? p.submitLabel : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
         </button>
         {p.onRemove && (
           <button className="btn danger-link" onClick={p.onRemove}>{S.item.remove}</button>

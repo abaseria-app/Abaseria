@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { S } from '../strings';
 import { db, recentLabels, storeName, type Item } from '../lib/db';
-import { formatPeso, lineTotal } from '../lib/money';
+import { formatKg, formatPeso, lineTotal } from '../lib/money';
 import { logEvent } from '../lib/events';
 import { Capture } from './Capture';
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
@@ -59,6 +59,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
       bundlePriceCentavos: v.bundlePriceCentavos,
       isPromo: v.isPromo,
       quantity: v.quantity,
+      weightGrams: v.weightGrams,
       lineTotalCentavos: v.lineTotalCentavos,
       category: v.category,
       captureMethod: method,
@@ -81,6 +82,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
       bundlePriceCentavos: v.bundlePriceCentavos,
       isPromo: v.isPromo,
       quantity: v.quantity,
+      weightGrams: v.weightGrams,
       lineTotalCentavos: v.lineTotalCentavos,
       category: v.category,
     });
@@ -165,8 +167,12 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
               <span className="item-name">
                 {i.label}
                 <small>
-                  {i.priceType === 'bundle' ? S.item.bundleChip(i.bundleQty!, formatPeso(i.bundlePriceCentavos!)) : formatPeso(i.unitPriceCentavos)}
-                  {i.quantity > 1 ? ` × ${i.quantity}` : ''}
+                  {i.priceType === 'perkg'
+                    ? S.item.perKgLine(formatPeso(i.unitPriceCentavos), formatKg(i.weightGrams ?? 0))
+                    : i.priceType === 'bundle'
+                      ? S.item.bundleChip(i.bundleQty!, formatPeso(i.bundlePriceCentavos!))
+                      : formatPeso(i.unitPriceCentavos)}
+                  {i.priceType !== 'perkg' && i.quantity > 1 ? ` × ${i.quantity}` : ''}
                   {i.isPromo ? ' · promo' : ''}
                 </small>
               </span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPeso, lineTotal, parsePesoInput } from './money';
+import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput } from './money';
 
 describe('formatPeso', () => {
   it('formats centavos with peso sign and commas', () => {
@@ -43,5 +43,41 @@ describe('lineTotal', () => {
   });
   it('bundle: 2 for ₱99, buy 1', () => {
     expect(lineTotal({ priceType: 'bundle', unitPriceCentavos: 0, quantity: 1, bundleQty: 2, bundlePriceCentavos: 9900 })).toBe(4950);
+  });
+});
+
+
+describe('per-kilo items', () => {
+  it('multiplies price per kilo by weight, rounded to the centavo', () => {
+    expect(lineTotal({ priceType: 'perkg', unitPriceCentavos: 32000, quantity: 1, weightGrams: 750 })).toBe(24000);
+    expect(lineTotal({ priceType: 'perkg', unitPriceCentavos: 18950, quantity: 1, weightGrams: 1234 })).toBe(23384);
+    expect(lineTotal({ priceType: 'perkg', unitPriceCentavos: 32000, quantity: 1, weightGrams: null })).toBe(0);
+  });
+
+  it('reads kilos, fractions and grams', () => {
+    expect(parseKgInput('0.75')).toBe(750);
+    expect(parseKgInput('.5')).toBe(500);
+    expect(parseKgInput('1.25 kg')).toBe(1250);
+    expect(parseKgInput('1/2')).toBe(500);
+    expect(parseKgInput('1 1/2')).toBe(1500);
+    expect(parseKgInput('1/4 kilo')).toBe(250);
+    expect(parseKgInput('750g')).toBe(750);
+    expect(parseKgInput('750 g')).toBe(750);
+    expect(parseKgInput('0,5')).toBe(500);
+  });
+
+  it('rejects junk and silly weights', () => {
+    expect(parseKgInput('')).toBeNull();
+    expect(parseKgInput('abc')).toBeNull();
+    expect(parseKgInput('0')).toBeNull();
+    expect(parseKgInput('80')).toBeNull();
+    expect(parseKgInput('5/8')).toBeNull();
+  });
+
+  it('formats weights without trailing zeros', () => {
+    expect(formatKg(750)).toBe('0.75 kg');
+    expect(formatKg(1500)).toBe('1.5 kg');
+    expect(formatKg(1000)).toBe('1 kg');
+    expect(formatKg(1234)).toBe('1.234 kg');
   });
 });

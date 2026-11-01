@@ -65,7 +65,8 @@ create table public.price_sightings (
   branch_id              uuid not null references public.branches (id),
   -- Day only, on purpose: a time of day plus a branch is someone's routine.
   seen_on                date not null,
-  price_type             text not null check (price_type in ('each', 'bundle')),
+  -- 'perkg': unit_price_centavos is the price per kilo.
+  price_type             text not null check (price_type in ('each', 'bundle', 'perkg')),
   unit_price_centavos    integer not null check (unit_price_centavos between 1 and 10000000),
   bundle_qty             smallint check (bundle_qty between 2 and 100),
   bundle_price_centavos  integer check (bundle_price_centavos between 1 and 10000000),

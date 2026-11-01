@@ -9,7 +9,7 @@ The test answers one question: **will people keep logging past item 15?**
 - **Tag-first capture.** One photo of the shelf tag gives the price and usually the name. OCR runs on the phone with Tesseract.js. No barcode step.
 - **Price chips, not a guess.** The parser finds every price on the tag and ranks them by text size and ₱/P marker. The top chip is preselected, so a good read is one tap on Add.
 - **Offline.** The app, OCR engine and language data are cached by a service worker. After one visit with signal, it works in a mall basement.
-- **Money** is integer centavos everywhere. Bundles ("3 for ₱100") are supported. Per-kilo isn't: supermarket weighed items carry a sticker with the total.
+- **Money** is integer centavos everywhere. Items are sold each, as a bundle ("3 for ₱100") or per kilo (price per kg × amount bought, e.g. ₱320/kg × 0.75 kg = ₱240). A per-kg or per-100g price on a tag switches the item to per kilo.
 - **Everything stays on the phone** (IndexedDB). No login, no backend, no ads, no analytics.
 - **Store picker.** New trip takes one location reading and preselects the nearest saved branch. Two stores within 100 m of each other means the shopper taps. The first time at a store, the shopper adds it and the phone's position becomes the branch location.
 
