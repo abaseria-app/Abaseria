@@ -163,7 +163,7 @@ export function ItemEditor(p: Props) {
             role="radio"
             aria-checked={category === c.id}
             className={`chip cat ${category === c.id ? 'on' : ''}`}
-            style={{ ['--cat' as string]: c.color }}
+            style={{ ['--cat' as string]: c.color, ['--cat-ink' as string]: c.ink }}
             onClick={() => setPickedCategory(c.id)}
           >
             {c.label}

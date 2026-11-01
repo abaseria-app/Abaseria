@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryOf, guessCategory } from './categories';
+import { CATEGORIES, categoryOf, guessCategory } from './categories';
 
 describe('guessCategory', () => {
   const cases: Array<[string, string]> = [
@@ -44,5 +44,24 @@ describe('categoryOf', () => {
     expect(categoryOf({ label: 'Pork Liempo', category: 'other' })).toBe('other');
     expect(categoryOf({ label: 'Pork Liempo', category: null })).toBe('meat');
     expect(categoryOf({ label: 'Pork Liempo' })).toBe('meat');
+  });
+});
+
+// WCAG 2 contrast ratio between two #rrggbb colors.
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe('category chip labels', () => {
+  it.each(CATEGORIES.map((c) => [c.label, c.color, c.ink]))('%s label is readable on its chip', (_label, color, ink) => {
+    expect(contrast(color, ink)).toBeGreaterThanOrEqual(4.5);
   });
 });

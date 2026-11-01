@@ -13,15 +13,21 @@ export interface Category {
   id: CategoryId;
   label: string;
   color: string;
+  /** Text color on a chip filled with `color`. Picked so the label stays at 4.5:1 or better. */
+  ink: string;
 }
 
+const WHITE = '#ffffff';
+const NAVY = '#1a3555'; // same as --navy in index.css
+
 export const CATEGORIES: Category[] = [
-  { id: 'meat', label: 'Meat & seafood', color: '#c2410c' },
-  { id: 'vegetables', label: 'Vegetables & fruit', color: '#16a34a' },
-  { id: 'pantry', label: 'Pantry', color: '#d4a017' },
-  { id: 'dry', label: 'Dry goods', color: '#7c5c3b' },
-  { id: 'household', label: 'Household', color: '#2563eb' },
-  { id: 'other', label: 'Other', color: '#9ca3af' },
+  { id: 'meat', label: 'Meat & seafood', color: '#c2410c', ink: WHITE },
+  // A step darker than #16a34a: white on the old green was 3.3:1.
+  { id: 'vegetables', label: 'Vegetables & fruit', color: '#15803d', ink: WHITE },
+  { id: 'pantry', label: 'Pantry', color: '#d4a017', ink: NAVY },
+  { id: 'dry', label: 'Dry goods', color: '#7c5c3b', ink: WHITE },
+  { id: 'household', label: 'Household', color: '#2563eb', ink: WHITE },
+  { id: 'other', label: 'Other', color: '#9ca3af', ink: NAVY },
 ];
 
 export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c])) as Record<CategoryId, Category>;

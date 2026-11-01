@@ -197,5 +197,5 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .legend-amt { font-variant-numeric: tabular-nums; font-weight: 700; }
 .legend-pct { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .chip.cat { min-height: 44px; font-size: .9rem; padding: 0 12px; }
-.chip.cat.on { background: var(--cat); border-color: var(--cat); color: #fff; }
+.chip.cat.on { background: var(--cat); border-color: var(--cat); color: var(--cat-ink, #fff); }
 .spend-change { margin-bottom: 4px; }
