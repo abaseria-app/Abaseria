@@ -52,6 +52,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
   async function addItem(v: ItemSubmit, method: Item['captureMethod'], ms: number) {
     const id = await db.items.add({
       tripId,
+      barcode: v.barcode ?? null,
       label: v.label,
       priceType: v.priceType,
       unitPriceCentavos: v.unitPriceCentavos,
@@ -67,7 +68,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
       createdAt: new Date().toISOString(),
     });
     navigator.vibrate?.(30);
-    await logEvent('item_added', tripId, { item_id: id, capture_method: method, ms_since_open: ms, line_total: v.lineTotalCentavos, category: v.category, category_guessed: v.categoryGuessed });
+    await logEvent('item_added', tripId, { item_id: id, has_barcode: !!v.barcode, capture_method: method, ms_since_open: ms, line_total: v.lineTotalCentavos, category: v.category, category_guessed: v.categoryGuessed });
     setCapture(null);
   }
 
@@ -108,6 +109,7 @@ export function Shopping({ tripId, onFinish, onHome }: Props) {
     return (
       <Capture
         tripId={tripId}
+        branchUuid={trip?.branchUuid ?? null}
         startTyped={capture === 'typed'}
         recent={recent}
         fallbackName={S.item.unnamed(unnamedCount + 1)}

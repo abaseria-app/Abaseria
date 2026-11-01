@@ -3,23 +3,42 @@ import { S } from '../strings';
 import { GUIDE, guideToSourceRect, prepareImage, readTag, type OcrResult } from '../lib/ocr';
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
 import { logEvent } from '../lib/events';
+import { getDetector, scanFrame } from '../lib/barcode';
+import { recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
+import { formatPeso } from '../lib/money';
 
-type Step = 'camera' | 'nocam' | 'reading' | 'confirm' | 'type';
+/**
+ * barcode: live camera looking for a package barcode, no tap needed
+ * camera:  live camera aimed at the shelf tag, tap the shutter
+ */
+type Step = 'barcode' | 'camera' | 'nocam' | 'reading' | 'confirm' | 'type' | 'recall';
 
 interface Props {
   tripId: number;
+  branchUuid: string | null;
   startTyped?: boolean;
   recent: string[];
   fallbackName: string;
-  onAdd: (v: ItemSubmit, method: 'tag' | 'tag+typed' | 'typed', msSinceOpen: number) => void;
+  onAdd: (v: ItemSubmit, method: CaptureMethod, msSinceOpen: number) => void;
   onClose: () => void;
 }
 
-/** Snap tag -> read -> pick price -> Add. Also hosts "Type it" so both paths share timing and logging. */
-export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClose }: Props) {
-  const [step, setStep] = useState<Step>(startTyped ? 'type' : 'camera');
+/** How often the barcode step looks at the camera frame. */
+const SCAN_EVERY_MS = 200;
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+
+/**
+ * Barcode -> (known here? confirm price : snap tag -> pick price) -> Add.
+ * Phones that can't read barcodes start at the tag. "Type it" works from any step.
+ */
+export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, onAdd, onClose }: Props) {
+  const [step, setStep] = useState<Step>(startTyped ? 'type' : 'barcode');
   const [result, setResult] = useState<OcrResult | null>(null);
   const [ocrError, setOcrError] = useState(false);
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const [recall, setRecall] = useState<Recall | null>(null);
+  const [aimNote, setAimNote] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -27,11 +46,12 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
   const usedCamera = useRef(!startTyped);
 
   useEffect(() => {
-    logEvent('capture_open', tripId, { method: startTyped ? 'typed' : 'tag' });
+    logEvent('capture_open', tripId, { method: startTyped ? 'typed' : 'barcode' });
   }, [tripId, startTyped]);
 
+  // Live camera for both the barcode and the tag step; the stream is opened once and reused.
   useEffect(() => {
-    if (step !== 'camera') return;
+    if (step !== 'camera' && step !== 'barcode') return;
     let cancelled = false;
     (async () => {
       try {
@@ -54,7 +74,76 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
     };
   }, [step, tripId]);
 
+  // Barcode step: look at a frame every 200 ms until a valid barcode shows up.
+  useEffect(() => {
+    if (step !== 'barcode') return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    (async () => {
+      const detector = await getDetector();
+      if (stop) return;
+      if (!detector) {
+        // This browser can't read barcodes (iPhones today). Go straight to the tag.
+        logEvent('barcode_unsupported', tripId, {});
+        setStep('camera');
+        return;
+      }
+      const tick = async () => {
+        if (stop) return;
+        const v = videoRef.current;
+        if (v && v.readyState >= 2) {
+          try {
+            const hit = await scanFrame(detector, v);
+            if (hit && !stop) {
+              stop = true;
+              navigator.vibrate?.(40);
+              await found(hit.code);
+              return;
+            }
+          } catch {
+            /* a frame that fails to decode is just skipped */
+          }
+        }
+        timer = setTimeout(tick, SCAN_EVERY_MS);
+      };
+      tick();
+    })();
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+    // found() only reads props that don't change during a capture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, tripId]);
+
   useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
+
+  async function found(code: string | null) {
+    const ms = Math.round(performance.now() - openedAt.current);
+    if (!code) {
+      // Store scale sticker: the sticker itself is the "tag".
+      logEvent('barcode_scanned', tripId, { kind: 'scale_sticker', ms });
+      setAimNote(S.capture.scaleSticker);
+      setStep('camera');
+      return;
+    }
+    setBarcode(code);
+    const r = await recallBarcode(code, branchUuid);
+    logEvent('barcode_scanned', tripId, { kind: r ? (r.sameBranch ? 'known_here' : 'known_elsewhere') : 'new', ms });
+    setRecall(r);
+    if (r?.sameBranch) {
+      setStep('recall');
+    } else {
+      setAimNote(S.capture.nowTag);
+      setStep('camera');
+    }
+  }
+
+  function skipBarcode() {
+    logEvent('barcode_skipped', tripId, {});
+    setAimNote(null);
+    setStep('camera');
+  }
 
   async function runOcr(canvas: HTMLCanvasElement) {
     setStep('reading');
@@ -89,15 +178,47 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
   }
 
   function cancel() {
-    logEvent('capture_abandoned', tripId, { step: step === 'nocam' ? 'camera' : step === 'type' ? 'type' : step });
+    logEvent('capture_abandoned', tripId, { step: step === 'nocam' ? 'camera' : step, had_barcode: !!barcode });
     onClose();
   }
 
-  function add(v: ItemSubmit) {
-    const method = !usedCamera.current ? 'typed' : v.chosenRank === 'typed' || v.editedAfterChoice ? 'tag+typed' : 'tag';
+  function add(v: ItemSubmit, fromRecall: boolean) {
+    const method: CaptureMethod = fromRecall
+      ? v.priceTouched
+        ? 'typed'
+        : 'recall'
+      : !usedCamera.current
+        ? 'typed'
+        : v.chosenRank === 'typed' || v.editedAfterChoice
+          ? 'tag+typed'
+          : 'tag';
     const ms = Math.round(performance.now() - openedAt.current);
-    logEvent('price_chosen', tripId, { rank: v.chosenRank, edited_after: v.editedAfterChoice });
-    onAdd(v, method, ms);
+    logEvent('price_chosen', tripId, { rank: fromRecall ? 'recall' : v.chosenRank, edited_after: v.editedAfterChoice || (fromRecall && v.priceTouched) });
+    onAdd({ ...v, barcode }, method, ms);
+  }
+
+  // Known at this branch: last name and price, shopper checks the tag and taps Add.
+  if (step === 'recall' && recall) {
+    const last: Item = { ...recall.item, quantity: 1, weightGrams: null };
+    return (
+      <ItemEditor
+        key={`recall-${barcode}`}
+        title={S.item.addTitle}
+        submitLabel={S.item.add}
+        initial={last}
+        recallNote={S.item.lastSeen(formatPeso(recall.item.unitPriceCentavos), shortDate(recall.item.createdAt))}
+        barcode={barcode}
+        recent={recent}
+        fallbackName={fallbackName}
+        onSubmit={(v) => add(v, true)}
+        onCancel={cancel}
+        retakeLabel={S.capture.snapTagInstead}
+        onRetake={() => {
+          setAimNote(S.capture.nowTag);
+          setStep('camera');
+        }}
+      />
+    );
   }
 
   if (step === 'confirm' || step === 'type') {
@@ -109,17 +230,20 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
         submitLabel={S.item.add}
         candidates={isTag ? result?.candidates ?? [] : undefined}
         nameGuess={isTag ? result?.nameGuess : null}
+        knownName={recall?.item.label ?? null}
+        barcode={barcode}
         promoHint={isTag ? result?.promoHint : false}
         notice={isTag ? (ocrError ? S.capture.ocrFailed : result && result.candidates.length === 0 ? S.capture.noPrice : null) : null}
         recent={recent}
         fallbackName={fallbackName}
-        onSubmit={add}
+        onSubmit={(v) => add(v, false)}
         onCancel={cancel}
         onRetake={isTag ? () => setStep(streamRef.current ? 'camera' : 'nocam') : undefined}
       />
     );
   }
 
+  const scanning = step === 'barcode';
   return (
     <div className="camera" role="dialog" aria-label={S.shop.snap}>
       {step !== 'nocam' && (
@@ -127,10 +251,16 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
           <video ref={videoRef} playsInline muted />
           <div
             ref={guideRef}
-            className="guide"
-            style={{ left: `${GUIDE.x * 100}%`, top: `${GUIDE.y * 100}%`, width: `${GUIDE.w * 100}%`, height: `${GUIDE.h * 100}%` }}
+            className={`guide ${scanning ? 'barcode' : ''}`}
+            style={
+              scanning
+                ? undefined
+                : { left: `${GUIDE.x * 100}%`, top: `${GUIDE.y * 100}%`, width: `${GUIDE.w * 100}%`, height: `${GUIDE.h * 100}%` }
+            }
           />
-          <p className="aim">{step === 'reading' ? S.capture.reading : S.capture.aim}</p>
+          <p className="aim">
+            {step === 'reading' ? S.capture.reading : scanning ? S.capture.aimBarcode : aimNote ?? S.capture.aim}
+          </p>
         </>
       )}
       {step === 'nocam' && (
@@ -144,6 +274,7 @@ export function Capture({ tripId, startTyped, recent, fallbackName, onAdd, onClo
       )}
       <div className="camera-bar">
         <button className="link light" onClick={cancel}>{S.capture.cancel}</button>
+        {scanning && <button className="btn secondary no-barcode" onClick={skipBarcode}>{S.capture.noBarcode}</button>}
         {step === 'camera' && <button className="shutter" aria-label={S.shop.snap} onClick={shoot} />}
         {step === 'reading' && <div className="spinner" aria-label={S.capture.reading} />}
         <button

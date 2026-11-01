@@ -55,7 +55,11 @@ export interface Trip {
   receiptItemCount: number | null;
 }
 
-export type CaptureMethod = 'tag' | 'tag+typed' | 'typed';
+/**
+ * tag: price read from the shelf tag and accepted. tag+typed: read, then corrected. typed: typed in.
+ * recall: price filled in from this barcode's last price at this branch and accepted without changes.
+ */
+export type CaptureMethod = 'tag' | 'tag+typed' | 'typed' | 'recall';
 
 /**
  * One row per item on a trip. The price fields are what was seen on the shelf at that store and time,
@@ -64,6 +68,8 @@ export type CaptureMethod = 'tag' | 'tag+typed' | 'typed';
 export interface Item {
   id?: number;
   tripId: number;
+  /** Product barcode from the package. Missing for items logged by tag or typing only. */
+  barcode?: string | null;
   label: string;
   priceType: PriceType;
   unitPriceCentavos: number;
@@ -117,7 +123,36 @@ class AbeseriaDB extends Dexie {
       settings: 'key',
       branches: '++id, &uuid, chain',
     });
+    // v3: items are findable by barcode.
+    this.version(3).stores({
+      trips: '++id, testerId, startedAt, endedAt, branchUuid',
+      items: '++id, tripId, label, createdAt, barcode',
+      events: '++id, tripId, type, createdAt',
+      settings: 'key',
+      branches: '++id, &uuid, chain',
+    });
   }
+}
+
+export interface Recall {
+  /** The most recent item with this barcode: at this branch when there is one, otherwise anywhere. */
+  item: Item;
+  /** True when `item` was logged at the branch being shopped now, so its price applies here. */
+  sameBranch: boolean;
+}
+
+/** What this phone already knows about a barcode. Works offline; the shared database comes later. */
+export async function recallBarcode(code: string, branchUuid: string | null | undefined): Promise<Recall | null> {
+  const rows = (await db.items.where('barcode').equals(code).toArray()).filter((i) => !i.removed);
+  if (!rows.length) return null;
+  rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (branchUuid) {
+    const trips = await db.trips.bulkGet([...new Set(rows.map((r) => r.tripId))]);
+    const here = new Set(trips.filter((t) => t?.branchUuid === branchUuid).map((t) => t!.id));
+    const hit = rows.find((r) => here.has(r.tripId));
+    if (hit) return { item: hit, sameBranch: true };
+  }
+  return { item: rows[0], sameBranch: false };
 }
 
 /** RFC 4122 v4. crypto.randomUUID only exists on HTTPS, and the dev server runs over plain Wi-Fi HTTP. */

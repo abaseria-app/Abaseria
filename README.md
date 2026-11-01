@@ -6,7 +6,8 @@ The test answers one question: **will people keep logging past item 15?**
 
 ## How it works
 
-- **Tag-first capture.** One photo of the shelf tag gives the price and usually the name. OCR runs on the phone with Tesseract.js. No barcode step.
+- **Barcode first.** Scan item opens the camera on the package barcode; it reads on its own, no tap. If this phone logged that barcode at this branch before, the name and last price fill in and the shopper checks the tag and taps Add. If not, the camera switches to the shelf tag. "No barcode" skips to the tag (loose produce, meat). Store scale stickers (13 digits starting with 2) go to the tag step too. Phones without a built-in barcode reader (iPhones today) start at the tag.
+- **Tag reading.** One photo of the shelf tag gives the price and usually the name. OCR runs on the phone with Tesseract.js.
 - **Price chips, not a guess.** The parser finds every price on the tag and ranks them by text size and ₱/P marker. The top chip is preselected, so a good read is one tap on Add.
 - **Offline.** The app, OCR engine and language data are cached by a service worker. After one visit with signal, it works in a mall basement.
 - **Money** is integer centavos everywhere. Items are sold each, as a bundle ("3 for ₱100") or per kilo (price per kg × amount bought, e.g. ₱320/kg × 0.75 kg = ₱240). A per-kg or per-100g price on a tag switches the item to per kilo.

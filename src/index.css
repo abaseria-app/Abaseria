@@ -213,3 +213,7 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .add-branch .warn p { margin: 0 0 6px; }
 .add-actions { justify-content: flex-end; margin-top: 8px; }
 .add-actions .btn { flex: 1; }
+
+/* Barcode step: a wide, short box in the middle; the whole frame is scanned anyway. */
+.guide.barcode { left: 8%; width: 84%; top: 38%; height: 22%; border-color: var(--teal); }
+.no-barcode { min-height: 52px; font-size: 1rem; }
