@@ -67,5 +67,10 @@ describe('CSV round trip and pass line', () => {
 
     rows.splice(0, 1); // drop T01's first trip: now only 5 pass
     expect(computeResults(rows).pass).toBe(false);
+
+    // A cancelled trip 1 for T01 with low coverage, listed first, must not be judged.
+    rows.unshift({ ...rows[0], tester_id: 'T01', trip_index: '1', coverage_pct: '10', cancelled: 'true' });
+    rows.push({ ...rows[1], tester_id: 'T01', trip_index: '1', coverage_pct: '95', cancelled: 'false' });
+    expect(computeResults(rows).pass).toBe(true);
   });
 });

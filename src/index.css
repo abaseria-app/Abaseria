@@ -217,3 +217,9 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 /* Barcode step: a wide, short box in the middle; the whole frame is scanned anyway. */
 .guide.barcode { left: 8%; width: 84%; top: 38%; height: 22%; border-color: var(--teal); }
 .no-barcode { min-height: 52px; font-size: 1rem; }
+
+/* Cancel trip: a quiet link under the list, then a confirm card */
+.cancel-trip { margin-top: 16px; font-size: .95rem; }
+.confirm.card { background: var(--card); border: 2px solid var(--red); border-radius: var(--radius); padding: 4px 14px 10px; margin-top: 16px; }
+.confirm.card p { margin: 10px 0 4px; }
+.seg button.danger { background: var(--red); border-color: var(--red); color: #fff; }

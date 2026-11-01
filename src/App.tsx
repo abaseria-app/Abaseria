@@ -65,7 +65,18 @@ export default function App() {
         />
       );
     case 'shop':
-      return <Shopping tripId={tripId!} onFinish={() => setRoute('cashier')} onHome={() => setRoute('home')} />;
+      return (
+        <Shopping
+          tripId={tripId!}
+          onFinish={() => setRoute('cashier')}
+          onHome={() => setRoute('home')}
+          onCancelled={() => {
+            setTripId(null);
+            setToast(S.shop.cancelled);
+            setRoute('home');
+          }}
+        />
+      );
     case 'cashier':
       return (
         <Cashier

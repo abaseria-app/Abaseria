@@ -61,3 +61,23 @@ describe('recallBarcode', () => {
     expect(await recallBarcode('4800016644115', 'imus')).toBeNull();
   });
 });
+
+describe('cancelled trips', () => {
+  beforeEach(async () => {
+    await Promise.all([db.items.clear(), db.trips.clear()]);
+  });
+
+  it('are ignored when recalling a barcode', async () => {
+    const real = await db.trips.add(trip('imus', '2026-10-20T08:00:00Z'));
+    const test = await db.trips.add({ ...trip('imus', '2026-11-01T09:00:00Z'), cancelledAt: '2026-11-01T09:05:00Z' });
+    await db.items.bulkAdd([item(real, 1500, '2026-10-20T08:10:00Z'), item(test, 99, '2026-11-01T09:01:00Z')]);
+    const r = await recallBarcode('4800016644115', 'imus');
+    expect(r?.item.unitPriceCentavos).toBe(1500);
+  });
+
+  it('leave nothing to recall when they were the only source', async () => {
+    const test = await db.trips.add({ ...trip('imus', '2026-11-01T09:00:00Z'), cancelledAt: '2026-11-01T09:05:00Z' });
+    await db.items.add(item(test, 99, '2026-11-01T09:01:00Z'));
+    expect(await recallBarcode('4800016644115', 'imus')).toBeNull();
+  });
+});

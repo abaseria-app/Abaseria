@@ -50,6 +50,8 @@ export interface Trip {
   prompted: boolean;
   startedAt: string;
   endedAt: string | null;
+  /** Set when the shopper cancels the trip. Its items don't count toward spending, tests or remembered prices. */
+  cancelledAt?: string | null;
   receiptMatched: boolean | null;
   receiptTotalCentavos: number | null;
   receiptItemCount: number | null;
@@ -143,13 +145,16 @@ export interface Recall {
 
 /** What this phone already knows about a barcode. Works offline; the shared database comes later. */
 export async function recallBarcode(code: string, branchUuid: string | null | undefined): Promise<Recall | null> {
-  const rows = (await db.items.where('barcode').equals(code).toArray()).filter((i) => !i.removed);
+  const found = (await db.items.where('barcode').equals(code).toArray()).filter((i) => !i.removed);
+  if (!found.length) return null;
+  const trips = new Map(
+    (await db.trips.bulkGet([...new Set(found.map((r) => r.tripId))])).flatMap((t) => (t && !t.cancelledAt ? [[t.id!, t] as const] : [])),
+  );
+  // Items from cancelled trips (test scans at home, wrong store) don't count.
+  const rows = found.filter((r) => trips.has(r.tripId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!rows.length) return null;
-  rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (branchUuid) {
-    const trips = await db.trips.bulkGet([...new Set(rows.map((r) => r.tripId))]);
-    const here = new Set(trips.filter((t) => t?.branchUuid === branchUuid).map((t) => t!.id));
-    const hit = rows.find((r) => here.has(r.tripId));
+    const hit = rows.find((r) => trips.get(r.tripId)?.branchUuid === branchUuid);
     if (hit) return { item: hit, sameBranch: true };
   }
   return { item: rows[0], sameBranch: false };

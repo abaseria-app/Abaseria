@@ -70,6 +70,7 @@ export function StartTrip({ testMode, onStarted, onBack }: Props) {
     db.trips
       .where('testerId')
       .equals(id)
+      .filter((t) => !t.cancelledAt)
       .count()
       .then((n) => {
         setTripIndex(n + 1);
