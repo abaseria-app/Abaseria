@@ -7,7 +7,7 @@ import { getDetector, scanFrame } from '../lib/barcode';
 import { makeThumb } from '../lib/thumb';
 import { recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
 import { formatPeso } from '../lib/money';
-import { SHARING_ON, sharedPhoto, sharedPrice } from '../lib/sync';
+import { SHARING_ON, sharedPrice } from '../lib/sync';
 
 /**
  * barcode: live camera looking for a package barcode, no tap needed
@@ -44,8 +44,6 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
   const [aimNote, setAimNote] = useState<string | null>(null);
   /** Package photo from the barcode read; the tag photo fills it in when there's no barcode. */
   const thumbRef = useRef<string | null>(null);
-  /** Published photo of this barcode from the shared database, when one arrives in time. Beats our own frame. */
-  const sharedThumbRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -137,8 +135,6 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
       return;
     }
     setBarcode(code);
-    // Doesn't hold up the scan: if the photo arrives before Add, it's used; if not, our own frame is.
-    if (SHARING_ON) sharedPhoto(code).then((p) => (sharedThumbRef.current = p));
     let r = await recallBarcode(code, branchUuid);
     logEvent('barcode_scanned', tripId, { kind: r ? (r.sameBranch ? 'known_here' : 'known_elsewhere') : 'new', ms });
     if (!r?.sameBranch && SHARING_ON) {
@@ -221,9 +217,8 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
     const ms = Math.round(performance.now() - openedAt.current);
     logEvent('price_chosen', tripId, { rank: fromRecall ? 'recall' : v.chosenRank, edited_after: v.editedAfterChoice || (fromRecall && v.priceTouched) });
     // Typed items keep no photo, even if the camera was open earlier in this capture.
-    const own = !usedCamera.current && !barcode ? null : thumbRef.current;
-    const shared = barcode ? sharedThumbRef.current : null;
-    onAdd({ ...v, barcode, thumb: shared ?? own, thumbSource: shared ? 'shared' : own ? 'camera' : null }, method, ms);
+    const thumb = !usedCamera.current && !barcode ? null : thumbRef.current;
+    onAdd({ ...v, barcode, thumb }, method, ms);
   }
 
   // Known at this branch: last name and price, shopper checks the tag and taps Add.

@@ -2,11 +2,10 @@
 //
 // Barcode items get a frame from the moment the barcode read, which shows the package. Tag-only items
 // (iPhones, produce, meat) get the shelf-tag photo. Typed items have none and show a placeholder.
-// A camera thumbnail is uploaded as the product's photo once the trip is shared (dev app only, see sync.ts),
-// and waits as pending until someone publishes it. It's never in the CSV export.
+// Thumbnails stay on this phone: they aren't in the CSV export and aren't shared with other phones.
 
-/** Pixels per side: big enough to judge in the admin dashboard, about 10-15 KB as JPEG. Shown at 56 px in the list. */
-export const THUMB_PX = 240;
+/** Pixels per side. Shown at 56 px, so this is sharp on 2x screens and about 4-7 KB as JPEG. */
+export const THUMB_PX = 112;
 const QUALITY = 0.7;
 
 export interface Rect {

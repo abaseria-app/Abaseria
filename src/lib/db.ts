@@ -80,14 +80,8 @@ export interface Item {
   tripId: number;
   /** Product barcode from the package. Missing for items logged by tag or typing only. */
   barcode?: string | null;
-  /** Small JPEG data URL: from this phone's camera, or a published photo from the shared database. Not in CSV exports. */
+  /** Small JPEG data URL from the camera (package at barcode read, or the shelf tag). Never exported or shared. */
   thumb?: string | null;
-  /** 'camera' photos can be uploaded as the product's photo; 'shared' ones came from the database already. */
-  thumbSource?: 'camera' | 'shared' | null;
-  /** Made just before this item's photo is first uploaded, so a retry writes the same file. */
-  photoId?: string | null;
-  /** Set once the photo is in the shared database, or the database said it can't take it. */
-  photoSentAt?: string | null;
   label: string;
   priceType: PriceType;
   unitPriceCentavos: number;

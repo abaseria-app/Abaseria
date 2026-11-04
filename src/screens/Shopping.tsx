@@ -58,7 +58,6 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
       tripId,
       barcode: v.barcode ?? null,
       thumb: v.thumb ?? null,
-      thumbSource: v.thumb ? v.thumbSource ?? 'camera' : null,
       label: v.label,
       priceType: v.priceType,
       unitPriceCentavos: v.unitPriceCentavos,

@@ -2,8 +2,7 @@
 //
 // What leaves the phone, per item with a real product barcode: barcode, store, price, promo flag, how the
 // price was captured, and the day (never the time). Location, receipt numbers, tester ids and items without
-// a barcode stay on the phone. Per barcode, this phone also sends one product photo (the camera frame from the
-// barcode read), which other shoppers only see after someone publishes it. Shelf-tag photos stay on the phone.
+// a barcode stay on the phone.
 //
 // Sharing is on in the dev app only. The live app turns it on once the consent screen exists (module 4),
 // and only trips that end after this phone starts sharing are uploaded.
@@ -21,13 +20,6 @@ export const MAX_AGE_DAYS = 14;
 export const LOOKUP_TIMEOUT_MS = 2000;
 
 const SINCE_KEY = 'sharingSince';
-
-/** Storage bucket for product photos (supabase/migrations/003_product_photos.sql). */
-export const PHOTO_BUCKET = 'product-photos';
-/** Most photos sent in one run, so a long-offline phone doesn't spend a shopper's data in one go. */
-export const PHOTOS_PER_RUN = 20;
-/** How long a scan waits for a published photo. It never holds up the price. */
-export const PHOTO_TIMEOUT_MS = 3000;
 
 // ---------------------------------------------------------------------------------------------------------
 // Pure helpers (tested in sync.test.ts)
@@ -88,37 +80,6 @@ export function sightingRow(item: Item & { shareId: string }, branchId: string):
     is_promo: item.isPromo,
     capture_method: item.captureMethod,
   };
-}
-
-/** Where a photo's file lives in the bucket; the database builds the same path from the row. */
-export const photoPath = (barcode: string, photoId: string) => `${barcode}/${photoId}.jpg`;
-
-/** Items whose photo should go up: own camera photo of a shareable item, from a shared trip, one per barcode. */
-export function photosToSend(items: Item[], sharedTripIds: Set<number>): Item[] {
-  const done = new Set(items.filter((i) => i.barcode && i.photoSentAt).map((i) => i.barcode!));
-  const pick = new Map<string, Item>();
-  for (const i of [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
-    if (!shareable(i) || !i.thumb || i.thumbSource === 'shared' || !sharedTripIds.has(i.tripId)) continue;
-    if (done.has(i.barcode!) || pick.has(i.barcode!)) continue;
-    pick.set(i.barcode!, i);
-  }
-  return [...pick.values()];
-}
-
-export function dataUrlToBlob(url: string): Blob | null {
-  const m = /^data:([^;,]+);base64,(.*)$/.exec(url);
-  if (!m) return null;
-  const bin = atob(m[2]);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: m[1] });
-}
-
-async function blobToDataUrl(b: Blob): Promise<string> {
-  const bytes = new Uint8Array(await b.arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return `data:${b.type || 'image/jpeg'};base64,${btoa(bin)}`;
 }
 
 export function productRow(item: Item) {
@@ -212,7 +173,6 @@ async function shareTrip(client: SupabaseClient, trip: Trip, branch: Branch): Pr
 export interface ShareResult {
   trips: number;
   prices: number;
-  photos?: number;
   waiting: number;
   error?: string;
 }
@@ -232,9 +192,7 @@ async function run(): Promise<ShareResult> {
   const since = await sharingSince();
   const todo = tripsToShare(await db.trips.toArray(), since);
   const result: ShareResult = { trips: 0, prices: 0, waiting: todo.length };
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return result;
-  // Photos that failed on a bad connection go up on the next run, even with no new trip to share.
-  if (!todo.length && !(await photosWaiting())) return result;
+  if (!todo.length || (typeof navigator !== 'undefined' && navigator.onLine === false)) return result;
 
   const client = await getSupabase();
   if (!client) return result;
@@ -251,109 +209,11 @@ async function run(): Promise<ShareResult> {
       result.prices += sent;
       result.waiting--;
     }
-    result.photos = await sharePhotos(client);
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);
     await logEvent('share_failed', null, { error: result.error });
   }
   return result;
-}
-
-async function photosWaiting(): Promise<boolean> {
-  const shared = new Set((await db.trips.toArray()).filter((t) => t.sharedAt && !t.cancelledAt).map((t) => t.id!));
-  return photosToSend((await db.items.toArray()).filter((i) => i.barcode), shared).length > 0;
-}
-
-/** Statuses that mean the database won't take this photo, ever: retrying wouldn't help. */
-const PHOTO_FINAL = new Set(['400', '403', '409', '413', '415']);
-
-/**
- * Sends one photo per barcode from trips that are already shared. The row goes first, then the file at its
- * path; the database refuses a file with no pending row. Safe to repeat after a dropped connection.
- */
-async function sharePhotos(client: SupabaseClient): Promise<number> {
-  const shared = new Set((await db.trips.toArray()).filter((t) => t.sharedAt && !t.cancelledAt).map((t) => t.id!));
-  const todo = photosToSend((await db.items.toArray()).filter((i) => i.barcode), shared).slice(0, PHOTOS_PER_RUN);
-  if (!todo.length) return 0;
-
-  // A photo needs its product in the database; unnamed products wait until someone names them.
-  const codes = todo.map((i) => i.barcode!);
-  const { data: known, error: knownErr } = await client.from('products').select('barcode').in('barcode', codes);
-  if (knownErr) throw new Error(`photos check: ${knownErr.message}`);
-  const exists = new Set((known ?? []).map((r) => r.barcode as string));
-
-  let sent = 0;
-  for (const it of todo.filter((i) => exists.has(i.barcode!))) {
-    const blob = dataUrlToBlob(it.thumb!);
-    const markSent = () => db.items.update(it.id!, { photoSentAt: new Date().toISOString() });
-    if (!blob) {
-      await markSent();
-      continue;
-    }
-    if (!it.photoId) {
-      it.photoId = newUuid();
-      await db.items.update(it.id!, { photoId: it.photoId });
-    }
-    // 23505: this row is already there (a retry), or this phone already sent a photo of this barcode.
-    // Either way, try the file: the database only takes it at the path of this phone's own pending row.
-    const row = await client.from('product_photos').insert({ id: it.photoId, barcode: it.barcode });
-    if (row.error && row.error.code !== '23505') {
-      if (/^2[23]/.test(row.error.code ?? '') || row.error.code === '42501') {
-        await markSent();
-        continue;
-      }
-      throw new Error(`photos: ${row.error.message}`);
-    }
-    const up = await client.storage.from(PHOTO_BUCKET).upload(photoPath(it.barcode!, it.photoId), blob, { contentType: 'image/jpeg', upsert: false });
-    if (up.error) {
-      const e = up.error as { statusCode?: string | number; status?: string | number; message: string };
-      if (!PHOTO_FINAL.has(String(e.statusCode ?? e.status ?? ''))) throw new Error(`photo file: ${e.message}`);
-      await logEvent('photo_refused', it.tripId, { item_id: it.id, status: String(e.statusCode ?? e.status ?? '') });
-    } else {
-      sent++;
-    }
-    await markSent();
-  }
-  return sent;
-}
-
-/**
- * The first published photo of this barcode, as a data URL to keep with the item.
- * Null when there isn't one, sharing is off, the phone is offline, or it takes longer than 3 seconds.
- */
-export async function sharedPhoto(barcode: string): Promise<string | null> {
-  if (!SHARING_ON || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
-  const ctrl = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => {
-      ctrl.abort();
-      resolve(null);
-    }, PHOTO_TIMEOUT_MS);
-  });
-  const lookup = (async () => {
-    const client = await getSupabase();
-    if (!client) return null;
-    const { data, error } = await client
-      .from('product_photos')
-      .select('path')
-      .eq('barcode', barcode)
-      .eq('status', 'published')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .retry(false)
-      .abortSignal(ctrl.signal);
-    const path = data?.[0]?.path as string | undefined;
-    if (error || !path) return null;
-    const file = await client.storage.from(PHOTO_BUCKET).download(path);
-    if (file.error || !file.data) return null;
-    return blobToDataUrl(file.data);
-  })().catch(() => null);
-  try {
-    return await Promise.race([lookup, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /** Trips ended before this phone started sharing stay on the phone. */
