@@ -51,7 +51,18 @@ Camera access needs HTTPS (or localhost), so test the camera on your phone throu
 
 ## Deploy
 
-Pushing to `main` runs tests, builds, and publishes to GitHub Pages through `.github/workflows/deploy.yml`. In the repo: Settings → Pages → Source: **GitHub Actions**. The app lands at `https://<user>.github.io/<repo>/`.
+One GitHub Pages site holds two apps:
+
+| Address | Built from | Database | Phone storage |
+|---|---|---|---|
+| `https://<user>.github.io/<repo>/` | `main` | abeseria-prod | `abeseria` |
+| `https://<user>.github.io/<repo>/dev/` | `dev` | abeseria-dev | `abeseria-dev` |
+
+- **Pushing to `dev`** runs `.github/workflows/dev.yml`: tests, then a rebuild that updates `/dev/` only. Test new features here on a real phone.
+- **Merging `dev` into `main`** runs `.github/workflows/deploy.yml` and updates the live app (and `/dev/` along with it).
+- The dev app shows a red **DEV · test data** badge and installs as "Abeseria Dev", so the two can sit side by side on one phone without sharing trips or offline files.
+
+In the repo: Settings → Pages → Source: **GitHub Actions**.
 
 ## Files
 

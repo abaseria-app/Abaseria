@@ -223,3 +223,12 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .confirm.card { background: var(--card); border: 2px solid var(--red); border-radius: var(--radius); padding: 4px 14px 10px; margin-top: 16px; }
 .confirm.card p { margin: 10px 0 4px; }
 .seg button.danger { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* Test builds only (see main.tsx). Sits above the bottom safe area, never blocks a tap. */
+.dev-badge {
+  position: fixed; left: 50%; bottom: calc(6px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  z-index: 1000; pointer-events: none;
+  padding: 2px 10px; border-radius: 999px;
+  background: #b3261e; color: #fff; font: 600 11px/18px system-ui, sans-serif; letter-spacing: .04em;
+  opacity: .9;
+}

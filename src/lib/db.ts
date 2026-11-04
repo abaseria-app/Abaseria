@@ -102,6 +102,12 @@ export interface Setting {
   value: string;
 }
 
+/**
+ * The live app and the dev app (/dev/) share one web address, so they'd share phone storage too.
+ * Only production builds use the original name, which keeps existing testers' trips where they are.
+ */
+export const DB_NAME = import.meta.env.MODE === 'production' ? 'abeseria' : 'abeseria-dev';
+
 class AbeseriaDB extends Dexie {
   trips!: Table<Trip, number>;
   items!: Table<Item, number>;
@@ -110,7 +116,7 @@ class AbeseriaDB extends Dexie {
   branches!: Table<Branch, number>;
 
   constructor() {
-    super('abeseria');
+    super(DB_NAME);
     this.version(1).stores({
       trips: '++id, testerId, startedAt, endedAt',
       items: '++id, tripId, label, createdAt',
