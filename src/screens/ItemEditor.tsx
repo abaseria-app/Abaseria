@@ -4,6 +4,7 @@ import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type Pri
 import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
 import { CATEGORIES, guessCategory, type CategoryId } from '../lib/categories';
+import { formatBarcode } from '../lib/barcode';
 
 export interface ItemSubmit {
   label: string;
@@ -23,6 +24,8 @@ export interface ItemSubmit {
   priceTouched: boolean;
   /** Filled in by the capture screen, not the editor. */
   barcode?: string | null;
+  /** Filled in by the capture screen, not the editor. */
+  thumb?: string | null;
 }
 
 interface Props {
@@ -146,7 +149,7 @@ export function ItemEditor(p: Props) {
 
       {p.notice && <p className="notice">{p.notice}</p>}
       {p.recallNote && <p className="notice">{p.recallNote}</p>}
-      {p.barcode && <p className="hint small">{S.item.barcodeLine(p.barcode)}</p>}
+      {p.barcode && <p className="hint small">{S.item.barcodeLine(formatBarcode(p.barcode))}</p>}
 
       {p.candidates && p.candidates.length > 0 && (
         <section>

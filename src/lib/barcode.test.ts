@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gtinOk, isInStoreCode, normalizeBarcode } from './barcode';
+import { formatBarcode, gtinOk, isInStoreCode, normalizeBarcode } from './barcode';
 
 describe('gtinOk', () => {
   it('accepts valid EAN-13, EAN-8 and UPC-A', () => {
@@ -30,5 +30,16 @@ describe('isInStoreCode', () => {
   it('flags scale-printed codes', () => {
     expect(isInStoreCode('2000000000008')).toBe(true);
     expect(isInStoreCode('4800016644115')).toBe(false);
+  });
+});
+
+describe('formatBarcode', () => {
+  it('groups digits like the print under the bars', () => {
+    expect(formatBarcode('4800016644115')).toBe('4 800016 644115');
+    expect(formatBarcode('036000291452')).toBe('0 36000 29145 2');
+    expect(formatBarcode('96385074')).toBe('9638 5074');
+  });
+  it('leaves other lengths alone', () => {
+    expect(formatBarcode('12345678901234')).toBe('12345678901234');
   });
 });

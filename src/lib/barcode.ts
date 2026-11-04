@@ -90,3 +90,14 @@ export async function scanFrame(detector: BarcodeDetectorLike, video: HTMLVideoE
   }
   return null;
 }
+
+/**
+ * Digits grouped the way they're printed under the bars, so a shopper can check them against the package:
+ * EAN-13 "4 800016 644115", UPC-A "0 36000 29145 2", EAN-8 "9638 5074". Anything else is shown as is.
+ */
+export function formatBarcode(code: string): string {
+  if (/^\d{13}$/.test(code)) return `${code[0]} ${code.slice(1, 7)} ${code.slice(7)}`;
+  if (/^\d{12}$/.test(code)) return `${code[0]} ${code.slice(1, 6)} ${code.slice(6, 11)} ${code[11]}`;
+  if (/^\d{8}$/.test(code)) return `${code.slice(0, 4)} ${code.slice(4)}`;
+  return code;
+}

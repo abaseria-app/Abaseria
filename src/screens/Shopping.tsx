@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { S } from '../strings';
 import { db, recentLabels, setSetting, storeName, type Item } from '../lib/db';
 import { formatKg, formatPeso, lineTotal } from '../lib/money';
+import { formatBarcode } from '../lib/barcode';
+import { CATEGORY_BY_ID, categoryOf } from '../lib/categories';
 import { logEvent } from '../lib/events';
 import { Capture } from './Capture';
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
@@ -55,6 +57,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
     const id = await db.items.add({
       tripId,
       barcode: v.barcode ?? null,
+      thumb: v.thumb ?? null,
       label: v.label,
       priceType: v.priceType,
       unitPriceCentavos: v.unitPriceCentavos,
@@ -175,6 +178,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
         {live.map((i) => (
           <li key={i.id}>
             <button className="item-row" onClick={() => setEditing(i)}>
+              <Thumb item={i} />
               <span className="item-name">
                 {i.label}
                 <small>
@@ -186,6 +190,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
                   {i.priceType !== 'perkg' && i.quantity > 1 ? ` × ${i.quantity}` : ''}
                   {i.isPromo ? ' · promo' : ''}
                 </small>
+                {i.barcode && <small className="item-code">{formatBarcode(i.barcode)}</small>}
               </span>
               <strong>{formatPeso(i.lineTotalCentavos)}</strong>
             </button>
@@ -220,5 +225,16 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
         </div>
       </footer>
     </main>
+  );
+}
+
+/** The item's photo, or its first letter on the category color when there's no photo. */
+function Thumb({ item }: { item: Item }) {
+  if (item.thumb) return <img className="item-thumb" src={item.thumb} alt="" />;
+  const cat = CATEGORY_BY_ID[categoryOf(item)];
+  return (
+    <span className="item-thumb blank" style={{ background: cat.color, color: cat.ink }} aria-hidden="true">
+      {item.label.trim().charAt(0).toUpperCase() || '•'}
+    </span>
   );
 }
