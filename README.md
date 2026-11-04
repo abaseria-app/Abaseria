@@ -43,6 +43,7 @@ Each one has a done-state. Don't move to the next until it's met.
 npm install
 npm run dev      # http://localhost:5173, also on your Wi-Fi so your phone can open it
 npm test         # parser, money and metrics tests
+npm run test:schema  # database rules, in an in-memory Postgres
 npm run build    # production build in dist/
 ```
 
@@ -62,6 +63,8 @@ Pushing to `main` runs tests, builds, and publishes to GitHub Pages through `.gi
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
 | `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
-| `supabase/` | Shared price database schema and setup steps (not connected to the app yet) |
+| `.env.development` | Dev database address and publishable key (abeseria-dev) |
+| `src/lib/supabase.ts` | Connection to the shared price database; picks dev or prod and refuses a mismatch |
+| `supabase/` | Shared price database schema, setup steps for the dev and prod projects, schema checks |
 | `src/strings.ts` | Every user-facing string, ready for translation |
 | `scripts/copy-ocr.mjs` | Copies the OCR engine into `public/` so nothing loads from a CDN |

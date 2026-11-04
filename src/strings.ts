@@ -179,6 +179,13 @@ export const S = {
     ocrCheckHint: 'Pick 10 shelf-tag photos from your gallery. Pass = right price in the chips 8 times or more.',
     results: 'Combine tester results',
     resultsHint: 'Pick the trips CSV files from every tester’s phone.',
+    db: 'Shared price database',
+    dbCheck: 'Check connection',
+    dbChecking: 'Checking…',
+    dbOff: 'Not set up. Prices stay on this phone.',
+    dbOk: (target: string, branches: number, products: number, prices: number) =>
+      `Connected to ${target}. ${branches} stores, ${products} products, ${prices} prices.`,
+    dbError: (target: string, message: string) => `Can’t reach ${target}: ${message}`,
     back: 'Back',
     about: 'About',
     aboutText: 'Abeseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',

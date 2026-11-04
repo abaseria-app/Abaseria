@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { S } from '../strings';
 import { exportCsvFiles } from '../lib/export';
+import { checkConnection, dbConfig, type DbStatus } from '../lib/supabase';
 
 interface Props {
   testMode: boolean;
@@ -12,6 +13,8 @@ interface Props {
 
 export function Settings({ testMode, onTestMode, onOcrCheck, onResults, onBack }: Props) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [db, setDb] = useState<DbStatus | null>(null);
+  const [checking, setChecking] = useState(false);
   return (
     <main className="screen settings">
       <header className="topbar">
@@ -38,6 +41,25 @@ export function Settings({ testMode, onTestMode, onOcrCheck, onResults, onBack }
 
       <button className="btn secondary wide" onClick={onResults}>{S.settings.results}</button>
       <p className="hint">{S.settings.resultsHint}</p>
+
+      <section className="card">
+        <h2>{S.settings.db}</h2>
+        {dbConfig ? (
+          <>
+            <button className="btn secondary wide" disabled={checking} onClick={async () => {
+              setChecking(true);
+              setDb(await checkConnection());
+              setChecking(false);
+            }}>
+              {checking ? S.settings.dbChecking : S.settings.dbCheck}
+            </button>
+            {db?.state === 'ok' && <p className="hint">{S.settings.dbOk(db.target, db.branches, db.products, db.prices)}</p>}
+            {db?.state === 'error' && <p className="hint">{S.settings.dbError(db.target, db.message)}</p>}
+          </>
+        ) : (
+          <p className="hint">{S.settings.dbOff}</p>
+        )}
+      </section>
 
       <section className="about">
         <h2>{S.settings.about}</h2>

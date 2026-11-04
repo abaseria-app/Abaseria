@@ -25,9 +25,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run test:schema
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # Production database. Set these under Settings → Secrets and variables → Actions → Variables.
+          # Left empty, the app builds phone-only, as before.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_PROD_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PROD_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ENV: prod
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
