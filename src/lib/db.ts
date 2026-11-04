@@ -34,6 +34,11 @@ export interface Branch {
   lat: number | null;
   lng: number | null;
   createdAt: string;
+  /**
+   * This store's id in the shared database, once known. Usually the same as `uuid`; different when another
+   * phone added the same store first.
+   */
+  remoteId?: string | null;
 }
 
 export interface Trip {
@@ -55,13 +60,16 @@ export interface Trip {
   receiptMatched: boolean | null;
   receiptTotalCentavos: number | null;
   receiptItemCount: number | null;
+  /** When this trip's prices were shared (or the trip was looked at and had nothing to share). */
+  sharedAt?: string | null;
 }
 
 /**
  * tag: price read from the shelf tag and accepted. tag+typed: read, then corrected. typed: typed in.
  * recall: price filled in from this barcode's last price at this branch and accepted without changes.
+ * shared: price filled in from another shopper's latest price at this branch and accepted without changes.
  */
-export type CaptureMethod = 'tag' | 'tag+typed' | 'typed' | 'recall';
+export type CaptureMethod = 'tag' | 'tag+typed' | 'typed' | 'recall' | 'shared';
 
 /**
  * One row per item on a trip. The price fields are what was seen on the shelf at that store and time,
@@ -87,6 +95,8 @@ export interface Item {
   captureMethod: CaptureMethod;
   removed: boolean;
   createdAt: string;
+  /** Made just before this item's price is first uploaded; the shared database ignores a second upload with the same id. */
+  shareId?: string | null;
 }
 
 export interface AppEvent {
@@ -147,6 +157,8 @@ export interface Recall {
   item: Item;
   /** True when `item` was logged at the branch being shopped now, so its price applies here. */
   sameBranch: boolean;
+  /** True when the price came from other shoppers through the shared database, not from this phone. */
+  shared?: boolean;
 }
 
 /** What this phone already knows about a barcode. Works offline; the shared database comes later. */

@@ -101,6 +101,7 @@ export const S = {
   capture: {
     aim: 'Fit the shelf tag inside the box',
     reading: 'Reading the tag…',
+    lookingUp: 'Checking other shoppers’ prices…',
     typeInstead: 'Type it instead',
     cancel: 'Cancel',
     cameraBlocked: 'Camera is blocked. Allow camera access in your browser settings, or take a photo instead.',
@@ -149,6 +150,7 @@ export const S = {
     needPrice: 'Enter a price',
     unnamed: (n: number) => `Item •${String(n).padStart(2, '0')}`,
     lastSeen: (price: string, date: string) => `Last price here: ${price} on ${date}. Check the tag and change it if it’s different.`,
+    sharedSeen: (price: string, date: string) => `Other shoppers paid ${price} here on ${date}. Check the tag and change it if it’s different.`,
     barcodeLine: (code: string) => `Barcode ${code}`,
     unit: { kg: '/kg', '100g': '/100g', pc: '/pc' } as Record<string, string>,
     bundleChip: (q: number, p: string) => `${q} for ${p}`,
@@ -186,9 +188,18 @@ export const S = {
     dbOk: (target: string, branches: number, products: number, prices: number) =>
       `Connected to ${target}. ${branches} stores, ${products} products, ${prices} prices.`,
     dbError: (target: string, message: string) => `Can’t reach ${target}: ${message}`,
+    shareWaiting: (n: number) => (n === 1 ? '1 finished trip waiting to share its prices.' : `${n} finished trips waiting to share their prices.`),
+    shareNone: 'All finished trips have shared their prices.',
+    shareNow: 'Share now',
+    sharing: 'Sharing…',
+    shareDone: (trips: number, prices: number) => `Shared ${prices} ${prices === 1 ? 'price' : 'prices'} from ${trips} ${trips === 1 ? 'trip' : 'trips'}.`,
+    shareFailed: (message: string) => `Couldn’t share: ${message}. It will try again next time the app opens online.`,
+    shareOff: 'Price sharing is off in this version. It turns on once the consent screen is added.',
     back: 'Back',
     about: 'About',
     aboutText: 'Abeseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',
+    aboutTextSharing:
+      'Abeseria test prototype. Prices of items with a barcode are shared with other shoppers: product, store, price and day. Your location, the time and anything without a barcode stay on this phone. Text reading uses Tesseract (Apache 2.0).',
     version: 'Version 0.1 (prototype)',
   },
 

@@ -2,7 +2,7 @@
 // then checks the read/add/no-edit rules. Run before pasting a changed schema into either Supabase project.
 // Usage: npm run test:schema
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const db = new PGlite();
@@ -21,6 +21,10 @@ await db.exec(`
   grant execute on function auth.uid() to anon, authenticated;
 `);
 await db.exec(schema);
+// Migrations must apply cleanly on top of the current schema too.
+for (const f of readdirSync(new URL('./migrations/', import.meta.url)).filter((n) => n.endsWith('.sql')).sort()) {
+  await db.exec(readFileSync(new URL(`./migrations/${f}`, import.meta.url), 'utf8'));
+}
 
 let pass = 0, fail = 0;
 async function as(role, uid, sql) {
@@ -50,6 +54,10 @@ await refused('same sighting uploaded twice', 'authenticated', U1, sighting('c00
 await refused('sighting older than 14 days', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000002', '2020-01-01'));
 await refused('bundle missing its price', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000003', today, 'x'));
 await refused('faked contributor id', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method, contributor) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 100, 'tag', '${U2}')`);
+await ok('a shared price can be confirmed', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000009', '4800016644818', '${B1}', '${today}', 'each', 11500, 'shared')`);
+await refused('unknown capture method', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 11500, 'guess')`);
+await ok('re-upload of a known product is ignored, not an error', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Other name') on conflict (barcode) do nothing`);
+await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
 await refused('edit a sighting', 'authenticated', U1, `update public.price_sightings set unit_price_centavos = 1`);

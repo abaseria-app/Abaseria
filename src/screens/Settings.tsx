@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { S } from '../strings';
 import { exportCsvFiles } from '../lib/export';
 import { checkConnection, dbConfig, type DbStatus } from '../lib/supabase';
+import { SHARING_ON, sharePending, waitingToShare, type ShareResult } from '../lib/sync';
 
 interface Props {
   testMode: boolean;
@@ -15,6 +16,12 @@ export function Settings({ testMode, onTestMode, onOcrCheck, onResults, onBack }
   const [msg, setMsg] = useState<string | null>(null);
   const [db, setDb] = useState<DbStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  const [waiting, setWaiting] = useState<number | null>(null);
+  const [share, setShare] = useState<ShareResult | null>(null);
+  const [sharing, setSharing] = useState(false);
+  useEffect(() => {
+    waitingToShare().then(setWaiting);
+  }, [share]);
   return (
     <main className="screen settings">
       <header className="topbar">
@@ -55,6 +62,23 @@ export function Settings({ testMode, onTestMode, onOcrCheck, onResults, onBack }
             </button>
             {db?.state === 'ok' && <p className="hint">{S.settings.dbOk(db.target, db.branches, db.products, db.prices)}</p>}
             {db?.state === 'error' && <p className="hint">{S.settings.dbError(db.target, db.message)}</p>}
+            {SHARING_ON ? (
+              <>
+                <p className="hint">{waiting ? S.settings.shareWaiting(waiting) : S.settings.shareNone}</p>
+                {!!waiting && (
+                  <button className="btn secondary wide" disabled={sharing} onClick={async () => {
+                    setSharing(true);
+                    setShare(await sharePending());
+                    setSharing(false);
+                  }}>
+                    {sharing ? S.settings.sharing : S.settings.shareNow}
+                  </button>
+                )}
+                {share && <p className="hint">{share.error ? S.settings.shareFailed(share.error) : S.settings.shareDone(share.trips, share.prices)}</p>}
+              </>
+            ) : (
+              <p className="hint">{S.settings.shareOff}</p>
+            )}
           </>
         ) : (
           <p className="hint">{S.settings.dbOff}</p>
@@ -63,7 +87,7 @@ export function Settings({ testMode, onTestMode, onOcrCheck, onResults, onBack }
 
       <section className="about">
         <h2>{S.settings.about}</h2>
-        <p>{S.settings.aboutText}</p>
+        <p>{SHARING_ON ? S.settings.aboutTextSharing : S.settings.aboutText}</p>
         <p className="hint">{S.settings.version}</p>
       </section>
     </main>

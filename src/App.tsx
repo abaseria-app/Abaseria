@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSetting, requestPersistentStorage, setSetting } from './lib/db';
 import { warmOcr } from './lib/ocr';
+import { sharePending, startSharing } from './lib/sync';
 import { S } from './strings';
 import { Home } from './screens/Home';
 import { StartTrip } from './screens/StartTrip';
@@ -22,6 +23,8 @@ export default function App() {
     requestPersistentStorage();
     // Start the OCR engine now so the first tag photo doesn't wait for it.
     warmOcr().catch((e) => console.warn('OCR warm-up failed', e));
+    // Uploads finished trips that didn't make it last time (dev app only for now).
+    startSharing();
     (async () => {
       setTestMode((await getSetting('testMode')) === '1');
       const active = Number(await getSetting('activeTripId'));
@@ -83,6 +86,7 @@ export default function App() {
           tripId={tripId!}
           onBack={() => setRoute('shop')}
           onEnded={() => {
+            sharePending();
             setTripId(null);
             setToast(S.cashier.thanks);
             setRoute('home');

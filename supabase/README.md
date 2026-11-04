@@ -49,6 +49,12 @@ To confirm: open the app → Settings → Shared price database → Check connec
 
 ## Changing the schema
 
+Changes after the first setup go in `supabase/migrations/`, numbered in order. `schema.sql` always holds the full current version for new projects.
+
+| Migration | What it does | Run in dev | Run in prod |
+|---|---|---|---|
+| `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
+
 Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 17 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it

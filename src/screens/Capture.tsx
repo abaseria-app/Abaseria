@@ -6,12 +6,14 @@ import { logEvent } from '../lib/events';
 import { getDetector, scanFrame } from '../lib/barcode';
 import { recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
 import { formatPeso } from '../lib/money';
+import { SHARING_ON, sharedPrice } from '../lib/sync';
 
 /**
  * barcode: live camera looking for a package barcode, no tap needed
  * camera:  live camera aimed at the shelf tag, tap the shutter
+ * lookup:  barcode read, asking the shared database for other shoppers' price (2 seconds at most)
  */
-type Step = 'barcode' | 'camera' | 'nocam' | 'reading' | 'confirm' | 'type' | 'recall';
+type Step = 'barcode' | 'lookup' | 'camera' | 'nocam' | 'reading' | 'confirm' | 'type' | 'recall';
 
 interface Props {
   tripId: number;
@@ -128,8 +130,19 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
       return;
     }
     setBarcode(code);
-    const r = await recallBarcode(code, branchUuid);
+    let r = await recallBarcode(code, branchUuid);
     logEvent('barcode_scanned', tripId, { kind: r ? (r.sameBranch ? 'known_here' : 'known_elsewhere') : 'new', ms });
+    if (!r?.sameBranch && SHARING_ON) {
+      // Not seen here by this phone: ask whether other shoppers have.
+      setStep('lookup');
+      const t0 = performance.now();
+      const shared = await sharedPrice(code, branchUuid);
+      logEvent('shared_lookup', tripId, { hit: !!shared, ms: Math.round(performance.now() - t0) });
+      if (shared) {
+        if (!shared.item.label && r) shared.item.label = r.item.label;
+        r = shared;
+      }
+    }
     setRecall(r);
     if (r?.sameBranch) {
       setStep('recall');
@@ -186,7 +199,9 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
     const method: CaptureMethod = fromRecall
       ? v.priceTouched
         ? 'typed'
-        : 'recall'
+        : recall?.shared
+          ? 'shared'
+          : 'recall'
       : !usedCamera.current
         ? 'typed'
         : v.chosenRank === 'typed' || v.editedAfterChoice
@@ -206,7 +221,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
         title={S.item.addTitle}
         submitLabel={S.item.add}
         initial={last}
-        recallNote={S.item.lastSeen(formatPeso(recall.item.unitPriceCentavos), shortDate(recall.item.createdAt))}
+        recallNote={(recall.shared ? S.item.sharedSeen : S.item.lastSeen)(formatPeso(recall.item.unitPriceCentavos), shortDate(recall.item.createdAt))}
         barcode={barcode}
         recent={recent}
         fallbackName={fallbackName}
@@ -259,7 +274,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
             }
           />
           <p className="aim">
-            {step === 'reading' ? S.capture.reading : scanning ? S.capture.aimBarcode : aimNote ?? S.capture.aim}
+            {step === 'reading' ? S.capture.reading : step === 'lookup' ? S.capture.lookingUp : scanning ? S.capture.aimBarcode : aimNote ?? S.capture.aim}
           </p>
         </>
       )}
@@ -276,7 +291,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
         <button className="link light" onClick={cancel}>{S.capture.cancel}</button>
         {scanning && <button className="btn secondary no-barcode" onClick={skipBarcode}>{S.capture.noBarcode}</button>}
         {step === 'camera' && <button className="shutter" aria-label={S.shop.snap} onClick={shoot} />}
-        {step === 'reading' && <div className="spinner" aria-label={S.capture.reading} />}
+        {(step === 'reading' || step === 'lookup') && <div className="spinner" aria-label={step === 'lookup' ? S.capture.lookingUp : S.capture.reading} />}
         <button
           className="link light"
           onClick={() => {

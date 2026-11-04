@@ -73,7 +73,8 @@ create table public.price_sightings (
   is_promo               boolean not null default false,
   -- 'tag' = price read from the shelf tag and accepted as is; 'tag+typed' = read then corrected; 'typed' = typed.
   -- 'recall' = this phone's last price for the barcode at this branch, accepted after checking the tag.
-  capture_method         text not null check (capture_method in ('tag', 'tag+typed', 'typed', 'recall')),
+  -- 'shared' = another shopper's latest price at this branch, accepted after checking the tag.
+  capture_method         text not null check (capture_method in ('tag', 'tag+typed', 'typed', 'recall', 'shared')),
   contributor            uuid default auth.uid() references auth.users (id) on delete set null,
   check ((price_type = 'bundle') = (bundle_qty is not null and bundle_price_centavos is not null))
 );
