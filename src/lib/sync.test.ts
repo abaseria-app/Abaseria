@@ -7,9 +7,13 @@ interface Store {
   branches: { id: string; chain: string; name: string }[];
   products: { barcode: string; name: string }[];
   price_sightings: Record<string, unknown>[];
+  product_photos: Record<string, unknown>[];
   failNext?: string;
 }
-const store: Store = { branches: [], products: [], price_sightings: [] };
+const store: Store = { branches: [], products: [], price_sightings: [], product_photos: [] };
+/** Files in the product-photos bucket, by path. */
+const files = new Map<string, Blob>();
+let failUploads = 0;
 let signIns = 0;
 
 function table(name: keyof Omit<Store, 'failNext'>) {
@@ -21,6 +25,7 @@ function table(name: keyof Omit<Store, 'failNext'>) {
     eq: (k: string, v: unknown) => (filters.push([k, v]), b),
     in: (k: string, v: unknown[]) => ((inFilter = [k, v]), b),
     limit: () => b,
+    order: () => b,
     retry: () => b,
     abortSignal: () => b,
     insert: (rows: unknown) => ((op = { kind: 'insert', rows: [rows].flat() as Record<string, unknown>[] }), b),
@@ -45,7 +50,8 @@ function table(name: keyof Omit<Store, 'failNext'>) {
           if (op.kind === 'upsert') continue;
           return resolve({ data: null, error: { message: 'duplicate', code: '23505' } });
         }
-        rows.push({ ...r });
+        // The database fills these in for photo rows (schema.sql).
+        rows.push(name === 'product_photos' ? { status: 'pending', path: `${r.barcode}/${r.id}.jpg`, ...r } : { ...r });
       }
       return resolve({ data: null, error: null });
     },
@@ -53,8 +59,21 @@ function table(name: keyof Omit<Store, 'failNext'>) {
   return b;
 }
 
+// The bucket takes a file only at the path of a pending photo row, once, like the storage policies.
+const bucket = {
+  upload: async (path: string, blob: Blob) => {
+    if (failUploads > 0) return failUploads--, { data: null, error: { message: 'connection reset', statusCode: '500' } };
+    if (files.has(path)) return { data: null, error: { message: 'Duplicate', statusCode: '409' } };
+    if (!store.product_photos.some((r) => r.path === path && r.status === 'pending')) return { data: null, error: { message: 'row-level security', statusCode: '403' } };
+    files.set(path, blob);
+    return { data: { path }, error: null };
+  },
+  download: async (path: string) => (files.has(path) ? { data: files.get(path)!, error: null } : { data: null, error: { message: 'not found' } }),
+};
+
 const fakeClient = {
   from: (t: keyof Omit<Store, 'failNext'>) => table(t),
+  storage: { from: () => bucket },
   auth: {
     getSession: async () => ({ data: { session: signIns ? {} : null } }),
     signInAnonymously: async () => (signIns++, { data: {}, error: null }),
@@ -92,6 +111,9 @@ beforeEach(async () => {
   store.branches = [];
   store.products = [];
   store.price_sightings = [];
+  store.product_photos = [];
+  files.clear();
+  failUploads = 0;
   signIns = 0;
   await Promise.all([db.trips.clear(), db.items.clear(), db.branches.clear(), db.settings.clear(), db.events.clear()]);
   await db.settings.put({ key: 'sharingSince', value: iso(30) });
@@ -208,5 +230,71 @@ describe('sharedPrice', () => {
 
   it('returns nothing for a store nobody has shared yet', async () => {
     expect(await sync.sharedPrice('4800016644818', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toBeNull();
+  });
+});
+
+// A real 1×1 JPEG is not needed: the bytes only have to survive the round trip.
+const PHOTO = `data:image/jpeg;base64,${btoa('fake jpeg bytes')}`;
+
+describe('product photos', () => {
+  it('picks one camera photo per barcode, newest first, from shared trips only', () => {
+    const shared = new Set([1]);
+    const a = item({ id: 1, thumb: PHOTO, thumbSource: 'camera', createdAt: iso(1) });
+    const b = item({ id: 2, thumb: PHOTO, thumbSource: 'camera', createdAt: iso(0) });
+    const fromDb = item({ id: 3, barcode: '4806502162316', thumb: PHOTO, thumbSource: 'shared' });
+    const notShared = item({ id: 4, tripId: 2, barcode: '4800016644115', thumb: PHOTO, thumbSource: 'camera' });
+    const noPhoto = item({ id: 5, barcode: '4800016644115' });
+    expect(sync.photosToSend([a, b, fromDb, notShared, noPhoto], shared).map((i) => i.id)).toEqual([2]);
+    expect(sync.photosToSend([{ ...a, photoSentAt: iso(0) }, b], shared)).toEqual([]);
+  });
+
+  it('sends the row, then the file, once per barcode', async () => {
+    const tripId = await addTrip();
+    await db.items.bulkAdd([
+      item({ tripId, thumb: PHOTO, thumbSource: 'camera' }),
+      item({ tripId, thumb: PHOTO, thumbSource: 'camera', quantity: 2 }),
+    ]);
+    const r = await sync.sharePending();
+    expect(r).toMatchObject({ trips: 1, photos: 1 });
+    expect(store.product_photos).toHaveLength(1);
+    expect(store.product_photos[0]).toMatchObject({ barcode: '4800016644818', status: 'pending' });
+    expect(Object.keys(store.product_photos[0])).not.toContain('created_by');
+    const path = store.product_photos[0].path as string;
+    expect(await files.get(path)!.text()).toBe('fake jpeg bytes');
+    const again = await sync.sharePending();
+    expect(again.trips).toBe(0);
+    expect(again.photos ?? 0).toBe(0);
+    expect(files.size).toBe(1);
+  });
+
+  it('retries a dropped file upload into the same path, with no new trip', async () => {
+    const tripId = await addTrip();
+    await db.items.add(item({ tripId, thumb: PHOTO, thumbSource: 'camera' }));
+    failUploads = 1;
+    const first = await sync.sharePending();
+    expect(first.error).toMatch(/connection reset/);
+    expect(store.product_photos).toHaveLength(1);
+    expect(files.size).toBe(0);
+    const second = await sync.sharePending();
+    expect(second.error).toBeUndefined();
+    expect(second.photos).toBe(1);
+    expect(store.product_photos).toHaveLength(1);
+    expect([...files.keys()]).toEqual([store.product_photos[0].path]);
+  });
+
+  it("doesn't send a photo that came from the database", async () => {
+    const tripId = await addTrip();
+    await db.items.add(item({ tripId, thumb: PHOTO, thumbSource: 'shared' }));
+    expect((await sync.sharePending()).photos).toBe(0);
+    expect(store.product_photos).toHaveLength(0);
+  });
+
+  it('shows other shoppers a photo only once it is published', async () => {
+    const tripId = await addTrip();
+    await db.items.add(item({ tripId, thumb: PHOTO, thumbSource: 'camera' }));
+    await sync.sharePending();
+    expect(await sync.sharedPhoto('4800016644818')).toBeNull();
+    store.product_photos[0].status = 'published';
+    expect(await sync.sharedPhoto('4800016644818')).toBe(PHOTO);
   });
 });

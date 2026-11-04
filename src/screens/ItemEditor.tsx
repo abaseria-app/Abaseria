@@ -26,6 +26,7 @@ export interface ItemSubmit {
   barcode?: string | null;
   /** Filled in by the capture screen, not the editor. */
   thumb?: string | null;
+  thumbSource?: 'camera' | 'shared' | null;
 }
 
 interface Props {

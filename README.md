@@ -74,6 +74,7 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/money.ts` | Centavo formatting and line totals |
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
 | `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
+| `src/lib/thumb.ts` | Item photo: a 240 px square from the camera frame at barcode read (or the tag photo). Barcode photos go to the shared database as pending; tag photos stay on the phone |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
 | `.env.development` | Dev database address and publishable key (abeseria-dev) |
 | `src/lib/sync.ts` | Uploading finished trips and looking up other shoppers' prices |

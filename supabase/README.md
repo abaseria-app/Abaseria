@@ -12,6 +12,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 | `products` | barcode | 8/12/13/14 digits with a valid check digit. In-store scale codes (13 digits starting with 2) are rejected because they change daily |
 | `price_sightings` | confirmed price | day only (no time), never edited by the app, `client_id` stops double uploads |
 | `latest_prices` (view) | barcode × branch | newest sighting |
+| `product_photos` | uploaded product photo | one per barcode per phone; `pending` until you publish it. The file is in the private storage bucket `product-photos` at `<barcode>/<id>.jpg` (JPEG, 64 KB max) |
 
 ## Rules
 
@@ -20,6 +21,11 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 - Nobody can edit or delete from the app. You fix bad rows in the Supabase dashboard.
 - Which phone added a price is stored but can't be read through the app.
 - Sightings older than 14 days or dated in the future are refused.
+- Photos: shoppers only see published ones; the phone that sent a pending photo sees its own. The row has to exist before its file can be uploaded, and nobody can swap or delete a file from the app.
+
+## Publishing photos
+
+Until the admin dashboard exists: Table Editor → `product_photos` → set `status` to `published` (or `rejected`). To look at a photo first, open Storage → `product-photos` → the barcode's folder.
 
 ## Two databases
 
@@ -54,8 +60,9 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | Migration | What it does | Run in dev | Run in prod |
 |---|---|---|---|
 | `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
+| `003_product_photos.sql` | Product photos: `product_photos` table and the private `product-photos` bucket, pending until published | Before testing photos in the dev app | Before photo sharing turns on in the live app |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 17 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 41 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 
