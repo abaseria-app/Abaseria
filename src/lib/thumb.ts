@@ -1,51 +1,37 @@
-// Item thumbnails: one small square photo per item, taken from the camera frame the shopper already aimed.
+// List thumbnails: the product's one reference image from the shared database, shrunk to a small square.
 //
-// Barcode items get a frame from the moment the barcode read, which shows the package. Tag-only items
-// (iPhones, produce, meat) get the shelf-tag photo. Typed items have none and show a placeholder.
-// Thumbnails stay on this phone: they aren't in the CSV export and aren't shared with other phones.
+// The full image can be a few hundred KB; the list shows it at 56 px. Shrinking it once at scan time and
+// keeping it with the item means the list works offline and the phone doesn't refetch it every trip.
+// Shoppers' cameras never supply this image.
 
-/** Pixels per side. Shown at 56 px, so this is sharp on 2x screens and about 4-7 KB as JPEG. */
-export const THUMB_PX = 112;
-const QUALITY = 0.7;
+/** Pixels per side: sharp at 56 px on 3x screens, about 5-8 KB as JPEG. */
+export const THUMB_PX = 168;
+const QUALITY = 0.8;
 
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+/** Where a w × h image sits inside a square box when it's fit whole (letterboxed), centered. */
+export function fitInside(w: number, h: number, box = THUMB_PX): { x: number; y: number; w: number; h: number } {
+  const scale = Math.min(box / w, box / h);
+  const fw = Math.round(w * scale);
+  const fh = Math.round(h * scale);
+  return { x: Math.round((box - fw) / 2), y: Math.round((box - fh) / 2), w: fw, h: fh };
 }
 
 /**
- * The square to cut from a w × h frame: centered on `focus` (or the frame's center) and as big as fits.
- * `fill` is how much of the short side to keep; 0.8 trims the edges where the shelf usually is.
+ * The image fit whole on a white square, as a JPEG data URL. White matches the plain backgrounds product
+ * shots usually have. Null when the file isn't an image this phone can read.
  */
-export function squareCrop(w: number, h: number, focus?: Rect, fill = 0.8): Rect {
-  const cx = focus ? focus.x + focus.w / 2 : w / 2;
-  const cy = focus ? focus.y + focus.h / 2 : h / 2;
-  const side = Math.round(Math.min(w, h) * fill);
-  const x = Math.round(Math.min(Math.max(cx - side / 2, 0), w - side));
-  const y = Math.round(Math.min(Math.max(cy - side / 2, 0), h - side));
-  return { x, y, w: side, h: side };
-}
-
-type Source = HTMLVideoElement | HTMLCanvasElement | ImageBitmap;
-
-function size(s: Source): { w: number; h: number } {
-  if (s instanceof HTMLVideoElement) return { w: s.videoWidth, h: s.videoHeight };
-  return { w: s.width, h: s.height };
-}
-
-/** A JPEG data URL of the frame's center (or around `focus`), or null if the frame is empty or the phone can't encode. */
-export function makeThumb(source: Source, focus?: Rect): string | null {
+export async function shrinkImage(file: Blob): Promise<string | null> {
   try {
-    const { w, h } = size(source);
-    if (!w || !h) return null;
-    const c = squareCrop(w, h, focus);
+    const bmp = await createImageBitmap(file);
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = THUMB_PX;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(source, c.x, c.y, c.w, c.h, 0, 0, THUMB_PX, THUMB_PX);
+    if (!ctx || !bmp.width || !bmp.height) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, THUMB_PX, THUMB_PX);
+    const r = fitInside(bmp.width, bmp.height);
+    ctx.drawImage(bmp, r.x, r.y, r.w, r.h);
+    bmp.close?.();
     const url = canvas.toDataURL('image/jpeg', QUALITY);
     return url.startsWith('data:image/jpeg') ? url : null;
   } catch {

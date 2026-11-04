@@ -5,7 +5,7 @@ import type { Item, Trip } from './db';
 // A stand-in for the shared database: tables in memory, the same unique rules as schema.sql.
 interface Store {
   branches: { id: string; chain: string; name: string }[];
-  products: { barcode: string; name: string }[];
+  products: { barcode: string; name: string; image_path?: string | null }[];
   price_sightings: Record<string, unknown>[];
   failNext?: string;
 }
@@ -55,11 +55,15 @@ function table(name: keyof Omit<Store, 'failNext'>) {
 
 const fakeClient = {
   from: (t: keyof Omit<Store, 'failNext'>) => table(t),
+  storage: { from: (bucket: string) => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/${bucket}/${path}` } }) }) },
   auth: {
     getSession: async () => ({ data: { session: signIns ? {} : null } }),
     signInAnonymously: async () => (signIns++, { data: {}, error: null }),
   },
 };
+
+// Shrinking needs a real browser canvas; here it just tags what it was given.
+vi.mock('./thumb', () => ({ shrinkImage: async (b: Blob) => `small:${await b.text()}` }));
 
 vi.mock('./supabase', () => ({
   dbConfig: { url: 'https://x.supabase.co', key: 'k', target: 'dev' },
@@ -208,5 +212,29 @@ describe('sharedPrice', () => {
 
   it('returns nothing for a store nobody has shared yet', async () => {
     expect(await sync.sharedPrice('4800016644818', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toBeNull();
+  });
+});
+
+describe('productImage', () => {
+  it("returns the product's image, shrunk, from the public bucket", async () => {
+    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', image_path: '4800016644818.jpg' });
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => (fetched.push(url), new Response('jpeg bytes', { status: 200 })));
+    expect(await sync.productImage('4800016644818')).toBe('small:jpeg bytes');
+    expect(fetched).toEqual(['https://x.supabase.co/storage/v1/object/public/product-images/4800016644818.jpg']);
+    vi.unstubAllGlobals();
+  });
+
+  it('returns nothing when the product has no image or the file is missing', async () => {
+    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', image_path: null }, { barcode: '4806502162316', name: 'X', image_path: 'gone.jpg' });
+    vi.stubGlobal('fetch', async () => new Response('', { status: 404 }));
+    expect(await sync.productImage('4800016644818')).toBeNull();
+    expect(await sync.productImage('4806502162316')).toBeNull();
+    expect(await sync.productImage('4800016644115')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('never sends an image when the app adds a product', () => {
+    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'category']);
   });
 });

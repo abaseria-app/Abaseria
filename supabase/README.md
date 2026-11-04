@@ -9,7 +9,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 | Table | One row per | Notes |
 |---|---|---|
 | `branches` | physical store | id is made on the phone; lat/lng is the store's position, never a shopper's |
-| `products` | barcode | 8/12/13/14 digits with a valid check digit. In-store scale codes (13 digits starting with 2) are rejected because they change daily |
+| `products` | barcode | 8/12/13/14 digits with a valid check digit. In-store scale codes (13 digits starting with 2) are rejected because they change daily. `image_path` names the product's one reference image |
 | `price_sightings` | confirmed price | day only (no time), never edited by the app, `client_id` stops double uploads |
 | `latest_prices` (view) | barcode × branch | newest sighting |
 
@@ -20,6 +20,16 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 - Nobody can edit or delete from the app. You fix bad rows in the Supabase dashboard.
 - Which phone added a price is stored but can't be read through the app.
 - Sightings older than 14 days or dated in the future are refused.
+- Product images are yours to set. Phones can view them but can't add, replace or delete one.
+
+## Product images
+
+One image per product, shown as the thumbnail in the shopper's list so they can see the scan found the right thing.
+
+1. Storage → `product-images` → upload the file (JPEG, PNG or WebP, 512 KB max). Name it after the barcode, e.g. `4800016644818.jpg`.
+2. Table Editor → `products` → that barcode's row → put the file name in `image_path`.
+
+To replace one, upload the new file under the same name, or a new name and change `image_path`. Phones that already scanned the product keep their copy until it's scanned on a phone that hasn't.
 
 ## Two databases
 
@@ -54,8 +64,9 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | Migration | What it does | Run in dev | Run in prod |
 |---|---|---|---|
 | `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
+| `003_product_images.sql` | `products.image_path` and the public `product-images` bucket; images set in the dashboard only | Before adding images | Before images show in the live app |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 17 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 28 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 

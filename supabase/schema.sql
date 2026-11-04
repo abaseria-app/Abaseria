@@ -49,6 +49,8 @@ create table public.products (
   size        text check (char_length(size) <= 40),
   category    text not null default 'other'
               check (category in ('meat', 'vegetables', 'pantry', 'dry', 'household', 'other')),
+  -- Reference image: a file name in the public 'product-images' bucket. Set in the dashboard, never by the app.
+  image_path  text check (image_path is null or image_path ~ '^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$'),
   created_by  uuid default auth.uid() references auth.users (id) on delete set null,
   created_at  timestamptz not null default now(),
   -- 13-digit codes starting with 2 are printed in-store (deli, meat, produce scales) and often contain
@@ -122,3 +124,11 @@ grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_cen
               bundle_price_centavos, is_promo, capture_method)
   on public.price_sightings to authenticated;
 grant select on public.latest_prices to anon, authenticated;
+
+
+-- Product images ---------------------------------------------------------------------------------------
+-- One reference image per product, set by you (and later the admin dashboard), never by shoppers' phones.
+-- Anyone can view the bucket; with no storage policies for it, the app's keys can't upload, replace or delete.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('product-images', 'product-images', true, 524288, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;

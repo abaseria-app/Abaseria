@@ -19,6 +19,13 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  -- Stand-in for Supabase Storage: just what the checks use. Supabase turns on RLS for objects itself.
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text);
+  alter table storage.objects enable row level security;
+  grant usage on schema storage to anon, authenticated;
+  grant select, insert, update, delete on storage.objects to anon, authenticated;
 `);
 await db.exec(schema);
 // Migrations must apply cleanly on top of the current schema too.
@@ -63,6 +70,16 @@ await refused('contributor column hidden', 'anon', null, `select contributor fro
 await refused('edit a sighting', 'authenticated', U1, `update public.price_sightings set unit_price_centavos = 1`);
 await refused('delete a sighting', 'authenticated', U1, `delete from public.price_sightings`);
 await refused('edit a product', 'authenticated', U1, `update public.products set name = 'x'`);
+
+// Product images: set in the dashboard, readable by anyone, never set by the app.
+await db.exec(`update public.products set image_path = '4800016644818.jpg' where barcode = '4800016644818'`);
+await ok('logged-out phone reads a product image name', 'anon', null, `select image_path from public.products where barcode = '4800016644818'`, (r) => r.rows[0]?.image_path === '4800016644818.jpg');
+await refused('app sets an image when adding a product', 'authenticated', U1, `insert into public.products (barcode, name, image_path) values ('4800016644115', 'X', 'x.jpg')`);
+await refused('app changes a product image', 'authenticated', U1, `update public.products set image_path = 'other.jpg'`);
+await refused('image name with a path trick', 'postgres', null, `update public.products set image_path = '../secret' where barcode = '4800016644818'`);
+await ok('image bucket is public', 'postgres', null, `select public from storage.buckets where id = 'product-images'`, (r) => r.rows[0]?.public === true);
+await refused('app uploads an image file', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', 'x.jpg')`);
+await refused('logged-out phone uploads an image file', 'anon', null, `insert into storage.objects (bucket_id, name) values ('product-images', 'y.jpg')`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

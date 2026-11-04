@@ -4,10 +4,9 @@ import { GUIDE, guideToSourceRect, prepareImage, readTag, type OcrResult } from 
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
 import { logEvent } from '../lib/events';
 import { getDetector, scanFrame } from '../lib/barcode';
-import { makeThumb } from '../lib/thumb';
-import { recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
+import { db, recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
 import { formatPeso } from '../lib/money';
-import { SHARING_ON, sharedPrice } from '../lib/sync';
+import { SHARING_ON, productImage, sharedPrice } from '../lib/sync';
 
 /**
  * barcode: live camera looking for a package barcode, no tap needed
@@ -42,8 +41,8 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
   const [barcode, setBarcode] = useState<string | null>(null);
   const [recall, setRecall] = useState<Recall | null>(null);
   const [aimNote, setAimNote] = useState<string | null>(null);
-  /** Package photo from the barcode read; the tag photo fills it in when there's no barcode. */
-  const thumbRef = useRef<string | null>(null);
+  /** The product's reference image from the shared database, when it arrives before Add. */
+  const imageRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -102,8 +101,6 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
             if (hit && !stop) {
               stop = true;
               navigator.vibrate?.(40);
-              // The package is in view right now; scale stickers are left for the tag photo.
-              if (hit.code) thumbRef.current = makeThumb(v);
               await found(hit.code);
               return;
             }
@@ -135,6 +132,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
       return;
     }
     setBarcode(code);
+    loadImage(code);
     let r = await recallBarcode(code, branchUuid);
     logEvent('barcode_scanned', tripId, { kind: r ? (r.sameBranch ? 'known_here' : 'known_elsewhere') : 'new', ms });
     if (!r?.sameBranch && SHARING_ON) {
@@ -155,6 +153,17 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
       setAimNote(S.capture.nowTag);
       setStep('camera');
     }
+  }
+
+  /** Doesn't hold up the scan: if the image is in by the time the shopper taps Add, the item keeps it. */
+  async function loadImage(code: string) {
+    // Seen on this phone before: reuse that copy, which also works offline.
+    const known = await db.items.where('barcode').equals(code).filter((i) => !!i.thumb).last();
+    if (known?.thumb) {
+      imageRef.current = known.thumb;
+      return;
+    }
+    imageRef.current = await productImage(code);
   }
 
   function skipBarcode() {
@@ -184,7 +193,6 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
     if (!v || !v.videoWidth) return;
     navigator.vibrate?.(20);
     const crop = guideRef.current ? guideToSourceRect(v, guideRef.current) : undefined;
-    if (!thumbRef.current) thumbRef.current = makeThumb(v, crop);
     const canvas = prepareImage(v, crop);
     v.pause();
     runOcr(canvas);
@@ -193,7 +201,6 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
   async function fromFile(file: File | undefined) {
     if (!file) return;
     const bmp = await createImageBitmap(file);
-    if (!thumbRef.current) thumbRef.current = makeThumb(bmp);
     runOcr(prepareImage(bmp));
   }
 
@@ -216,9 +223,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
           : 'tag';
     const ms = Math.round(performance.now() - openedAt.current);
     logEvent('price_chosen', tripId, { rank: fromRecall ? 'recall' : v.chosenRank, edited_after: v.editedAfterChoice || (fromRecall && v.priceTouched) });
-    // Typed items keep no photo, even if the camera was open earlier in this capture.
-    const thumb = !usedCamera.current && !barcode ? null : thumbRef.current;
-    onAdd({ ...v, barcode, thumb }, method, ms);
+    onAdd({ ...v, barcode, thumb: barcode ? imageRef.current : null }, method, ms);
   }
 
   // Known at this branch: last name and price, shopper checks the tag and taps Add.

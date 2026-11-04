@@ -11,6 +11,7 @@ import { db, getSetting, newUuid, setSetting, type Branch, type CaptureMethod, t
 import { gtinOk, isInStoreCode } from './barcode';
 import { dbConfig, getSupabase } from './supabase';
 import { logEvent } from './events';
+import { shrinkImage } from './thumb';
 
 export const SHARING_ON = dbConfig?.target === 'dev';
 
@@ -20,6 +21,11 @@ export const MAX_AGE_DAYS = 14;
 export const LOOKUP_TIMEOUT_MS = 2000;
 
 const SINCE_KEY = 'sharingSince';
+
+/** Public bucket holding each product's reference image (supabase/migrations/003_product_images.sql). */
+export const IMAGE_BUCKET = 'product-images';
+/** How long a scan waits for the product image. It never holds up the price. */
+export const IMAGE_TIMEOUT_MS = 3000;
 
 // ---------------------------------------------------------------------------------------------------------
 // Pure helpers (tested in sync.test.ts)
@@ -214,6 +220,31 @@ async function run(): Promise<ShareResult> {
     await logEvent('share_failed', null, { error: result.error });
   }
   return result;
+}
+
+/**
+ * The product's reference image, shrunk for the list, as a data URL to keep with the item.
+ * Null when the product has none, sharing is off, the phone is offline, or it takes longer than 3 seconds.
+ */
+export async function productImage(barcode: string): Promise<string | null> {
+  if (!SHARING_ON || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), IMAGE_TIMEOUT_MS);
+  try {
+    const client = await getSupabase();
+    if (!client) return null;
+    const { data, error } = await client.from('products').select('image_path').eq('barcode', barcode).limit(1).retry(false).abortSignal(ctrl.signal);
+    const path = data?.[0]?.image_path as string | null | undefined;
+    if (error || !path) return null;
+    const url = client.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) return null;
+    return await shrinkImage(await res.blob());
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Trips ended before this phone started sharing stay on the phone. */

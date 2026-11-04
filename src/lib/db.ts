@@ -80,7 +80,7 @@ export interface Item {
   tripId: number;
   /** Product barcode from the package. Missing for items logged by tag or typing only. */
   barcode?: string | null;
-  /** Small JPEG data URL from the camera (package at barcode read, or the shelf tag). Never exported or shared. */
+  /** The product's reference image, shrunk and kept on the phone so the list shows it offline. Not in CSV exports. */
   thumb?: string | null;
   label: string;
   priceType: PriceType;
