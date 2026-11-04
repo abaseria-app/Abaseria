@@ -174,7 +174,7 @@ export const S = {
   settings: {
     title: 'Settings',
     testMode: 'Test mode',
-    testModeHint: 'Asks for a tester ID at the start of each trip.',
+    testModeHint: 'Asks for a tester ID at the start of each trip and the number of items on the receipt at the counter.',
     export: 'Export test data (CSV)',
     exported: 'Files ready.',
     ocrCheck: 'Check tag reading on photos',

@@ -8,11 +8,13 @@ import { coveragePct } from '../lib/export';
 
 interface Props {
   tripId: number;
+  /** Settings → Test mode. The receipt item count (for coverage) is only asked for in test mode. */
+  testMode: boolean;
   onBack: () => void;
   onEnded: () => void;
 }
 
-export function Cashier({ tripId, onBack, onEnded }: Props) {
+export function Cashier({ tripId, testMode, onBack, onEnded }: Props) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId]);
   const items = (useLiveQuery(() => db.items.where('tripId').equals(tripId).toArray(), [tripId]) ?? []).filter((i) => !i.removed);
   const total = items.reduce((s, i) => s + i.lineTotalCentavos, 0);
@@ -76,11 +78,13 @@ export function Cashier({ tripId, onBack, onEnded }: Props) {
         </label>
       )}
 
-      <label className="field">
-        <span className="label">{S.cashier.receiptItems}</span>
-        <input inputMode="numeric" value={receiptItems} onChange={(e) => setReceiptItems(e.target.value.replace(/\D/g, ''))} placeholder="e.g. 24" />
-        <span className="hint">{S.cashier.receiptItemsHint}</span>
-      </label>
+      {(testMode || !!trip?.testerId) && (
+        <label className="field">
+          <span className="label">{S.cashier.receiptItems}</span>
+          <input inputMode="numeric" value={receiptItems} onChange={(e) => setReceiptItems(e.target.value.replace(/\D/g, ''))} placeholder="e.g. 24" />
+          <span className="hint">{S.cashier.receiptItemsHint}</span>
+        </label>
+      )}
 
       <div className="bottom">
         <button className="btn primary huge" onClick={end}>{S.cashier.endTrip}</button>

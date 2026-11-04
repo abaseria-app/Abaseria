@@ -84,6 +84,7 @@ export default function App() {
       return (
         <Cashier
           tripId={tripId!}
+          testMode={testMode}
           onBack={() => setRoute('shop')}
           onEnded={() => {
             sharePending();
