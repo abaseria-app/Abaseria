@@ -1,5 +1,10 @@
 name: Deploy to GitHub Pages
 
+# One site, two apps:
+#   /<repo>/       the live app, built from main, talking to abeseria-prod
+#   /<repo>/dev/   the test app, built from the dev branch, talking to abeseria-dev
+# Pushing to main runs this. Pushing to dev runs dev.yml, which tests dev and then runs this on main.
+
 on:
   push:
     branches: [main]
@@ -23,6 +28,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      # Live app (main)
       - run: npm ci
       - run: npm test
       - run: npm run test:schema
@@ -34,6 +41,29 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_PROD_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PROD_PUBLISHABLE_KEY }}
           VITE_SUPABASE_ENV: prod
+
+      # Test app (dev branch, or main if there's no dev branch yet)
+      - name: Get the dev branch
+        run: |
+          if git ls-remote --exit-code --heads origin dev >/dev/null; then
+            git fetch --depth 1 origin dev
+            git worktree add dev-src FETCH_HEAD
+          else
+            echo "No dev branch; building the test app from main."
+            git worktree add dev-src HEAD
+          fi
+      - name: Build the test app
+        working-directory: dev-src
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/dev/
+        run: |
+          npm ci
+          # Dev database settings come from the branch's own .env.development.
+          set -a; . ./.env.development; set +a
+          npm run build -- --mode staging
+          mkdir -p ../dist/dev
+          cp -r dist/. ../dist/dev/
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
