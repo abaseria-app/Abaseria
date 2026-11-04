@@ -63,6 +63,7 @@ Pushing to `main` runs tests, builds, and publishes to GitHub Pages through `.gi
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
 | `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
+| `.env.development` | Dev database address and publishable key (abeseria-dev) |
 | `src/lib/supabase.ts` | Connection to the shared price database; picks dev or prod and refuses a mismatch |
 | `supabase/` | Shared price database schema, setup steps for the dev and prod projects, schema checks |
 | `src/strings.ts` | Every user-facing string, ready for translation |
