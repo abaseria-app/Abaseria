@@ -2,7 +2,7 @@
 
 The app is the way in; this database is the product. Every confirmed price becomes a row: which barcode, which branch, which day, how much.
 
-The app doesn't talk to it yet. This folder sets it up so the next build can upload sightings and pull the latest price for a scanned barcode at the current branch.
+The app can connect and read from it (Settings → Check connection). Uploading sightings and pulling the latest price for a scanned barcode come next.
 
 ## Tables
 
@@ -21,19 +21,41 @@ The app doesn't talk to it yet. This folder sets it up so the next build can upl
 - Which phone added a price is stored but can't be read through the app.
 - Sightings older than 14 days or dated in the future are refused.
 
-## Setup (about 10 minutes)
+## Two databases
 
-1. Sign up at supabase.com and create a project named `abeseria`. Pick the **Southeast Asia (Singapore)** region, the closest to the Philippines. Save the database password in your password manager.
+| Project | Used by | Data |
+|---|---|---|
+| `abeseria-dev` | `npm run dev` on your computer | Test scans, made-up stores. Wipe it whenever you like. |
+| `abeseria-prod` | The GitHub Pages app shoppers use | Real prices only. Nothing typed during development goes here. |
+
+The app checks the label: the dev server only connects to a database marked `dev`, a production build only to one marked `prod`. Mismatched or missing settings mean the app runs phone-only, as before.
+
+## Setup (about 20 minutes, both projects)
+
+Do these steps twice, once for `abeseria-dev` and once for `abeseria-prod`. The free plan allows two active projects.
+
+1. Sign up at supabase.com. Create the project, pick **Southeast Asia (Singapore)**, the region closest to the Philippines, and save the database password in your password manager.
 2. Open **SQL Editor**, start a new query, paste all of `schema.sql`, and run it. It should finish with no errors.
-3. In **Authentication** settings, turn on **Allow anonymous sign-ins**.
-4. From the project's **API** settings, copy the **Project URL** and the **publishable (anon) key**. These two are meant to sit inside the app.
-5. Never put the **secret / service_role key** or the database password in the app or in this repo. Either one bypasses every rule above.
+3. In **Authentication → Sign In / Providers**, turn on **Allow anonymous sign-ins**.
+4. From **Project Settings → API**, copy the **Project URL** and the **publishable key** (starts with `sb_publishable_`, or the older `anon` key).
+5. Never put the **secret / service_role key** or the database password in the app or in this repo. Either one bypasses every rule above. The app refuses to start its connection if a secret key is pasted in.
+
+Where the two values go:
+
+- **Dev:** `.env.development` in the repo (see `.env.example`).
+- **Prod:** GitHub repo → Settings → Secrets and variables → Actions → **Variables** tab: `SUPABASE_PROD_URL` and `SUPABASE_PROD_PUBLISHABLE_KEY`. The next push to `main` builds them in.
+
+To confirm: open the app → Settings → Shared price database → Check connection. It shows which database it reached and how many stores, products and prices it holds.
+
+## Changing the schema
+
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 17 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 
-- The free plan pauses a project after a week with no activity. The quiet week between trip 1 and trip 2 could hit that, so either open the dashboard mid-week or move to Pro ($25/month) for the test.
+- The free plan pauses a project after a week with no activity. The quiet week between trip 1 and trip 2 could hit that on `abeseria-prod`, so either open its dashboard mid-week or move prod to Pro ($25/month) for the test.
 - Anonymous sign-ins can be abused by scripts. Turn on CAPTCHA protection before the app is public.
 
 ## Checked
 
-`schema.sql` was run against Postgres with a stand-in for Supabase's auth and roles. 22 checks passed, covering: adding as a signed-in phone, duplicate branches, swapped coordinates, faked contributor ids, scale barcodes, double uploads, old dates, bad bundles, unknown barcodes, latest-price logic, blocked edits and deletes, the hidden contributor column, and logged-out reads.
+Before `npm run test:schema` existed, `schema.sql` was run against Postgres with a stand-in for Supabase's auth and roles. 22 checks passed, covering: adding as a signed-in phone, duplicate branches, swapped coordinates, faked contributor ids, scale barcodes, double uploads, old dates, bad bundles, unknown barcodes, latest-price logic, blocked edits and deletes, the hidden contributor column, and logged-out reads.

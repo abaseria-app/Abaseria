@@ -11,9 +11,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "test:schema": "node supabase/check-schema.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",
@@ -22,6 +24,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
