@@ -19,6 +19,11 @@ export const CATALOG_TIMEOUT_MS = 10_000;
 const PAGE = 1000;
 export const MAX_SHARED_ROWS = 20_000;
 
+/** The key a trip's prices are filed under: the store's shared id when known, otherwise a phone-only key. */
+export function storeKeyOf(trip: Pick<Trip, 'chain' | 'customStore' | 'branchUuid'>, branch: Branch | undefined): string {
+  return branch ? (branch.remoteId ?? branch.uuid) : `store:${storeName(trip).toLowerCase()}`;
+}
+
 const nameKey = (label: string) => `name:${label.trim().toLowerCase().replace(/\s+/g, ' ')}`;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -56,7 +61,7 @@ export function buildPhoneCatalog(items: Item[], trips: Trip[], branches: Branch
 
     const trip = tripById.get(it.tripId)!;
     const branch = trip.branchUuid ? branchByUuid.get(trip.branchUuid) : undefined;
-    const storeKey = branch ? (branch.remoteId ?? branch.uuid) : `store:${storeName(trip).toLowerCase()}`;
+    const storeKey = storeKeyOf(trip, branch);
     if (g.seen.has(storeKey)) continue;
     g.seen.set(storeKey, it.createdAt);
     g.item.prices.push({
