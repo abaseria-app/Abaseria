@@ -110,7 +110,7 @@ export const S = {
     cancel: 'Cancel',
     cameraBlocked: 'Camera is blocked. Allow camera access in your browser settings, or take a photo instead.',
     takePhoto: 'Take a photo',
-    noPrice: "Couldn't find a price on that tag.",
+    noPrice: "Couldn't read a price. Move closer so the price fills most of the box and hold still, or type it.",
     retake: 'Retake',
     aimBarcode: 'Point at the barcode on the package',
     noBarcode: 'No barcode',
