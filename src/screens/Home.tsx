@@ -14,11 +14,12 @@ interface Props {
   onStart: () => void;
   onContinue: () => void;
   onSettings: () => void;
+  onSearch: () => void;
 }
 
 const dateFmt = new Intl.DateTimeFormat('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 
-export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: Props) {
+export function Home({ activeTripId, toast, onStart, onContinue, onSettings, onSearch }: Props) {
   const [period, setPeriod] = useState<Period>('week');
   const trips = useLiveQuery(() => db.trips.toArray(), []) ?? [];
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
@@ -88,6 +89,14 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings }: P
         <button className="link" onClick={onSettings}>{S.home.settings}</button>
       </header>
       {toast && <p className="toast">{toast}</p>}
+
+      <button className="search-open" onClick={onSearch} aria-label={S.search.open}>
+        <svg className="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.5" />
+          <path d="M15.5 15.5 21 21" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+        <span>{S.search.openHint}</span>
+      </button>
 
       {active && (
         <button className="active-trip" onClick={onContinue}>
