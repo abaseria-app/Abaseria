@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           // OCR engine + language data are large; precache them so the app works in a basement with no signal.
-          globPatterns: ['**/*.{js,css,html,png,svg,gz,mp4}'],
+          globPatterns: ['**/*.{js,css,html,png,svg,gz,mp4,webp}'],
           // Modern Android Chrome uses the relaxed-SIMD core, so only that one is precached (about 4 MB).
           // Older phones fetch their core on first use and keep it via the runtime cache below.
           globIgnores: ['**/tesseract-core-lstm.wasm.js', '**/tesseract-core-simd-lstm.wasm.js'],

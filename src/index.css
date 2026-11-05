@@ -19,6 +19,8 @@
   --bg: #f6f5f0;
   --card: #ffffff;
   --line: #dedcd4;
+  /* Lifts white and colored cards off the watercolor background */
+  --shadow-card: 0 1px 2px rgba(26, 53, 85, .08), 0 4px 12px rgba(26, 53, 85, .12);
   --ink: var(--navy);
   --muted: var(--charcoal);
   --radius: 14px;
@@ -86,7 +88,7 @@ h2 { font-size: 1.05rem; margin: 18px 0 10px; }
 .bottom > * { max-width: 528px; margin: 0 auto; }
 
 /* Shopping */
-.total-card { position: sticky; top: 0; z-index: 2; background: var(--teal); color: var(--navy); border-radius: 0 0 20px 20px; margin: -12px -16px 12px; padding: 14px 18px 16px; }
+.total-card { position: sticky; top: 0; z-index: 2; background: var(--teal); color: var(--navy); border-radius: 0 0 20px 20px; margin: -12px -16px 12px; padding: 14px 18px 16px; box-shadow: var(--shadow-card); }
 .total-card .label { color: var(--navy); }
 .total-card.over .label { color: var(--on-navy); }
 .total-card.over { background: var(--red); color: var(--on-navy); }
@@ -102,7 +104,7 @@ h2 { font-size: 1.05rem; margin: 18px 0 10px; }
 
 .items { list-style: none; padding: 0; margin: 0; }
 .items .empty { color: var(--muted); text-align: center; padding: 40px 12px; font-size: 1.1rem; }
-.item-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: var(--card); border: 0; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; min-height: 64px; }
+.item-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: var(--card); border: 0; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; min-height: 64px; box-shadow: var(--shadow-card); }
 .item-name { display: flex; flex-direction: column; font-weight: 600; font-size: 1.05rem; min-width: 0; flex: 1; }
 .item-thumb { flex: none; width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--line); }
 .item-thumb.blank { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; }
@@ -169,7 +171,7 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .active-trip .go { color: var(--navy); font-weight: 700; white-space: nowrap; }
 .period-tabs { margin-top: 12px; }
 .period-tabs button { min-height: 48px; }
-.spend-card { background: var(--teal); color: var(--navy); border-radius: 20px; padding: 16px 18px 12px; margin: 8px 0 4px; }
+.spend-card { background: var(--teal); color: var(--navy); border-radius: 20px; padding: 16px 18px 12px; margin: 8px 0 4px; box-shadow: var(--shadow-card); }
 .spend-card .label { color: var(--navy); }
 .spend-num { font-size: clamp(2.6rem, 12vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0; }
 .spend-sub { margin: 0; color: var(--navy); }
@@ -177,14 +179,14 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .spend-change.up::before { content: '▲ '; color: var(--navy); }
 .spend-change.down::before { content: '▼ '; color: var(--navy); }
 .trip-list { list-style: none; padding: 0; margin: 0; }
-.trip-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.trip-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow-card); }
 .trip-list li span { display: flex; flex-direction: column; min-width: 0; }
 .trip-list small { color: var(--muted); }
 .trip-list li > strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hint.small { font-size: .8rem; }
 
 /* Category pie */
-.pie-card { background: var(--card); border-radius: 20px; padding: 6px 16px 12px; margin: 12px 0 4px; }
+.pie-card { background: var(--card); border-radius: 20px; padding: 6px 16px 12px; margin: 12px 0 4px; box-shadow: var(--shadow-card); }
 .pie-card h2 { margin: 12px 0 4px; }
 .donut { position: relative; width: min(240px, 70vw); margin: 4px auto 8px; }
 .donut svg { display: block; width: 100%; height: auto; }
@@ -251,3 +253,12 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .launch { position: fixed; inset: 0; z-index: 2000; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity .25s ease; }
 .launch.out { opacity: 0; pointer-events: none; }
 .launch video { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+/* Watercolor behind the dashboard and the trip list. Fixed to the screen, so it stays put while the list scrolls. */
+.screen.home, .screen.shop { position: relative; isolation: isolate; }
+.screen.home::before, .screen.shop::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: #fff url('/backgrounds/watercolor.webp') center / cover no-repeat;
+}
+/* The fade behind the bottom button matches the white page, not the off-white one. */
+.screen.home .bottom { background: linear-gradient(rgba(255, 255, 255, 0), #fff 30%); }
