@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { S } from '../strings';
 
 // The Abaseria intro video, played once each time the app is freshly opened (not when switching back to it).
@@ -34,7 +34,7 @@ export function LaunchScreen() {
   // The video is loaded into memory first. The offline cache serves it whole (no byte ranges), and Chrome
   // won't jump into a video served that way, so a memory copy is what lets it start at START_SECONDS.
   const [src, setSrc] = useState<string | null>(null);
-  const still = useRef(reducedMotion());
+  const [still] = useState(reducedMotion);
 
   function finish() {
     setState((s) => (s === 'playing' ? 'fading' : s));
@@ -57,7 +57,7 @@ export function LaunchScreen() {
       })
       .catch(finish);
     // Safety net if loading or autoplay stalls; with reduced motion, the still frame shows for about a second.
-    const t = setTimeout(finish, still.current ? 1500 : (VIDEO_SECONDS - START_SECONDS + 3) * 1000);
+    const t = setTimeout(finish, still ? 1500 : (VIDEO_SECONDS - START_SECONDS + 3) * 1000);
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -85,12 +85,12 @@ export function LaunchScreen() {
       {src && (
         <video
           src={src}
-          autoPlay={!still.current}
+          autoPlay={!still}
           muted
           playsInline
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
-            if (still.current) {
+            if (still) {
               // No animation: show the finished logo frame.
               v.pause();
               v.currentTime = VIDEO_SECONDS - 0.1;
