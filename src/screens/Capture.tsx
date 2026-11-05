@@ -197,7 +197,9 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
   async function runOcr(canvas: HTMLCanvasElement) {
     setStep('reading');
     try {
-      const r = await readTag(canvas);
+      // The scanned barcode's digits are often on the tag too; a known price helps rank what's left.
+      const ref = recall?.item.unitPriceCentavos ?? known?.elsewhere?.price ?? null;
+      const r = await readTag(canvas, { barcode, referenceCentavos: recall?.item.priceType === 'perkg' || known?.elsewhere?.priceType === 'perkg' ? null : ref });
       setResult(r);
       setOcrError(false);
       logEvent('ocr_done', tripId, { ms: r.ms, candidates: r.candidates.length, name_guessed: !!r.nameGuess });

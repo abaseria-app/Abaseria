@@ -1,5 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { findPriceCandidates, guessName, looksLikePromo, type OcrLine, type PriceCandidate } from './priceParser';
+import { findPriceCandidates, guessName, looksLikePromo, type OcrLine, type PriceCandidate, restoreRaisedCents, type TagContext } from './priceParser';
 
 // Everything loads from our own origin (copied in by scripts/copy-ocr.mjs) so OCR works offline.
 const assetBase = () => new URL(`${import.meta.env.BASE_URL}tesseract/`, window.location.href).href;
@@ -98,7 +98,7 @@ export interface OcrResult {
   ms: number;
 }
 
-export async function readTag(canvas: HTMLCanvasElement): Promise<OcrResult> {
+export async function readTag(canvas: HTMLCanvasElement, ctx: TagContext = {}): Promise<OcrResult> {
   const t0 = performance.now();
   const worker = await warmOcr();
   const { data } = await worker.recognize(canvas, {}, { blocks: true, text: true });
@@ -110,12 +110,14 @@ export async function readTag(canvas: HTMLCanvasElement): Promise<OcrResult> {
         const height = digitWords.length
           ? Math.max(...digitWords.map((w) => w.bbox.y1 - w.bbox.y0))
           : line.bbox.y1 - line.bbox.y0;
-        lines.push({ text: line.text.trim(), height });
+        // Rebuilt word by word so raised centavos (₱45⁰⁰) get their decimal point back.
+        const text = line.words.map((w) => restoreRaisedCents(w.text, w.symbols ?? [])).join(' ');
+        lines.push({ text: text.trim() || line.text.trim(), height });
       }
     }
   }
   return {
-    candidates: findPriceCandidates(lines),
+    candidates: findPriceCandidates(lines, 4, ctx),
     nameGuess: guessName(lines),
     promoHint: looksLikePromo(lines),
     lines,
