@@ -10,8 +10,9 @@ import { Cashier } from './screens/Cashier';
 import { Settings } from './screens/Settings';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
+import { Search } from './screens/Search';
 
-type Route = 'loading' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results';
+type Route = 'loading' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('loading');
@@ -53,6 +54,7 @@ export default function App() {
           onStart={() => setRoute('start')}
           onContinue={() => setRoute('shop')}
           onSettings={() => setRoute('settings')}
+          onSearch={() => setRoute('search')}
         />
       );
     case 'start':
@@ -111,5 +113,7 @@ export default function App() {
       return <OcrCheck onBack={() => setRoute('settings')} />;
     case 'results':
       return <Results onBack={() => setRoute('settings')} />;
+    case 'search':
+      return <Search onBack={() => setRoute('home')} />;
   }
 }

@@ -78,6 +78,8 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
 | `.env.development` | Dev database address and publishable key (abeseria-dev) |
 | `src/lib/sync.ts` | Uploading finished trips and looking up other shoppers' prices |
+| `src/lib/search.ts` | Item search: reads names, barcodes, prices and sizes from one box; filters and sorting |
+| `src/lib/catalog.ts` | The list search looks through: this phone's items merged with shared products and prices |
 | `src/lib/supabase.ts` | Connection to the shared price database; picks dev or prod and refuses a mismatch |
 | `supabase/` | Shared price database schema, setup steps for the dev and prod projects, schema checks |
 | `src/strings.ts` | Every user-facing string, ready for translation |
