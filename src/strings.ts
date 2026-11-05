@@ -1,5 +1,9 @@
 // Every user-facing string lives here so a Filipino translation is one file later.
 export const S = {
+  launch: {
+    skip: 'Skip intro',
+  },
+
   appName: 'Abeseria',
 
   home: {

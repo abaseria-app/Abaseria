@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+import { LaunchScreen } from './screens/LaunchScreen';
 import { setupInstallButton } from './lib/install';
 
 // When a new version is deployed, switch to it on this open instead of the next one.
@@ -24,5 +25,6 @@ if (import.meta.env.MODE !== 'production') {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
+    <LaunchScreen />
   </StrictMode>,
 );
