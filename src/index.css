@@ -235,3 +235,14 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
   background: #b3261e; color: #fff; font: 600 11px/18px system-ui, sans-serif; letter-spacing: .04em;
   opacity: .9;
 }
+
+/* In-app install: appears only when Chrome reports the app as installable. */
+.install-button {
+  position: fixed; right: 12px; top: calc(10px + env(safe-area-inset-top));
+  z-index: 1000;
+  min-height: 40px; padding: 0 16px; border-radius: 999px;
+  background: var(--lilac); color: var(--purple); border: 2px solid var(--purple);
+  font: 700 14px/1 system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}
+.install-button[hidden] { display: none; }
