@@ -222,20 +222,52 @@ async function run(): Promise<ShareResult> {
   return result;
 }
 
+export interface SharedProduct {
+  label: string;
+  category: Item['category'];
+  imagePath: string | null;
+}
+
 /**
- * The product's reference image, shrunk for the list, as a data URL to keep with the item.
- * Null when the product has none, sharing is off, the phone is offline, or it takes longer than 3 seconds.
+ * What the shared database knows about a barcode at any store: its name, category and image file.
+ * This is how a phone recognizes a product it has never seen. Null when nobody has named it, sharing is off,
+ * the phone is offline, or the answer takes longer than 2 seconds.
  */
-export async function productImage(barcode: string): Promise<string | null> {
+export async function sharedProduct(barcode: string): Promise<SharedProduct | null> {
+  if (!SHARING_ON || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS);
+  try {
+    const client = await getSupabase();
+    if (!client) return null;
+    const { data, error } = await client
+      .from('products')
+      .select('name, category, image_path')
+      .eq('barcode', barcode)
+      .limit(1)
+      .retry(false)
+      .abortSignal(ctrl.signal);
+    const row = data?.[0];
+    if (error || !row?.name) return null;
+    return { label: row.name as string, category: (row.category as Item['category']) ?? null, imagePath: (row.image_path as string | null) ?? null };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * A product image file from the public bucket, shrunk for the list, as a data URL to keep with the item.
+ * Null when the file is missing, sharing is off, the phone is offline, or it takes longer than 3 seconds.
+ */
+export async function productImage(path: string): Promise<string | null> {
   if (!SHARING_ON || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), IMAGE_TIMEOUT_MS);
   try {
     const client = await getSupabase();
     if (!client) return null;
-    const { data, error } = await client.from('products').select('image_path').eq('barcode', barcode).limit(1).retry(false).abortSignal(ctrl.signal);
-    const path = data?.[0]?.image_path as string | null | undefined;
-    if (error || !path) return null;
     const url = client.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
     const res = await fetch(url, { signal: ctrl.signal });
     if (!res.ok) return null;

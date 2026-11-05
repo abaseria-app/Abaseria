@@ -5,7 +5,7 @@ import type { Item, Trip } from './db';
 // A stand-in for the shared database: tables in memory, the same unique rules as schema.sql.
 interface Store {
   branches: { id: string; chain: string; name: string }[];
-  products: { barcode: string; name: string; image_path?: string | null }[];
+  products: { barcode: string; name: string; category?: string; image_path?: string | null }[];
   price_sightings: Record<string, unknown>[];
   failNext?: string;
 }
@@ -215,22 +215,29 @@ describe('sharedPrice', () => {
   });
 });
 
+describe('sharedProduct', () => {
+  it('recognizes a barcode named at any store, with no price needed', async () => {
+    store.products.push({ barcode: '4800163443036', name: 'Ligo sardines in tomato with chili', category: 'pantry', image_path: '4800163443036.jpg' });
+    expect(await sync.sharedProduct('4800163443036')).toEqual({ label: 'Ligo sardines in tomato with chili', category: 'pantry', imagePath: '4800163443036.jpg' });
+  });
+
+  it('returns nothing for a barcode nobody has named', async () => {
+    expect(await sync.sharedProduct('4800016644115')).toBeNull();
+  });
+});
+
 describe('productImage', () => {
-  it("returns the product's image, shrunk, from the public bucket", async () => {
-    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', image_path: '4800016644818.jpg' });
+  it('fetches the file from the public bucket and shrinks it', async () => {
     const fetched: string[] = [];
     vi.stubGlobal('fetch', async (url: string) => (fetched.push(url), new Response('jpeg bytes', { status: 200 })));
-    expect(await sync.productImage('4800016644818')).toBe('small:jpeg bytes');
+    expect(await sync.productImage('4800016644818.jpg')).toBe('small:jpeg bytes');
     expect(fetched).toEqual(['https://x.supabase.co/storage/v1/object/public/product-images/4800016644818.jpg']);
     vi.unstubAllGlobals();
   });
 
-  it('returns nothing when the product has no image or the file is missing', async () => {
-    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', image_path: null }, { barcode: '4806502162316', name: 'X', image_path: 'gone.jpg' });
+  it('returns nothing when the file is missing', async () => {
     vi.stubGlobal('fetch', async () => new Response('', { status: 404 }));
-    expect(await sync.productImage('4800016644818')).toBeNull();
-    expect(await sync.productImage('4806502162316')).toBeNull();
-    expect(await sync.productImage('4800016644115')).toBeNull();
+    expect(await sync.productImage('gone.jpg')).toBeNull();
     vi.unstubAllGlobals();
   });
 

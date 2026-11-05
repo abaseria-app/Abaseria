@@ -37,6 +37,8 @@ interface Props {
   initial?: Item;
   /** Name already known for this barcode; used instead of the tag's guess. */
   knownName?: string | null;
+  /** Category already known for this barcode; used instead of guessing from the name. */
+  knownCategory?: CategoryId | null;
   /** Shown above the form, e.g. where a recalled price came from. */
   recallNote?: string | null;
   barcode?: string | null;
@@ -75,7 +77,7 @@ export function ItemEditor(p: Props) {
   );
   const [qty, setQty] = useState(init?.quantity ?? 1);
   // The guess follows the name until the shopper taps a category themselves.
-  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? null);
+  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? p.knownCategory ?? null);
   const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);

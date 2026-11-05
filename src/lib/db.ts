@@ -161,6 +161,8 @@ export interface Recall {
   sameBranch: boolean;
   /** True when the price came from other shoppers through the shared database, not from this phone. */
   shared?: boolean;
+  /** Where `item` was logged, for "Last ₱25.00 at SM Center Imus". Missing on shared recalls. */
+  storeLabel?: string;
 }
 
 /** What this phone already knows about a barcode. Works offline; the shared database comes later. */
@@ -175,9 +177,9 @@ export async function recallBarcode(code: string, branchUuid: string | null | un
   if (!rows.length) return null;
   if (branchUuid) {
     const hit = rows.find((r) => trips.get(r.tripId)?.branchUuid === branchUuid);
-    if (hit) return { item: hit, sameBranch: true };
+    if (hit) return { item: hit, sameBranch: true, storeLabel: storeName(trips.get(hit.tripId)!) };
   }
-  return { item: rows[0], sameBranch: false };
+  return { item: rows[0], sameBranch: false, storeLabel: storeName(trips.get(rows[0].tripId)!) };
 }
 
 /** RFC 4122 v4. crypto.randomUUID only exists on HTTPS, and the dev server runs over plain Wi-Fi HTTP. */
