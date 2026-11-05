@@ -42,6 +42,8 @@ interface Props {
   /** Shown above the form, e.g. where a recalled price came from. */
   recallNote?: string | null;
   barcode?: string | null;
+  /** How the price is sold when there's no starting price, e.g. per kilo for meat found by search. */
+  startPriceType?: PriceType;
   recent: string[];
   fallbackName: string;
   notice?: string | null;
@@ -66,7 +68,7 @@ export function ItemEditor(p: Props) {
   const [label, setLabel] = useState(init?.label ?? p.knownName ?? p.nameGuess ?? '');
   const [chosen, setChosen] = useState<number | null>(top ? 0 : null);
   const [edited, setEdited] = useState(false);
-  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? priceTypeFor(top));
+  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? (top ? priceTypeFor(top) : (p.startPriceType ?? 'each')));
   const [priceText, setPriceText] = useState(
     init ? plain(init.unitPriceCentavos) : top && !top.bundleQty ? plain(perKgCentavos(top) ?? top.centavos) : '',
   );

@@ -19,6 +19,8 @@ interface Props {
   tripId: number;
   branchUuid: string | null;
   startTyped?: boolean;
+  /** Typed entry only: the name to start with, e.g. what the shopper searched for and didn't find. */
+  startName?: string;
   recent: string[];
   fallbackName: string;
   onAdd: (v: ItemSubmit, method: CaptureMethod, msSinceOpen: number) => void;
@@ -40,7 +42,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-PH', { m
  * Barcode -> (known here? confirm price : snap tag -> pick price) -> Add.
  * Phones that can't read barcodes start at the tag. "Type it" works from any step.
  */
-export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, onAdd, onClose }: Props) {
+export function Capture({ tripId, branchUuid, startTyped, startName, recent, fallbackName, onAdd, onClose }: Props) {
   const [step, setStep] = useState<Step>(startTyped ? 'type' : 'barcode');
   const [result, setResult] = useState<OcrResult | null>(null);
   const [ocrError, setOcrError] = useState(false);
@@ -288,7 +290,7 @@ export function Capture({ tripId, branchUuid, startTyped, recent, fallbackName, 
         submitLabel={S.item.add}
         candidates={isTag ? result?.candidates ?? [] : undefined}
         nameGuess={isTag ? result?.nameGuess : null}
-        knownName={known?.label ?? null}
+        knownName={known?.label ?? (!isTag && startName?.trim() ? startName.trim() : null)}
         knownCategory={known?.category ?? null}
         recallNote={elsewhereNote}
         barcode={barcode}

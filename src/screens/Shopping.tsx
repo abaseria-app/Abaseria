@@ -7,6 +7,8 @@ import { formatBarcode } from '../lib/barcode';
 import { CATEGORY_BY_ID, categoryOf } from '../lib/categories';
 import { logEvent } from '../lib/events';
 import { Capture } from './Capture';
+import { AddFromSearch } from './AddFromSearch';
+import { storeKeyOf } from '../lib/catalog';
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
 
 interface Props {
@@ -18,8 +20,14 @@ interface Props {
 
 export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId]);
+  const branch = useLiveQuery(
+    () => (trip?.branchUuid ? db.branches.where('uuid').equals(trip.branchUuid).first() : undefined),
+    [trip?.branchUuid],
+  );
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).toArray(), [tripId]) ?? [];
-  const [capture, setCapture] = useState<null | 'tag' | 'typed'>(null);
+  const [capture, setCapture] = useState<null | 'tag' | 'typed' | 'search'>(null);
+  /** What was in the search box when the shopper chose to type the item in instead. */
+  const [typedName, setTypedName] = useState('');
   const [editing, setEditing] = useState<Item | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [undo, setUndo] = useState<Item | null>(null);
@@ -117,12 +125,30 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
     setUndo(null);
   }
 
+  if (capture === 'search') {
+    return (
+      <AddFromSearch
+        tripId={tripId}
+        storeKey={trip ? storeKeyOf(trip, branch) : null}
+        recent={recent}
+        fallbackName={S.item.unnamed(unnamedCount + 1)}
+        onAdd={addItem}
+        onType={(text) => {
+          setTypedName(text);
+          setCapture('typed');
+        }}
+        onClose={() => setCapture(null)}
+      />
+    );
+  }
+
   if (capture) {
     return (
       <Capture
         tripId={tripId}
         branchUuid={trip?.branchUuid ?? null}
         startTyped={capture === 'typed'}
+        startName={capture === 'typed' ? typedName : undefined}
         recent={recent}
         fallbackName={S.item.unnamed(unnamedCount + 1)}
         onAdd={addItem}
@@ -220,7 +246,10 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
       <footer className="action-bar">
         <button className="btn finish" onClick={onFinish}>{S.shop.finish}</button>
         <div className="row">
-          <button className="btn secondary big" onClick={() => setCapture('typed')}>{S.shop.type}</button>
+          <button className="btn secondary big" onClick={() => {
+            setTypedName('');
+            setCapture('search');
+          }}>{S.shop.search}</button>
           <button className="btn primary big snap" onClick={() => setCapture('tag')}>{S.shop.snap}</button>
         </div>
       </footer>

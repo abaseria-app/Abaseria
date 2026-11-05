@@ -94,7 +94,7 @@ export const S = {
     cancelYes: 'Yes, cancel trip',
     cancelNo: 'Keep shopping',
     cancelled: 'Trip cancelled.',
-    type: 'Type it',
+    search: 'Search',
     finish: 'Done shopping',
     overBanner: (amt: string) => `You're ${amt} over budget.`,
     totalMismatch: 'Dev check: total doesn’t match the item list.',
@@ -234,6 +234,15 @@ export const S = {
     sourceOffline: 'Offline: showing items from this phone only.',
     sourceError: (msg: string) => `Couldn’t load other shoppers’ prices (${msg}). Showing this phone’s items.`,
     retry: 'Try again',
+    pickTitle: 'Add an item',
+    cancel: 'Cancel',
+    here: 'here',
+    elsewhere: (store: string) => `at ${store}`,
+    typeIt: 'Type it in',
+    typeNamed: (name: string) => `Type in “${name}”`,
+    pricedElsewhere: (price: string, store: string, date: string) =>
+      `No price here yet. Last seen at ${price} at ${store} on ${date}. Type this store’s price from the tag.`,
+    noPriceAnywhere: 'No price here yet. Type the price from the shelf tag.',
   },
 
   settings: {

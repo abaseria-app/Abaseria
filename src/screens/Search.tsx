@@ -25,13 +25,24 @@ import {
 
 interface Props {
   onBack: () => void;
+  /**
+   * Picking an item to add to the trip (from the shopping list). Tapping a row picks it instead of opening it,
+   * rows show this store's price first, and a button at the bottom types a new item in.
+   */
+  pick?: {
+    /** This trip's store, as catalog prices file it. Null when unknown. */
+    storeKey: string | null;
+    onPick: (item: CatalogItem) => void;
+    /** Type a new item; gets whatever is in the box so far. */
+    onType: (text: string) => void;
+  };
 }
 
 /** Rows drawn at once; "Show more" adds this many again. Keeps typing quick on low-end phones. */
 const PAGE = 60;
 const dayFmt = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' });
 
-export function Search({ onBack }: Props) {
+export function Search({ onBack, pick }: Props) {
   const [text, setText] = useState('');
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [sort, setSort] = useState<SortKey>('best');
@@ -97,8 +108,8 @@ export function Search({ onBack }: Props) {
   return (
     <main className="screen search">
       <header className="topbar">
-        <button className="link" onClick={onBack}>{S.search.back}</button>
-        <h1>{S.search.title}</h1>
+        <button className="link" onClick={onBack}>{pick ? S.search.cancel : S.search.back}</button>
+        <h1>{pick ? S.search.pickTitle : S.search.title}</h1>
         <span className="spacer" />
       </header>
 
@@ -220,7 +231,13 @@ export function Search({ onBack }: Props) {
           <ul className="items">
             {hits.length === 0 && <li className="empty">{catalog.length ? S.search.none : S.search.empty}</li>}
             {hits.slice(0, shown).map((h) => (
-              <ResultRow key={h.item.key} hit={h} open={open === h.item.key} onToggle={() => setOpen(open === h.item.key ? null : h.item.key)} />
+              <ResultRow
+                key={h.item.key}
+                hit={h}
+                hereKey={pick?.storeKey ?? null}
+                open={!pick && open === h.item.key}
+                onToggle={() => (pick ? pick.onPick(h.item) : setOpen(open === h.item.key ? null : h.item.key))}
+              />
             ))}
           </ul>
           {hits.length > shown && (
@@ -229,6 +246,16 @@ export function Search({ onBack }: Props) {
             </button>
           )}
         </>
+      )}
+
+      {pick && (
+        <footer className="action-bar">
+          <div className="row">
+            <button className="btn secondary big" onClick={() => pick.onType(text)}>
+              {text.trim() && !query.barcodes.length && !query.price ? S.search.typeNamed(text.trim()) : S.search.typeIt}
+            </button>
+          </div>
+        </footer>
       )}
     </main>
   );
@@ -254,13 +281,20 @@ function priceText(p: PricePoint): string {
 
 const dayText = (iso: string) => dayFmt.format(new Date(`${iso}T12:00:00`));
 
-function ResultRow({ hit, open, onToggle }: { hit: Hit; open: boolean; onToggle: () => void }) {
-  const { item, best, prices } = hit;
+function ResultRow({ hit, hereKey, open, onToggle }: { hit: Hit; hereKey: string | null; open: boolean; onToggle: () => void }) {
+  const { item, prices } = hit;
+  // Adding to a trip: this store's price is the one that matters; the cheapest elsewhere is only a hint.
+  const here = hereKey ? (prices.find((p) => p.storeKey === hereKey) ?? null) : null;
+  const best = here ?? hit.best;
   const cat = CATEGORY_BY_ID[item.category];
   const meta = [item.size, cat.label].filter(Boolean).join(' · ');
   const where = !best
     ? S.search.noPrice
-    : prices.length > 1
+    : here
+      ? `${S.search.here} · ${dayText(here.seenOn)}`
+      : hereKey
+        ? `${S.search.elsewhere(best.storeLabel)} · ${dayText(best.seenOn)}`
+        : prices.length > 1
       ? S.search.range(prices.length, formatPeso(comparable(prices[0])), formatPeso(comparable(prices[prices.length - 1])))
       : `${best.storeLabel} · ${dayText(best.seenOn)}`;
   return (
