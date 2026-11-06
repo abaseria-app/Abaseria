@@ -116,11 +116,19 @@ export interface Setting {
 
 /**
  * The live app and the dev app (/dev/) share one web address, so they'd share phone storage too.
- * Only production builds use the original name, which keeps existing testers' trips where they are.
+ * Each build gets its own name so the two never touch each other's trips.
  */
-export const DB_NAME = import.meta.env.MODE === 'production' ? 'abeseria' : 'abeseria-dev';
+export const DB_NAME = import.meta.env.MODE === 'production' ? 'abaseria' : 'abaseria-dev';
 
-class AbeseriaDB extends Dexie {
+/**
+ * Nov 6, 2026: the app was renamed from the misspelled "Abeseria". Trips saved under the old name
+ * on the phone are dropped (Brad's call); everything already uploaded stays in Supabase.
+ * Each build only removes its own old copy, so the dev app never wipes the live app's storage.
+ */
+const OLD_DB_NAME = import.meta.env.MODE === 'production' ? 'abeseria' : 'abeseria-dev';
+Dexie.delete(OLD_DB_NAME).catch(() => {});
+
+class AbaseriaDB extends Dexie {
   trips!: Table<Trip, number>;
   items!: Table<Item, number>;
   events!: Table<AppEvent, number>;
@@ -207,7 +215,7 @@ export async function branchesByRecent(): Promise<Branch[]> {
   return branches.sort((a, b) => key(b).localeCompare(key(a)) || b.createdAt.localeCompare(a.createdAt));
 }
 
-export const db = new AbeseriaDB();
+export const db = new AbaseriaDB();
 
 export async function getSetting(key: string): Promise<string | null> {
   return (await db.settings.get(key))?.value ?? null;

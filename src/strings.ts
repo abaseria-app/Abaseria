@@ -4,10 +4,10 @@ export const S = {
     skip: 'Skip intro',
   },
 
-  appName: 'Abeseria',
+  appName: 'Abaseria',
 
   login: {
-    title: 'Welcome to Abeseria',
+    title: 'Welcome to Abaseria',
     pitch: 'Know your total before you reach the cashier. Scan as you shop and watch it add up against your budget.',
     google: 'Continue with Google',
     going: 'Opening Google…',
@@ -291,9 +291,9 @@ export const S = {
     shareOff: 'Price sharing is off in this version. It turns on once the consent screen is added.',
     back: 'Back',
     about: 'About',
-    aboutText: 'Abeseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',
+    aboutText: 'Abaseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',
     aboutTextSharing:
-      'Abeseria test prototype. Prices of items with a barcode are shared with other shoppers: product, store, price and day. Your location, the time and anything without a barcode stay on this phone. Text reading uses Tesseract (Apache 2.0).',
+      'Abaseria test prototype. Prices of items with a barcode are shared with other shoppers: product, store, price and day. Your location, the time and anything without a barcode stay on this phone. Text reading uses Tesseract (Apache 2.0).',
     version: 'Version 0.1 (prototype)',
   },
 

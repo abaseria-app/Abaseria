@@ -27,7 +27,7 @@ export function Login({ finishing, error }: Props) {
 
   return (
     <main className="screen login">
-      <img className="login-logo" src={LOGO} alt="Abeseria" width={120} height={120} />
+      <img className="login-logo" src={LOGO} alt="Abaseria" width={120} height={120} />
       <h1>{S.login.title}</h1>
       <p className="login-pitch">{S.login.pitch}</p>
       {finishing ? (

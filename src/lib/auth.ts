@@ -6,7 +6,7 @@
 //
 // Phones that signed in anonymously before this (the dev test phones) keep the same user id when they pick
 // Google, so the prices they already shared stay credited to them. If that Google account already belongs to
-// another Abeseria user, the phone signs in to that user instead.
+// another Abaseria user, the phone signs in to that user instead.
 //
 // Trips stay on the phone either way: signing in or out doesn't move or delete them (that's feature 28).
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
@@ -159,7 +159,7 @@ async function init(): Promise<InitResult> {
   const { data, error } = await client.auth.getSession();
   if (back.finishing || back.error) window.history.replaceState(null, '', cleanUrl(window.location.href));
 
-  // That Google account already belongs to another Abeseria user: sign in to that one instead.
+  // That Google account already belongs to another Abaseria user: sign in to that one instead.
   if (back.code === 'identity_already_exists' && data.session?.user?.is_anonymous) {
     await client.auth.signOut({ scope: 'local' });
     const again = await startGoogle();

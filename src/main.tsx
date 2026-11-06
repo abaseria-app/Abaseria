@@ -11,11 +11,11 @@ import { setupInstallButton } from './lib/install';
 registerSW({ immediate: true });
 
 // Shows only when Chrome says the app can be installed, and never inside the installed app.
-setupInstallButton(import.meta.env.MODE === 'production' ? 'Install Abeseria' : 'Install Abeseria Dev');
+setupInstallButton(import.meta.env.MODE === 'production' ? 'Install Abaseria' : 'Install Abaseria Dev');
 
 // Test builds say so on every screen, so nobody shops a real trip in them by mistake.
 if (import.meta.env.MODE !== 'production') {
-  document.title = 'Abeseria (dev)';
+  document.title = 'Abaseria (dev)';
   const badge = document.createElement('div');
   badge.className = 'dev-badge';
   badge.textContent = 'DEV · test data';

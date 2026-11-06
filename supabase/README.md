@@ -35,28 +35,28 @@ To replace one, upload the new file under the same name, or a new name and chang
 
 Every shopper signs in with Google on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
 
-Phones that were already sharing anonymously keep their user id when they pick Google (manual linking), so their past prices stay credited to them. If that Google account already has an Abeseria user, the phone switches to it.
+Phones that were already sharing anonymously keep their user id when they pick Google (manual linking), so their past prices stay credited to them. If that Google account already has an Abaseria user, the phone switches to it.
 
 ### One-time setup, about 25 minutes
 
-**Google Cloud** (console.cloud.google.com, signed in with the Google account that should own Abeseria, not a Mako Moto one):
+**Google Cloud** (console.cloud.google.com, signed in with the Google account that should own Abaseria, not a Mako Moto one):
 
-1. Create a project named `Abeseria`.
-2. **Google Auth Platform → Branding:** app name `Abeseria`, your support email. Skip the logo for now: uploading one sends the app to Google for review.
+1. Create a project named `Abaseria`.
+2. **Google Auth Platform → Branding:** app name `Abaseria`, your support email. Skip the logo for now: uploading one sends the app to Google for review.
 3. **Audience:** User type **External**, leave it in **Testing**. Under Test users, add every Gmail that will sign in (you, Jovie, each tester). Testing mode allows 100. Before the app is public, press **Publish app** (name, email and profile scopes don't need Google's security review).
-4. **Clients → Create client → Web application**, name `Abeseria web`:
+4. **Clients → Create client → Web application**, name `Abaseria web`:
    - Authorized JavaScript origins: `https://bkarkos86-mako.github.io` and `http://localhost:5173`
    - Authorized redirect URIs: `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod)
 5. Copy the **Client ID** and **Client secret**. The secret goes into Supabase only, never into this repo or the app.
 
-**Supabase, abeseria-dev first:**
+**Supabase, abaseria-dev first:**
 
 1. **Authentication → Sign In / Providers → Google:** turn on, paste the Client ID and Client secret, save.
 2. Same page: turn on **Allow manual linking**. Without it, old anonymous test phones can't add Google.
 3. **Authentication → URL Configuration:** Site URL `https://bkarkos86-mako.github.io/Abaseria/dev/`. Redirect URLs: add `https://bkarkos86-mako.github.io/**` and `http://localhost:5173/**`.
 4. Once your test phones have signed in with Google, turn **off** Allow anonymous sign-ins. The app no longer uses it, and leaving it on lets scripts create users.
 
-**abeseria-prod:** the same 4 steps with Site URL `https://bkarkos86-mako.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
+**abaseria-prod:** the same 4 steps with Site URL `https://bkarkos86-mako.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
 
 To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick your account, and you land on Home. Settings → Account shows your name. In SQL Editor, `select email, is_anonymous from auth.users` shows your Gmail with `is_anonymous = false`.
 
@@ -68,14 +68,14 @@ With Google as the only way in, Google's own sign-in page does the bot checking,
 
 | Project | Used by | Data |
 |---|---|---|
-| `abeseria-dev` | `npm run dev` on your computer | Test scans, made-up stores. Wipe it whenever you like. |
-| `abeseria-prod` | The GitHub Pages app shoppers use | Real prices only. Nothing typed during development goes here. |
+| `abaseria-dev` | `npm run dev` on your computer | Test scans, made-up stores. Wipe it whenever you like. |
+| `abaseria-prod` | The GitHub Pages app shoppers use | Real prices only. Nothing typed during development goes here. |
 
 The app checks the label: the dev server only connects to a database marked `dev`, a production build only to one marked `prod`. Mismatched or missing settings mean the app runs phone-only, as before.
 
 ## Setup (about 20 minutes, both projects)
 
-Do these steps twice, once for `abeseria-dev` and once for `abeseria-prod`. The free plan allows two active projects.
+Do these steps twice, once for `abaseria-dev` and once for `abaseria-prod`. The free plan allows two active projects.
 
 1. Sign up at supabase.com. Create the project, pick **Southeast Asia (Singapore)**, the region closest to the Philippines, and save the database password in your password manager.
 2. Open **SQL Editor**, start a new query, paste all of `schema.sql`, and run it. It should finish with no errors.
@@ -103,7 +103,7 @@ Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgre
 
 ## Before real testers use it
 
-- The free plan pauses a project after a week with no activity. The quiet week between trip 1 and trip 2 could hit that on `abeseria-prod`, so either open its dashboard mid-week or move prod to Pro ($25/month) for the test.
+- The free plan pauses a project after a week with no activity. The quiet week between trip 1 and trip 2 could hit that on `abaseria-prod`, so either open its dashboard mid-week or move prod to Pro ($25/month) for the test.
 - Anonymous sign-ins can be abused by scripts. Turn on CAPTCHA protection before the app is public.
 
 ## Checked

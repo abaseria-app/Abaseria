@@ -1,4 +1,4 @@
--- Abeseria shared price database.
+-- Abaseria shared price database.
 -- Run once in the Supabase SQL Editor on a new project. Safe to read top to bottom: nothing here deletes data.
 --
 -- Three tables:
