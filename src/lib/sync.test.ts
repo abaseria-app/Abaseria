@@ -10,7 +10,8 @@ interface Store {
   failNext?: string;
 }
 const store: Store = { branches: [], products: [], price_sightings: [] };
-let signIns = 0;
+/** What the fake client's session holds: a Google account, an old anonymous phone, or nobody. */
+let sessionUser: { id: string; is_anonymous: boolean; email?: string } | null = { id: 'u1', is_anonymous: false, email: 'a@b.ph' };
 
 function table(name: keyof Omit<Store, 'failNext'>) {
   const filters: [string, unknown][] = [];
@@ -57,8 +58,7 @@ const fakeClient = {
   from: (t: keyof Omit<Store, 'failNext'>) => table(t),
   storage: { from: (bucket: string) => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/${bucket}/${path}` } }) }) },
   auth: {
-    getSession: async () => ({ data: { session: signIns ? {} : null } }),
-    signInAnonymously: async () => (signIns++, { data: {}, error: null }),
+    getSession: async () => ({ data: { session: sessionUser ? { user: sessionUser } : null } }),
   },
 };
 
@@ -96,7 +96,7 @@ beforeEach(async () => {
   store.branches = [];
   store.products = [];
   store.price_sightings = [];
-  signIns = 0;
+  sessionUser = { id: 'u1', is_anonymous: false, email: 'a@b.ph' };
   await Promise.all([db.trips.clear(), db.items.clear(), db.branches.clear(), db.settings.clear(), db.events.clear()]);
   await db.settings.put({ key: 'sharingSince', value: iso(30) });
   await db.branches.add({ uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', chain: 'Puregold', name: 'Imus', lat: 14.42, lng: 120.94, createdAt: iso(40) });
@@ -146,10 +146,24 @@ describe('sharePending', () => {
     expect(store.price_sightings).toHaveLength(1);
     expect(Object.keys(store.price_sightings[0])).not.toContain('created_at');
     expect((await db.trips.get(tripId))?.sharedAt).toBeTruthy();
-    expect(signIns).toBe(1);
     // Nothing left: a second run sends nothing.
     expect(await sync.sharePending()).toMatchObject({ trips: 0, prices: 0 });
     expect(store.price_sightings).toHaveLength(1);
+  });
+
+  it('keeps trips waiting until the shopper signs in with Google', async () => {
+    for (const who of [null, { id: 'anon', is_anonymous: true }]) {
+      sessionUser = who;
+      const tripId = await addTrip();
+      await db.items.add(item({ tripId }));
+      const r = await sync.sharePending();
+      expect(r).toMatchObject({ trips: 0, prices: 0, error: sync.NOT_SIGNED_IN });
+      expect(store.price_sightings).toHaveLength(0);
+      expect((await db.trips.get(tripId))?.sharedAt).toBeFalsy();
+      expect(await db.events.where('type').equals('share_failed').count()).toBe(0);
+    }
+    sessionUser = { id: 'u1', is_anonymous: false };
+    expect(await sync.sharePending()).toMatchObject({ trips: 2, prices: 2 });
   });
 
   it('uses the other phone’s store when it added the same one first', async () => {
