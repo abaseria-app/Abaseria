@@ -12,6 +12,7 @@ import { gtinOk, isInStoreCode } from './barcode';
 import { dbConfig, getSupabase } from './supabase';
 import { logEvent } from './events';
 import { shrinkImage } from './thumb';
+import { hasAccountSession } from './auth';
 
 export const SHARING_ON = dbConfig?.target === 'dev';
 
@@ -95,13 +96,12 @@ export function productRow(item: Item) {
 // ---------------------------------------------------------------------------------------------------------
 // Network
 
-/** Signs this phone in without a screen (anonymous). The session is kept on the phone for next time. */
+/** Uploads need the shopper's Google account. Phones that haven't signed in yet keep their trips waiting. */
 async function signIn(client: SupabaseClient): Promise<void> {
-  const { data } = await client.auth.getSession();
-  if (data.session) return;
-  const { error } = await client.auth.signInAnonymously();
-  if (error) throw new Error(`sign-in: ${error.message}`);
+  if (!(await hasAccountSession(client))) throw new Error(NOT_SIGNED_IN);
 }
+
+export const NOT_SIGNED_IN = 'not signed in';
 
 /**
  * The store's id in the shared database. Adds the store if nobody has; if another phone already added a store
@@ -217,7 +217,8 @@ async function run(): Promise<ShareResult> {
     }
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);
-    await logEvent('share_failed', null, { error: result.error });
+    // Not signed in yet isn't a failure worth logging: the trips upload after sign-in.
+    if (result.error !== NOT_SIGNED_IN) await logEvent('share_failed', null, { error: result.error });
   }
   return result;
 }

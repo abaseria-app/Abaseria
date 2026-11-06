@@ -6,6 +6,19 @@ export const S = {
 
   appName: 'Abeseria',
 
+  login: {
+    title: 'Welcome to Abeseria',
+    pitch: 'Know your total before you reach the cashier. Scan as you shop and watch it add up against your budget.',
+    google: 'Continue with Google',
+    going: 'Opening Google…',
+    finishing: 'Signing you in…',
+    why: 'Your Google name and email tie the prices you share to one account. Your trips and budget stay on this phone.',
+    offline: 'You’re offline. Connect to the internet once to sign in. After that the app works without signal.',
+    off: 'Sign-in isn’t set up in this build.',
+    failed: (message: string) => `Google sign-in didn’t finish: ${message}. Try again.`,
+    returned: (message: string) => `Google sign-in didn’t finish: ${message}.`,
+  },
+
   home: {
     periods: { week: 'Week', month: 'Month', year: 'Year', ytd: 'YTD' } as Record<string, string>,
     spentLabel: {
@@ -255,6 +268,13 @@ export const S = {
     ocrCheckHint: 'Pick 10 shelf-tag photos from your gallery. Pass = right price in the chips 8 times or more.',
     results: 'Combine tester results',
     resultsHint: 'Pick the trips CSV files from every tester’s phone.',
+    account: 'Account',
+    signedInAs: (name: string | null, email: string | null) =>
+      name && email ? `Signed in as ${name} (${email})` : `Signed in as ${name ?? email ?? 'your Google account'}`,
+    signOut: 'Sign out',
+    signOutAsk: 'Sign out on this phone? Your trips stay here, and you’ll need to sign in again before the next trip.',
+    signOutYes: 'Yes, sign out',
+    signOutNo: 'Stay signed in',
     db: 'Shared price database',
     dbCheck: 'Check connection',
     dbChecking: 'Checking…',

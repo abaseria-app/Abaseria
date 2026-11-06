@@ -16,7 +16,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 ## Rules
 
 - Anyone with the app's public key can read branches, products and prices.
-- A signed-in phone (anonymous sign-in, no account needed) can add rows. Each row is stamped with that phone's id.
+- A signed-in shopper can add rows. Each row is stamped with their user id. Since Nov 6, 2026 the app asks every shopper to sign in with Google before their first trip and no longer creates anonymous users (see Sign-in below).
 - Nobody can edit or delete from the app. You fix bad rows in the Supabase dashboard.
 - Which phone added a price is stored but can't be read through the app.
 - Sightings older than 14 days or dated in the future are refused.
@@ -30,6 +30,39 @@ One image per product, shown as the thumbnail in the shopper's list so they can 
 2. Table Editor → `products` → that barcode's row → put the file name in `image_path`.
 
 To replace one, upload the new file under the same name, or a new name and change `image_path`. Phones that already scanned the product keep their copy until it's scanned on a phone that hasn't.
+
+## Sign-in (Google)
+
+Every shopper signs in with Google on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
+
+Phones that were already sharing anonymously keep their user id when they pick Google (manual linking), so their past prices stay credited to them. If that Google account already has an Abeseria user, the phone switches to it.
+
+### One-time setup, about 25 minutes
+
+**Google Cloud** (console.cloud.google.com, signed in with the Google account that should own Abeseria, not a Mako Moto one):
+
+1. Create a project named `Abeseria`.
+2. **Google Auth Platform → Branding:** app name `Abeseria`, your support email. Skip the logo for now: uploading one sends the app to Google for review.
+3. **Audience:** User type **External**, leave it in **Testing**. Under Test users, add every Gmail that will sign in (you, Jovie, each tester). Testing mode allows 100. Before the app is public, press **Publish app** (name, email and profile scopes don't need Google's security review).
+4. **Clients → Create client → Web application**, name `Abeseria web`:
+   - Authorized JavaScript origins: `https://bkarkos86-mako.github.io` and `http://localhost:5173`
+   - Authorized redirect URIs: `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod)
+5. Copy the **Client ID** and **Client secret**. The secret goes into Supabase only, never into this repo or the app.
+
+**Supabase, abeseria-dev first:**
+
+1. **Authentication → Sign In / Providers → Google:** turn on, paste the Client ID and Client secret, save.
+2. Same page: turn on **Allow manual linking**. Without it, old anonymous test phones can't add Google.
+3. **Authentication → URL Configuration:** Site URL `https://bkarkos86-mako.github.io/Abaseria/dev/`. Redirect URLs: add `https://bkarkos86-mako.github.io/**` and `http://localhost:5173/**`.
+4. Once your test phones have signed in with Google, turn **off** Allow anonymous sign-ins. The app no longer uses it, and leaving it on lets scripts create users.
+
+**abeseria-prod:** the same 4 steps with Site URL `https://bkarkos86-mako.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
+
+To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick your account, and you land on Home. Settings → Account shows your name. In SQL Editor, `select email, is_anonymous from auth.users` shows your Gmail with `is_anonymous = false`.
+
+### CAPTCHA
+
+With Google as the only way in, Google's own sign-in page does the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in (the admin dashboard's staff login, or email-link sign-in for shoppers).
 
 ## Two databases
 
