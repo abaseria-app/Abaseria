@@ -52,7 +52,7 @@ Phones that were already sharing anonymously keep their user id when they pick G
 **Supabase, abeseria-dev first:**
 
 1. **Authentication → Sign In / Providers → Google:** turn on, paste the Client ID and Client secret, save.
-2. Same page: turn on **Allow manual linking**. Without it, old anonymous test phones can't add Google.
+2. Same page: turn on **Allow manual linking**. With it, old anonymous test phones keep their user id when they add Google. Without it, they sign in to Google as a new user and their past prices stay under the old anonymous id.
 3. **Authentication → URL Configuration:** Site URL `https://bkarkos86-mako.github.io/Abaseria/dev/`. Redirect URLs: add `https://bkarkos86-mako.github.io/**` and `http://localhost:5173/**`.
 4. Once your test phones have signed in with Google, turn **off** Allow anonymous sign-ins. The app no longer uses it, and leaving it on lets scripts create users.
 

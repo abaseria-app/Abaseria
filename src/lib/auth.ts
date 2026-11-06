@@ -35,6 +35,12 @@ export function accountFromUser(user: User | null | undefined): Account | null {
   return { id: user.id, name: name?.trim() ?? null, email: user.email ?? null };
 }
 
+/** A link attempt that can't work however often it's retried, so the phone signs in to Google on its own instead. */
+export function shouldStartFresh(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === 'manual_linking_disabled' || /manual linking is disabled/i.test(error.message ?? '');
+}
+
 /** Where Google sends the shopper back to: the app's own address, so /Abaseria/ and /Abaseria/dev/ each return home. */
 export function redirectUrl(origin: string, base: string): string {
   return origin + (base.startsWith('/') ? base : `/${base}`);
@@ -112,11 +118,18 @@ export async function startGoogle(): Promise<StartResult> {
   const client = await getSupabase();
   if (!client) return { ok: false, reason: 'off' };
   const redirectTo = redirectUrl(window.location.origin, import.meta.env.BASE_URL);
+  const google = () =>
+    client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, queryParams: { prompt: 'select_account' } } });
   const { data } = await client.auth.getSession();
-  // A phone that already shares prices anonymously keeps its user id by adding Google to it.
-  const { error } = data.session?.user?.is_anonymous
-    ? await client.auth.linkIdentity({ provider: 'google', options: { redirectTo } })
-    : await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, queryParams: { prompt: 'select_account' } } });
+  if (data.session?.user?.is_anonymous) {
+    // A phone that already shares prices anonymously keeps its user id by adding Google to it.
+    const linked = await client.auth.linkIdentity({ provider: 'google', options: { redirectTo } });
+    if (!linked.error) return { ok: true };
+    // Linking is switched off in Supabase: start fresh with Google rather than leave the shopper stuck.
+    if (!shouldStartFresh(linked.error)) return { ok: false, reason: 'failed', message: linked.error.message };
+    await client.auth.signOut({ scope: 'local' });
+  }
+  const { error } = await google();
   return error ? { ok: false, reason: 'failed', message: error.message } : { ok: true };
 }
 

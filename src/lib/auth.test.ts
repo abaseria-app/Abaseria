@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { User } from '@supabase/supabase-js';
-import { accountFromUser, cleanUrl, readReturn, redirectUrl } from './auth';
+import { accountFromUser, cleanUrl, readReturn, redirectUrl, shouldStartFresh } from './auth';
 
 const user = (over: Partial<User>): User =>
   ({ id: 'u1', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '', ...over }) as User;
@@ -45,5 +45,16 @@ describe('readReturn and cleanUrl', () => {
   it('leaves a normal address alone', () => {
     expect(readReturn(base)).toEqual({ finishing: false, error: null, code: null });
     expect(cleanUrl(`${base}?x=1`)).toBe(`${base}?x=1`);
+  });
+});
+
+describe('shouldStartFresh', () => {
+  it('falls back to a plain Google sign-in when linking is off in Supabase', () => {
+    expect(shouldStartFresh({ code: 'manual_linking_disabled', message: 'Manual linking is disabled' })).toBe(true);
+    expect(shouldStartFresh({ message: 'Manual linking is disabled' })).toBe(true);
+  });
+  it('shows other errors instead', () => {
+    expect(shouldStartFresh({ code: 'provider_disabled', message: 'Unsupported provider' })).toBe(false);
+    expect(shouldStartFresh(null)).toBe(false);
   });
 });
