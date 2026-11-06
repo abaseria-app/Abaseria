@@ -1,8 +1,8 @@
 name: Deploy to GitHub Pages
 
 # One site, two apps:
-#   /<repo>/       the live app, built from main, talking to abeseria-prod
-#   /<repo>/dev/   the test app, built from the dev branch, talking to abeseria-dev
+#   /<repo>/       the live app, built from main, talking to abaseria-prod
+#   /<repo>/dev/   the test app, built from the dev branch, talking to abaseria-dev
 # Pushing to main runs this. Pushing to dev runs dev.yml, which tests dev and then runs this on main.
 
 on:

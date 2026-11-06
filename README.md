@@ -1,4 +1,4 @@
-# Abeseria prototype
+# Abaseria prototype
 
 A grocery tally PWA for the 10-shopper test in Imus. The shopper snaps the shelf tag, picks the price, and watches a running total against their budget. At the counter they compare with the register and count the receipt lines.
 
@@ -56,12 +56,12 @@ One GitHub Pages site holds two apps:
 
 | Address | Built from | Database | Phone storage |
 |---|---|---|---|
-| `https://<user>.github.io/<repo>/` | `main` | abeseria-prod | `abeseria` |
-| `https://<user>.github.io/<repo>/dev/` | `dev` | abeseria-dev | `abeseria-dev` |
+| `https://<user>.github.io/<repo>/` | `main` | abaseria-prod | `abaseria` |
+| `https://<user>.github.io/<repo>/dev/` | `dev` | abaseria-dev | `abaseria-dev` |
 
 - **Pushing to `dev`** runs `.github/workflows/dev.yml`: tests, then a rebuild that updates `/dev/` only. Test new features here on a real phone.
 - **Merging `dev` into `main`** runs `.github/workflows/deploy.yml` and updates the live app (and `/dev/` along with it).
-- The dev app shows a red **DEV · test data** badge and installs as "Abeseria Dev", so the two can sit side by side on one phone without sharing trips or offline files.
+- The dev app shows a red **DEV · test data** badge and installs as "Abaseria Dev", so the two can sit side by side on one phone without sharing trips or offline files.
 
 In the repo: Settings → Pages → Source: **GitHub Actions**.
 
@@ -76,7 +76,7 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
 | `src/lib/thumb.ts` | Shrinks the product's reference image (from the shared database) to the list thumbnail kept on the phone |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
-| `.env.development` | Dev database address and publishable key (abeseria-dev) |
+| `.env.development` | Dev database address and publishable key (abaseria-dev) |
 | `src/lib/sync.ts` | Uploading finished trips and looking up other shoppers' prices |
 | `src/lib/search.ts` | Item search: reads names, barcodes, prices and sizes from one box; filters and sorting |
 | `src/lib/catalog.ts` | The list search looks through: this phone's items merged with shared products and prices |
