@@ -8,7 +8,7 @@
 // (loose produce, meat by the kilo) are grouped by name and only ever come from this phone.
 import type { Branch, Item, Trip } from './db';
 import { db, storeName } from './db';
-import { categoryOf, type CategoryId } from './categories';
+import { CATEGORIES, categoryOf, type CategoryId } from './categories';
 import { dbConfig, getSupabase } from './supabase';
 import { IMAGE_BUCKET, SHARING_ON, isPlaceholderName, localDay } from './sync';
 import type { CatalogItem, PricePoint } from './search';
@@ -102,7 +102,7 @@ export interface BranchRow {
   name: string;
 }
 
-const CATEGORY_IDS: CategoryId[] = ['meat', 'vegetables', 'pantry', 'dry', 'household', 'other'];
+const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
 const asCategory = (c: string | null, name: string): CategoryId =>
   c && (CATEGORY_IDS as string[]).includes(c) ? (c as CategoryId) : categoryOf({ label: name });
 

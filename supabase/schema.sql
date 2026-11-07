@@ -8,7 +8,7 @@
 -- plus a latest_prices view: the newest sighting per barcode per branch.
 --
 -- Who can do what (enforced by row-level security below):
---   anyone with the app's public key can READ branches, products, sightings and latest_prices
+--   anyone with the app's public key can READ branches, Published products, sightings and latest_prices
 --   a signed-in phone (anonymous sign-in is fine) can ADD rows, stamped with its own user id
 --   nobody can edit or delete rows from the app; fixes are done here by you
 --   which phone added a sighting (contributor) is stored but never readable through the app
@@ -48,7 +48,10 @@ create table public.products (
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
   category    text not null default 'other'
-              check (category in ('meat', 'vegetables', 'pantry', 'dry', 'household', 'other')),
+              constraint products_category_check
+              check (category in ('meat', 'poultry', 'vegetables', 'dairy', 'pantry', 'dry', 'household', 'other')),
+  -- New products wait as Pending until a Product Manager or Admin publishes them. Phones can't set this.
+  status      text not null default 'pending' check (status in ('pending', 'published')),
   -- Reference image: a file name in the public 'product-images' bucket. Set in the dashboard, never by the app.
   image_path  text check (image_path is null or image_path ~ '^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$'),
   created_by  uuid default auth.uid() references auth.users (id) on delete set null,
@@ -99,7 +102,10 @@ alter table public.products        enable row level security;
 alter table public.price_sightings enable row level security;
 
 create policy "read branches"  on public.branches        for select to anon, authenticated using (true);
-create policy "read products"  on public.products        for select to anon, authenticated using (true);
+-- Shoppers see Published products, plus the Pending ones they added themselves. A Pending product's prices
+-- still show (sightings and latest_prices aren't filtered), so a scan gets the price and the shopper types the name.
+create policy "read products"  on public.products        for select to anon, authenticated
+  using (status = 'published' or created_by = auth.uid());
 create policy "read sightings" on public.price_sightings for select to anon, authenticated using (true);
 
 create policy "add branches" on public.branches
@@ -124,6 +130,20 @@ grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_cen
               bundle_price_centavos, is_promo, capture_method)
   on public.price_sightings to authenticated;
 grant select on public.latest_prices to anon, authenticated;
+
+-- Uploading a price needs to know its barcode is already in the database, Pending or not.
+-- This answers only that: which of these barcodes exist (200 at most per call). No names, no status.
+create or replace function public.known_barcodes(codes text[])
+returns setof text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.barcode from public.products p where p.barcode = any (codes[1:200]);
+$$;
+revoke all on function public.known_barcodes(text[]) from public;
+grant execute on function public.known_barcodes(text[]) to authenticated;
 
 
 -- Product images ---------------------------------------------------------------------------------------

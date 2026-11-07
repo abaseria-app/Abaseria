@@ -5,7 +5,7 @@ import type { Item, Trip } from './db';
 // A stand-in for the shared database: tables in memory, the same unique rules as schema.sql.
 interface Store {
   branches: { id: string; chain: string; name: string }[];
-  products: { barcode: string; name: string; category?: string; image_path?: string | null }[];
+  products: { barcode: string; name: string; category?: string; image_path?: string | null; status?: 'pending' | 'published'; created_by?: string }[];
   price_sightings: Record<string, unknown>[];
   failNext?: string;
 }
@@ -35,6 +35,8 @@ function table(name: keyof Omit<Store, 'failNext'>) {
       const rows = store[name] as Record<string, unknown>[];
       if (op.kind === 'select') {
         let out = rows.filter((r) => filters.every(([k, v]) => r[k] === v));
+        // Same read rule as schema.sql: someone else's Pending product is hidden.
+        if (name === 'products') out = out.filter((r) => r.status !== 'pending' || r.created_by === sessionUser?.id);
         if (inFilter) out = out.filter((r) => inFilter![1].includes(r[inFilter![0]]));
         return resolve({ data: out, error: null });
       }
@@ -56,6 +58,16 @@ function table(name: keyof Omit<Store, 'failNext'>) {
 
 const fakeClient = {
   from: (t: keyof Omit<Store, 'failNext'>) => table(t),
+  // known_barcodes ignores who can read a product: Pending ones count too.
+  rpc: async (fn: string, args: { codes: string[] }) => {
+    if (fn !== 'known_barcodes') return { data: null, error: { message: `no function ${fn}` } };
+    if (store.failNext) {
+      const message = store.failNext;
+      store.failNext = undefined;
+      return { data: null, error: { message, code: 'PGRST000' } };
+    }
+    return { data: store.products.map((p) => p.barcode).filter((b) => args.codes.includes(b)), error: null };
+  },
   storage: { from: (bucket: string) => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/${bucket}/${path}` } }) }) },
   auth: {
     getSession: async () => ({ data: { session: sessionUser ? { user: sessionUser } : null } }),
@@ -203,6 +215,16 @@ describe('sharePending', () => {
     expect(store.products.map((p) => p.name)).toEqual(['Joy Lemon']);
   });
 
+  it('uploads the price for a Pending product someone else added, though the phone can’t read it', async () => {
+    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', status: 'pending', created_by: 'staff' });
+    const tripId = await addTrip();
+    await db.items.add(item({ tripId }));
+    const r = await sync.sharePending();
+    expect(r).toMatchObject({ trips: 1, prices: 1 });
+    expect(store.products).toHaveLength(1); // not added twice
+    expect(store.price_sightings[0]).toMatchObject({ barcode: '4800016644818' });
+  });
+
   it('skips trips too old for the shared database', async () => {
     const tripId = await addTrip({ startedAt: iso(20), endedAt: iso(20) });
     await db.items.add(item({ tripId, createdAt: iso(20) }));
@@ -222,6 +244,17 @@ describe('sharedPrice', () => {
     ];
     const r = await sync.sharedPrice('4800016644818', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect(r).toMatchObject({ shared: true, sameBranch: true, item: { label: 'Joy Lemon', unitPriceCentavos: 11500, captureMethod: 'shared' } });
+  });
+
+  it('returns a Pending product’s price with no name, so the shopper types it', async () => {
+    store.branches.push({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', chain: 'Puregold', name: 'Imus' });
+    store.products.push({ barcode: '4800016644818', name: 'Joy Lemon', status: 'pending', created_by: 'staff' });
+    (store as unknown as Record<string, unknown[]>).latest_prices = [
+      { barcode: '4800016644818', branch_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', seen_on: '2026-11-02', price_type: 'each', unit_price_centavos: 11500, bundle_qty: null, bundle_price_centavos: null, is_promo: false },
+    ];
+    const r = await sync.sharedPrice('4800016644818', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(r).toMatchObject({ shared: true, item: { label: '', unitPriceCentavos: 11500 } });
+    expect(await sync.sharedProduct('4800016644818')).toBeNull();
   });
 
   it('returns nothing for a store nobody has shared yet', async () => {

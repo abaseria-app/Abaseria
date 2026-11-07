@@ -156,10 +156,15 @@ async function shareTrip(client: SupabaseClient, trip: Trip, branch: Branch): Pr
   }
 
   // A price needs its product in the database. Unnamed items whose barcode nobody has named stay on the phone.
+  // Asked through known_barcodes, not a products read: Pending products added by someone else are hidden
+  // from reads, but their prices still belong in the database.
   const codes = [...new Set(items.map((i) => i.barcode!))];
-  const { data: known, error: knownErr } = await client.from('products').select('barcode').in('barcode', codes);
-  if (knownErr) throw new Error(`products check: ${knownErr.message}`);
-  const exists = new Set((known ?? []).map((r) => r.barcode as string));
+  const exists = new Set<string>();
+  for (let i = 0; i < codes.length; i += 200) {
+    const { data: known, error: knownErr } = await client.rpc('known_barcodes', { codes: codes.slice(i, i + 200) });
+    if (knownErr) throw new Error(`products check: ${knownErr.message}`);
+    for (const code of (known ?? []) as string[]) exists.add(code);
+  }
   const rows = items.filter((i) => exists.has(i.barcode!)).map((i) => sightingRow(i as Item & { shareId: string }, branchId));
   if (!rows.length) return 0;
 
