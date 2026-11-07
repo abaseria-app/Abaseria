@@ -10,13 +10,17 @@ export const S = {
     title: 'Welcome to Abaseria',
     pitch: 'Know your total before you reach the cashier. Scan as you shop and watch it add up against your budget.',
     google: 'Continue with Google',
-    going: 'Opening Google…',
+    facebook: 'Continue with Facebook',
+    going: (provider: 'google' | 'facebook') => (provider === 'google' ? 'Opening Google…' : 'Opening Facebook…'),
     finishing: 'Signing you in…',
-    why: 'Your Google name and email tie the prices you share to one account. Your trips and budget stay on this phone.',
+    why: 'Your name and email tie the prices you share to one account. Your trips and budget stay on this phone.',
+    privacy: 'Privacy and deleting your data',
     offline: 'You’re offline. Connect to the internet once to sign in. After that the app works without signal.',
     off: 'Sign-in isn’t set up in this build.',
-    failed: (message: string) => `Google sign-in didn’t start: ${message}.`,
-    returned: (message: string) => `Google sign-in didn’t finish: ${message}.`,
+    failed: (message: string) => `Sign-in didn’t start: ${message}.`,
+    returned: (message: string) => `Sign-in didn’t finish: ${message}.`,
+    noEmail:
+      'Your Facebook account doesn’t have an email on it, so Abaseria can’t sign you in with it. Use Google, or add an email in Facebook (Settings → Accounts Center → Personal details) and try again.',
   },
 
   home: {
@@ -270,7 +274,7 @@ export const S = {
     resultsHint: 'Pick the trips CSV files from every tester’s phone.',
     account: 'Account',
     signedInAs: (name: string | null, email: string | null) =>
-      name && email ? `Signed in as ${name} (${email})` : `Signed in as ${name ?? email ?? 'your Google account'}`,
+      name && email ? `Signed in as ${name} (${email})` : `Signed in as ${name ?? email ?? 'your account'}`,
     signOut: 'Sign out',
     signOutAsk: 'Sign out on this phone? Your trips stay here, and you’ll need to sign in again before the next trip.',
     signOutYes: 'Yes, sign out',

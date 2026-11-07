@@ -96,7 +96,7 @@ export function productRow(item: Item) {
 // ---------------------------------------------------------------------------------------------------------
 // Network
 
-/** Uploads need the shopper's Google account. Phones that haven't signed in yet keep their trips waiting. */
+/** Uploads need the shopper's Google or Facebook account. Phones that haven't signed in yet keep their trips waiting. */
 async function signIn(client: SupabaseClient): Promise<void> {
   if (!(await hasAccountSession(client))) throw new Error(NOT_SIGNED_IN);
 }
