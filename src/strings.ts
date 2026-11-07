@@ -15,7 +15,7 @@ export const S = {
     why: 'Your Google name and email tie the prices you share to one account. Your trips and budget stay on this phone.',
     offline: 'You’re offline. Connect to the internet once to sign in. After that the app works without signal.',
     off: 'Sign-in isn’t set up in this build.',
-    failed: (message: string) => `Google sign-in didn’t finish: ${message}. Try again.`,
+    failed: (message: string) => `Google sign-in didn’t start: ${message}.`,
     returned: (message: string) => `Google sign-in didn’t finish: ${message}.`,
   },
 
