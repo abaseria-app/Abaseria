@@ -19,6 +19,8 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  -- Like Supabase: new functions in public are granted to anon and authenticated directly.
+  alter default privileges in schema public grant execute on functions to anon, authenticated;
   -- Stand-in for Supabase Storage: just what the checks use. Supabase turns on RLS for objects itself.
   create schema storage;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
