@@ -15,7 +15,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 
 ## Rules
 
-- Anyone with the app's public key can read branches, products and prices.
+- Anyone with the app's public key can read branches, prices and Published products. A Pending product is visible only to the shopper who added it until it's published (Table Editor → `products` → `status` = `published`, later the dashboard).
 - A signed-in shopper can add rows. Each row is stamped with their user id. Since Nov 6, 2026 the app asks every shopper to sign in with Google before their first trip and no longer creates anonymous users (see Sign-in below).
 - Nobody can edit or delete from the app. You fix bad rows in the Supabase dashboard.
 - Which phone added a price is stored but can't be read through the app.
@@ -98,8 +98,10 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 |---|---|---|---|
 | `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
 | `003_product_images.sql` | `products.image_path` and the public `product-images` bucket; images set in the dashboard only | Before adding images | Before images show in the live app |
+| `004_poultry_dairy_product_status.sql` | Poultry and Dairy categories; `products.status` (pending / published), new products Pending | Done Nov 5 | Before the next `dev` → `main` merge |
+| `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Same time as 004 |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 28 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 42 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 
