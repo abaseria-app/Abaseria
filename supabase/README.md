@@ -16,7 +16,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 ## Rules
 
 - Anyone with the app's public key can read branches, prices and Published products. A Pending product is visible only to the shopper who added it until it's published (Table Editor → `products` → `status` = `published`, later the dashboard).
-- A signed-in shopper can add rows. Each row is stamped with their user id. Since Nov 6, 2026 the app asks every shopper to sign in with Google before their first trip and no longer creates anonymous users (see Sign-in below).
+- A signed-in shopper can add rows. Each row is stamped with their user id. Since Nov 6, 2026 the app asks every shopper to sign in before their first trip (Google, and Facebook since Nov 7) and no longer creates anonymous users (see Sign-in below).
 - Nobody can edit or delete from the app. You fix bad rows in the Supabase dashboard.
 - Which phone added a price is stored but can't be read through the app.
 - Sightings older than 14 days or dated in the future are refused.
@@ -31,13 +31,13 @@ One image per product, shown as the thumbnail in the shopper's list so they can 
 
 To replace one, upload the new file under the same name, or a new name and change `image_path`. Phones that already scanned the product keep their copy until it's scanned on a phone that hasn't.
 
-## Sign-in (Google)
+## Sign-in (Google and Facebook)
 
-Every shopper signs in with Google on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
+Every shopper signs in with Google or Facebook on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
 
-Phones that were already sharing anonymously keep their user id when they pick Google (manual linking), so their past prices stay credited to them. If that Google account already has an Abaseria user, the phone switches to it.
+Phones that were already sharing anonymously keep their user id when they pick a provider (manual linking), so their past prices stay credited to them. If that account already has an Abaseria user, the phone switches to it.
 
-### One-time setup, about 25 minutes
+### Google: one-time setup, about 25 minutes
 
 **Google Cloud** (console.cloud.google.com, signed in with the Google account that should own Abaseria, not a Mako Moto one):
 
@@ -60,9 +60,34 @@ Phones that were already sharing anonymously keep their user id when they pick G
 
 To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick your account, and you land on Home. Settings → Account shows your name. In SQL Editor, `select email, is_anonymous from auth.users` shows your Gmail with `is_anonymous = false`.
 
+### Facebook: one-time setup, about 30 minutes
+
+Facebook needs a public privacy page with data-deletion instructions before anyone outside your app's roles can sign in. That's `public/privacy.html`, served at `/Abaseria/dev/privacy.html` once this branch is on `dev` and `/Abaseria/privacy.html` once it's on `main`. Replace `CONTACT_EMAIL` in it first (3 places).
+
+**Meta for Developers** (developers.facebook.com, signed in with your personal Facebook profile, not the Mako Moto page):
+
+1. **My Apps → Create app.** Name `Abaseria`, your contact email. Use case: **Authenticate and request data from users with Facebook Login**. Skip connecting a business portfolio.
+2. **Use cases → Authentication and account creation → Customize:** next to `email`, press **Add**. `public_profile` is already on. Ask for nothing else: any other permission sends the app to Meta's App Review.
+3. **Facebook Login → Settings:** Valid OAuth Redirect URIs `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod). Leave Client OAuth login, Web OAuth login and Enforce HTTPS on. Save.
+4. **App settings → Basic:** Privacy Policy URL `https://bkarkos86-mako.github.io/Abaseria/dev/privacy.html`. User data deletion → **Data deletion instructions URL**, same address with `#delete` on the end. Category **Shopping**. Save, then copy the **App ID** and **App secret** (press Show). The secret goes into Supabase only, never into this repo or the app.
+5. While the app is in **Development** mode, only people with a role on it can sign in. To let Jovie test first: **App roles → Roles → Add people → Testers**, and she accepts at developers.facebook.com/requests.
+6. When the dev app works: **Publish** (top of the dashboard). With only `email` and `public_profile`, Meta usually lets it go live without a review. Once it's on `main`, change both URLs in step 4 to the `/Abaseria/` addresses.
+
+**Supabase, abaseria-dev first:** **Authentication → Sign In / Providers → Facebook:** turn on, paste the App ID (Client ID) and App secret, save. The callback URL shown there should match step 3. Allow manual linking and the redirect URLs are already set from the Google setup.
+
+**abaseria-prod:** the same switch, **before** this branch reaches `main`. Otherwise the live app shows a Facebook button that can't finish.
+
+To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Facebook, and you land on Home. In SQL Editor, `select email, raw_app_meta_data->'providers' from auth.users` shows `["facebook"]` next to your email.
+
+### Things to know about Facebook sign-in
+
+- **No email, no sign-in.** Supabase needs an email from Facebook. Accounts made with a mobile number and no email are refused; the app tells the shopper to use Google or add an email in Facebook. Watch how often testers hit this.
+- **Same email, same account.** A shopper who signs in with Google on one phone and Facebook on another, both with the same email, lands on one Abaseria account. Different emails make two accounts, and their shared prices are split between them.
+- **Links opened inside Messenger or Facebook** open in Facebook's own browser. Facebook sign-in works there; Google sign-in may be refused in that browser. Testers should open the link in Chrome and add it to the home screen, as the tester sheet already says.
+
 ### CAPTCHA
 
-With Google as the only way in, Google's own sign-in page does the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in (the admin dashboard's staff login, or email-link sign-in for shoppers).
+With Google and Facebook as the only ways in, their own sign-in pages do the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in (the admin dashboard's staff login, or email-link sign-in for shoppers).
 
 ## Two databases
 

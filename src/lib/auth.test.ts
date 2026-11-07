@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { User } from '@supabase/supabase-js';
-import { accountFromUser, cleanUrl, readReturn, redirectUrl, shouldStartFresh } from './auth';
+import { accountFromUser, cleanUrl, isMissingEmail, isProvider, readReturn, redirectUrl, shouldStartFresh } from './auth';
 
 const user = (over: Partial<User>): User =>
   ({ id: 'u1', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '', ...over }) as User;
@@ -42,6 +42,10 @@ describe('readReturn and cleanUrl', () => {
     expect(cleanUrl(q)).toBe(base);
     expect(cleanUrl(`${base}#error=access_denied`)).toBe(base);
   });
+  it('drops the "#_=_" Facebook adds to every return', () => {
+    expect(readReturn(`${base}?code=abc123#_=_`)).toEqual({ finishing: true, error: null, code: null });
+    expect(cleanUrl(`${base}?code=abc123#_=_`)).toBe(base);
+  });
   it('leaves a normal address alone', () => {
     expect(readReturn(base)).toEqual({ finishing: false, error: null, code: null });
     expect(cleanUrl(`${base}?x=1`)).toBe(`${base}?x=1`);
@@ -56,5 +60,27 @@ describe('shouldStartFresh', () => {
   it('shows other errors instead', () => {
     expect(shouldStartFresh({ code: 'provider_disabled', message: 'Unsupported provider' })).toBe(false);
     expect(shouldStartFresh(null)).toBe(false);
+  });
+});
+
+describe('isMissingEmail', () => {
+  it('spots a Facebook account with no email (Supabase refuses it)', () => {
+    const back = readReturn(
+      'https://bkarkos86-mako.github.io/Abaseria/dev/?error=server_error&error_code=unexpected_failure&error_description=Error+getting+user+email+from+external+provider#_=_',
+    );
+    expect(isMissingEmail(back.error)).toBe(true);
+  });
+  it('ignores other errors', () => {
+    expect(isMissingEmail('User cancelled')).toBe(false);
+    expect(isMissingEmail(null)).toBe(false);
+  });
+});
+
+describe('isProvider', () => {
+  it('accepts only the two sign-in buttons', () => {
+    expect(isProvider('google')).toBe(true);
+    expect(isProvider('facebook')).toBe(true);
+    expect(isProvider('apple')).toBe(false);
+    expect(isProvider(null)).toBe(false);
   });
 });

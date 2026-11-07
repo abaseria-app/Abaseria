@@ -1,27 +1,30 @@
 import { useState } from 'react';
 import { S } from '../strings';
-import { startGoogle } from '../lib/auth';
+import { isMissingEmail, startSignIn, type Provider } from '../lib/auth';
 
 interface Props {
-  /** Coming back from Google: the app is finishing the sign-in. */
+  /** Coming back from Google or Facebook: the app is finishing the sign-in. */
   finishing: boolean;
-  /** Why the last return from Google didn't work, if it didn't. */
+  /** Why the last return from sign-in didn't work, if it didn't. */
   error: string | null;
 }
 
 const LOGO = `${import.meta.env.BASE_URL}icons/icon-192.png`;
+const PRIVACY = `${import.meta.env.BASE_URL}privacy.html`;
+
+const returnMessage = (error: string) => (isMissingEmail(error) ? S.login.noEmail : S.login.returned(error));
 
 export function Login({ finishing, error }: Props) {
-  const [going, setGoing] = useState(false);
-  const [msg, setMsg] = useState<string | null>(error ? S.login.returned(error) : null);
+  const [going, setGoing] = useState<Provider | null>(null);
+  const [msg, setMsg] = useState<string | null>(error ? returnMessage(error) : null);
 
-  async function go() {
-    setGoing(true);
+  async function go(provider: Provider) {
+    setGoing(provider);
     setMsg(null);
-    const r = await startGoogle();
-    // On success the page is leaving for Google, so the button stays in its "opening" state.
+    const r = await startSignIn(provider);
+    // On success the page is leaving for the provider, so the button stays in its "opening" state.
     if (r.ok) return;
-    setGoing(false);
+    setGoing(null);
     setMsg(r.reason === 'offline' ? S.login.offline : r.reason === 'off' ? S.login.off : S.login.failed(r.message ?? ''));
   }
 
@@ -33,12 +36,18 @@ export function Login({ finishing, error }: Props) {
       {finishing ? (
         <p className="hint login-status">{S.login.finishing}</p>
       ) : (
-        <button className="btn primary huge" disabled={going} onClick={go}>
-          {going ? S.login.going : S.login.google}
-        </button>
+        <div className="login-buttons">
+          <button className="btn primary huge" disabled={!!going} onClick={() => go('google')}>
+            {going === 'google' ? S.login.going('google') : S.login.google}
+          </button>
+          <button className="btn facebook huge" disabled={!!going} onClick={() => go('facebook')}>
+            {going === 'facebook' ? S.login.going('facebook') : S.login.facebook}
+          </button>
+        </div>
       )}
       {msg && <p className="hint login-error" role="alert">{msg}</p>}
       <p className="hint small">{S.login.why}</p>
+      <a className="hint small login-privacy" href={PRIVACY}>{S.login.privacy}</a>
     </main>
   );
 }

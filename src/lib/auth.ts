@@ -1,11 +1,13 @@
-// Shopper sign-in. Every shopper signs in with Google before their first trip (decided Nov 6, 2026).
+// Shopper sign-in. Every shopper signs in with Google or Facebook before their first trip (Google decided
+// Nov 6, 2026; Facebook added Nov 7). A Facebook account with no email on it can't sign in: Supabase needs
+// an email from the provider and refuses the sign-in without one, so the shopper is told to use Google.
 //
 // Why the app keeps its own "signed in as" record on the phone: Supabase's session needs the internet to
 // refresh, and a shopper in a mall basement must still be able to open the app. The record is only a door
 // for the screens; what anyone can add to the shared database is still decided by its rules (schema.sql).
 //
 // Phones that signed in anonymously before this (the dev test phones) keep the same user id when they pick
-// Google, so the prices they already shared stay credited to them. If that Google account already belongs to
+// a provider, so the prices they already shared stay credited to them. If that account already belongs to
 // another Abaseria user, the phone signs in to that user instead.
 //
 // Trips stay on the phone either way: signing in or out doesn't move or delete them (that's feature 28).
@@ -16,6 +18,8 @@ import { dbConfig, getSupabase } from './supabase';
 /** Builds without a database stay phone-only and need no sign-in. */
 export const LOGIN_REQUIRED = !!dbConfig;
 
+export type Provider = 'google' | 'facebook';
+
 export interface Account {
   id: string;
   name: string | null;
@@ -23,6 +27,8 @@ export interface Account {
 }
 
 const ACCOUNT_KEY = 'account';
+/** Which button the shopper last tapped, so a retry after the redirect goes back to the same provider. */
+const PROVIDER_KEY = 'loginProvider';
 
 // ---------------------------------------------------------------------------------------------------------
 // Pure helpers (tested in auth.test.ts)
@@ -35,19 +41,19 @@ export function accountFromUser(user: User | null | undefined): Account | null {
   return { id: user.id, name: name?.trim() ?? null, email: user.email ?? null };
 }
 
-/** A link attempt that can't work however often it's retried, so the phone signs in to Google on its own instead. */
+/** A link attempt that can't work however often it's retried, so the phone signs in on its own instead. */
 export function shouldStartFresh(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false;
   return error.code === 'manual_linking_disabled' || /manual linking is disabled/i.test(error.message ?? '');
 }
 
-/** Where Google sends the shopper back to: the app's own address, so /Abaseria/ and /Abaseria/dev/ each return home. */
+/** Where Google or Facebook sends the shopper back to: the app's own address, so /Abaseria/ and /Abaseria/dev/ each return home. */
 export function redirectUrl(origin: string, base: string): string {
   return origin + (base.startsWith('/') ? base : `/${base}`);
 }
 
 export interface ReturnInfo {
-  /** Google or Supabase sent the shopper back with a code to finish signing in. */
+  /** Google, Facebook or Supabase sent the shopper back with a code to finish signing in. */
   finishing: boolean;
   error: string | null;
   code: string | null;
@@ -70,9 +76,17 @@ export function readReturn(href: string): ReturnInfo {
 export function cleanUrl(href: string): string {
   const url = new URL(href);
   for (const k of ['code', 'error', 'error_code', 'error_description', 'state']) url.searchParams.delete(k);
-  if (/(access_token|error)=/.test(url.hash)) url.hash = '';
+  // Facebook tacks "#_=_" onto every return address.
+  if (/(access_token|error)=/.test(url.hash) || url.hash === '#_=_') url.hash = '';
   return url.toString();
 }
+
+/** The Facebook account has no email on it (often one made with a mobile number), so Supabase refused it. */
+export function isMissingEmail(error: string | null | undefined): boolean {
+  return /getting user email from external provider/i.test(error ?? '');
+}
+
+export const isProvider = (v: unknown): v is Provider => v === 'google' || v === 'facebook';
 
 // ---------------------------------------------------------------------------------------------------------
 // The phone's record
@@ -112,39 +126,49 @@ const online = () => typeof navigator === 'undefined' || navigator.onLine !== fa
 
 export type StartResult = { ok: true } | { ok: false; reason: 'offline' | 'off' | 'failed'; message?: string };
 
-/** Sends the shopper to Google. The page leaves the app; it comes back to `redirectUrl`. */
-export async function startGoogle(): Promise<StartResult> {
+/** Sends the shopper to Google or Facebook. The page leaves the app; it comes back to `redirectUrl`. */
+export async function startSignIn(provider: Provider): Promise<StartResult> {
   if (!online()) return { ok: false, reason: 'offline' };
   const client = await getSupabase();
   if (!client) return { ok: false, reason: 'off' };
+  await setSetting(PROVIDER_KEY, provider);
   const redirectTo = redirectUrl(window.location.origin, import.meta.env.BASE_URL);
-  const google = () =>
-    client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, queryParams: { prompt: 'select_account' } } });
+  // Google: always show the account picker. Facebook: ask for email again if the shopper unticked it last time.
+  const queryParams: Record<string, string> =
+    provider === 'google' ? { prompt: 'select_account' } : { auth_type: 'rerequest' };
+  const scopes = provider === 'facebook' ? 'email public_profile' : undefined;
+  const signIn = () => client.auth.signInWithOAuth({ provider, options: { redirectTo, queryParams, scopes } });
   const { data } = await client.auth.getSession();
   if (data.session?.user?.is_anonymous) {
-    // A phone that already shares prices anonymously keeps its user id by adding Google to it.
-    const linked = await client.auth.linkIdentity({ provider: 'google', options: { redirectTo } });
+    // A phone that already shares prices anonymously keeps its user id by adding the account to it.
+    const linked = await client.auth.linkIdentity({ provider, options: { redirectTo, queryParams, scopes } });
     if (!linked.error) return { ok: true };
-    // Linking is switched off in Supabase: start fresh with Google rather than leave the shopper stuck.
+    // Linking is switched off in Supabase: start fresh rather than leave the shopper stuck.
     if (!shouldStartFresh(linked.error)) return { ok: false, reason: 'failed', message: linked.error.message };
     await client.auth.signOut({ scope: 'local' });
   }
-  const { error } = await google();
+  const { error } = await signIn();
   return error ? { ok: false, reason: 'failed', message: error.message } : { ok: true };
+}
+
+/** The provider the shopper last tapped on this phone, if any. */
+export async function lastProvider(): Promise<Provider | null> {
+  const v = await getSetting(PROVIDER_KEY);
+  return isProvider(v) ? v : null;
 }
 
 let started: Promise<InitResult> | null = null;
 
 export interface InitResult {
   account: Account | null;
-  /** Shown on the sign-in screen when the return from Google didn't work. */
+  /** Shown on the sign-in screen when the return from Google or Facebook didn't work. */
   error: string | null;
-  /** The app is on its way back to Google (switching from an anonymous phone to an existing account). */
+  /** The app is on its way back to the provider (switching from an anonymous phone to an existing account). */
   redirecting: boolean;
 }
 
 /**
- * Runs once per app open: finishes a sign-in coming back from Google, checks the phone's record against
+ * Runs once per app open: finishes a sign-in coming back from Google or Facebook, checks the phone's record against
  * Supabase when online, and listens for sign-outs. Offline it trusts the phone's record.
  */
 export function initAuth(): Promise<InitResult> {
@@ -157,7 +181,7 @@ async function init(): Promise<InitResult> {
   let saved = await savedAccount();
   if (!LOGIN_REQUIRED) return { account: saved, error: null, redirecting: false };
 
-  // Only load the database library early when it's needed: a return from Google, or no record yet.
+  // Only load the database library early when it's needed: a return from sign-in, or no record yet.
   if (saved && !back.finishing && !back.error && !online()) return { account: saved, error: null, redirecting: false };
 
   let client: SupabaseClient | null;
@@ -172,10 +196,10 @@ async function init(): Promise<InitResult> {
   const { data, error } = await client.auth.getSession();
   if (back.finishing || back.error) window.history.replaceState(null, '', cleanUrl(window.location.href));
 
-  // That Google account already belongs to another Abaseria user: sign in to that one instead.
+  // That account already belongs to another Abaseria user: sign in to that one instead.
   if (back.code === 'identity_already_exists' && data.session?.user?.is_anonymous) {
     await client.auth.signOut({ scope: 'local' });
-    const again = await startGoogle();
+    const again = await startSignIn((await lastProvider()) ?? 'google');
     if (again.ok) return { account: null, error: null, redirecting: true };
   }
 
