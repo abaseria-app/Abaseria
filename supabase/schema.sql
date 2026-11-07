@@ -143,6 +143,8 @@ as $$
   select p.barcode from public.products p where p.barcode = any (codes[1:200]);
 $$;
 revoke all on function public.known_barcodes(text[]) from public;
+-- Supabase also grants new functions to anon directly, so revoke that too: signed-in phones only.
+revoke execute on function public.known_barcodes(text[]) from anon;
 grant execute on function public.known_barcodes(text[]) to authenticated;
 
 
