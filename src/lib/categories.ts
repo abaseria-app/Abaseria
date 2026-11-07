@@ -1,9 +1,9 @@
 // Spending categories. Every item gets one: the app guesses from the name, the shopper can change it with one tap.
 //
 // meat       fresh, frozen and processed meat and seafood (liempo, bangus, hotdog, longganisa, chicken hotdog)
-// poultry    chicken, duck and other birds, fresh or frozen (manok, wings, drumstick, nuggets)
+// poultry    chicken, duck and other birds, fresh or frozen, and eggs (manok, wings, nuggets, itlog, balut)
 // vegetables vegetables, fruit and fresh herbs (kamatis, kangkong, saging, calamansi)
-// dairy      milk, cheese, butter, yogurt and eggs (Bear Brand, Eden, Alaska, itlog)
+// dairy      milk, cheese, butter and yogurt (Bear Brand, Eden, Alaska)
 // pantry     packaged food that isn't a staple: canned goods, sauces, oil, bread, snacks, drinks
 // dry        staples: rice, noodles, pasta, flour, sugar, coffee, cereal, dried beans
 // household  things you don't eat: detergent, soap, shampoo, tissue, diapers
@@ -25,11 +25,11 @@ const NAVY = '#1a3555'; // same as --navy in index.css
 export const CATEGORIES: Category[] = [
   { id: 'meat', label: 'Meat & seafood', color: '#c2410c', ink: WHITE },
   // Deep pink from the logo's wordmark; no other category is pink.
-  { id: 'poultry', label: 'Poultry', color: '#be185d', ink: WHITE },
+  { id: 'poultry', label: 'Poultry & eggs', color: '#be185d', ink: WHITE },
   // A step darker than #16a34a: white on the old green was 3.3:1.
   { id: 'vegetables', label: 'Vegetables & fruit', color: '#15803d', ink: WHITE },
   // Light sky blue reads as "milk" and stays clear of Household's darker blue.
-  { id: 'dairy', label: 'Dairy & eggs', color: '#7dd3fc', ink: NAVY },
+  { id: 'dairy', label: 'Dairy', color: '#7dd3fc', ink: NAVY },
   { id: 'pantry', label: 'Pantry', color: '#d4a017', ink: NAVY },
   // Dark purple from the app's button borders; no other category is purple.
   { id: 'dry', label: 'Dry goods', color: '#4b1f6f', ink: WHITE },
@@ -61,7 +61,7 @@ const RULES: Array<[CategoryId, string[]]> = [
   ['pantry', ['coconut milk', 'gata', 'peanut butter']],
   ['dairy', [
     'milk', 'gatas', 'bear brand', 'alaska', 'evap', 'evaporated', 'condensed', 'cheese', 'eden', 'butter', 'margarine',
-    'yogurt', 'yoghurt', 'ice cream', 'egg', 'eggs', 'itlog', 'quail eggs', 'dairy',
+    'yogurt', 'yoghurt', 'ice cream', 'dairy',
   ]],
   ['pantry', [
     'canned', 'de lata', 'sardines', 'sardinas', 'ligo', 'mega', 'corned', 'century', '555', 'tuna', 'pork and beans',
@@ -78,7 +78,7 @@ const RULES: Array<[CategoryId, string[]]> = [
   ]],
   ['poultry', [
     'chicken', 'manok', 'wings', 'drumstick', 'drumsticks', 'thigh', 'thighs', 'breast', 'nuggets', 'turkey',
-    'duck', 'pato', 'itik', 'quail', 'pugo', 'poultry',
+    'duck', 'pato', 'itik', 'quail', 'pugo', 'poultry', 'egg', 'eggs', 'itlog', 'balut', 'penoy',
   ]],
   ['meat', [
     'pork', 'baboy', 'liempo', 'kasim', 'pigue', 'pata', 'beef', 'baka', 'giniling', 'ground', 'meat', 'karne', 'steak',
