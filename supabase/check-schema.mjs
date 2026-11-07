@@ -71,8 +71,26 @@ await refused('edit a sighting', 'authenticated', U1, `update public.price_sight
 await refused('delete a sighting', 'authenticated', U1, `delete from public.price_sightings`);
 await refused('edit a product', 'authenticated', U1, `update public.products set name = 'x'`);
 
+// Pending / Published (004, 005): shoppers see Published products and their own Pending ones; prices always show.
+const P = '4800888123459';
+await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'poultry')`);
+await ok('...and is Pending in the database', 'postgres', null, `select status from public.products where barcode = '${P}'`, (r) => r.rows[0]?.status === 'pending');
+await refused('phone publishes its own product', 'authenticated', U1, `insert into public.products (barcode, name, status) values ('4800777123454', 'X', 'published')`);
+await refused('phone publishes a product later', 'authenticated', U1, `update public.products set status = 'published'`);
+await ok('the shopper who added it still sees it', 'authenticated', U1, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+await ok('other shoppers don\'t see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('logged-out phones don\'t see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('price for a Pending product can be added', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000020', '${P}', '${B1}', '${today}', 'each', 18900, 'tag')`);
+await ok('other shoppers see a Pending product\'s price', 'authenticated', U2, `select unit_price_centavos from public.latest_prices where barcode = '${P}'`, (r) => r.rows[0]?.unit_price_centavos === 18900);
+await ok('known_barcodes finds a Pending barcode', 'authenticated', U2, `select * from public.known_barcodes(array['${P}', '4800016644818', '4800777123454'])`, (r) => r.rows.length === 2);
+await refused('logged-out phone calls known_barcodes', 'anon', null, `select * from public.known_barcodes(array['${P}'])`);
+await ok('Dairy is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy')`);
+await refused('unknown category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'snacks')`);
+await db.exec(`update public.products set status = 'published' where barcode = '${P}'`);
+await ok('Published, other shoppers see it', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+
 // Product images: set in the dashboard, readable by anyone, never set by the app.
-await db.exec(`update public.products set image_path = '4800016644818.jpg' where barcode = '4800016644818'`);
+await db.exec(`update public.products set image_path = '4800016644818.jpg', status = 'published' where barcode = '4800016644818'`);
 await ok('logged-out phone reads a product image name', 'anon', null, `select image_path from public.products where barcode = '4800016644818'`, (r) => r.rows[0]?.image_path === '4800016644818.jpg');
 await refused('app sets an image when adding a product', 'authenticated', U1, `insert into public.products (barcode, name, image_path) values ('4800016644115', 'X', 'x.jpg')`);
 await refused('app changes a product image', 'authenticated', U1, `update public.products set image_path = 'other.jpg'`);
