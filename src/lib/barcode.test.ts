@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBarcode, gtinOk, isInStoreCode, normalizeBarcode } from './barcode';
+import { canonicalBarcode, formatBarcode, gtinOk, isInStoreCode, normalizeBarcode } from './barcode';
 
 describe('gtinOk', () => {
   it('accepts valid EAN-13, EAN-8 and UPC-A', () => {
@@ -23,6 +23,20 @@ describe('normalizeBarcode', () => {
   });
   it('keeps valid codes as read', () => {
     expect(normalizeBarcode('4800016644115', 'ean_13')).toBe('4800016644115');
+    expect(normalizeBarcode('024000010623', 'upc_a')).toBe('024000010623');
+  });
+  it('reads UPC-A reported as 13 digits with a leading 0 as the 12-digit code', () => {
+    expect(normalizeBarcode('0024000010623', 'ean_13')).toBe('024000010623');
+    expect(normalizeBarcode('0036000291452', 'ean_13')).toBe('036000291452');
+  });
+});
+
+describe('canonicalBarcode', () => {
+  it('drops the leading 0 from 13-digit codes only', () => {
+    expect(canonicalBarcode('0024000163022')).toBe('024000163022');
+    expect(canonicalBarcode('024000163022')).toBe('024000163022');
+    expect(canonicalBarcode('4800016644115')).toBe('4800016644115');
+    expect(canonicalBarcode('96385074')).toBe('96385074');
   });
 });
 

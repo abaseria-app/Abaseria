@@ -101,5 +101,24 @@ await ok('image bucket is public', 'postgres', null, `select public from storage
 await refused('app uploads an image file', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', 'x.jpg')`);
 await refused('logged-out phone uploads an image file', 'anon', null, `insert into storage.objects (bucket_id, name) values ('product-images', 'y.jpg')`);
 
+// One barcode form (006): UPC-A is 12 digits, never 13 with a leading 0.
+await refused('UPC-A written as 13 digits', 'authenticated', U1, `insert into public.products (barcode, name) values ('0024000010623', 'Del Monte peaches')`);
+await ok('UPC-A as 12 digits', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('024000010623', 'Del Monte Sliced Peaches', '825g')`);
+// Replay the Nov 8 dev data: a 13-digit twin with a photo, and a lone 13-digit row with a price.
+await db.exec(`
+  alter table public.products drop constraint products_barcode_upca_12;
+  insert into public.products (barcode, name, image_path) values ('0024000010623', 'Del Monte Yellow Cling Peach Halves', '0024000010623.jpg');
+  insert into public.products (barcode, name) values ('0024000163022', 'Del Monte Whole Kernel Corn');
+  insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method)
+    values ('c0000000-0000-4000-8000-000000000060', '0024000163022', '${B1}', '${today}', 'each', 5250, 'tag');
+`);
+await db.exec(readFileSync(new URL('./migrations/006_one_barcode_form.sql', import.meta.url), 'utf8'));
+await ok('006: twin merged, 12-digit name kept, photo added', 'postgres', null, `select name, size, image_path from public.products where barcode = '024000010623'`,
+  (r) => r.rows[0]?.name === 'Del Monte Sliced Peaches' && r.rows[0]?.size === '825g' && r.rows[0]?.image_path === '0024000010623.jpg');
+await ok('006: lone 13-digit row moved to 12 digits with its price', 'postgres', null,
+  `select count(*)::int n from public.price_sightings where barcode = '024000163022'`, (r) => r.rows[0]?.n === 1);
+await ok('006: no 13-digit 0 rows left', 'postgres', null, `select count(*)::int n from public.products where char_length(barcode) = 13 and barcode like '0%'`, (r) => r.rows[0]?.n === 0);
+await refused('006: check is back on', 'postgres', null, `insert into public.products (barcode, name) values ('0024000010920', 'X')`);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
