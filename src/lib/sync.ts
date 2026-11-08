@@ -8,7 +8,7 @@
 // and only trips that end after this phone starts sharing are uploaded.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { db, getSetting, newUuid, setSetting, type Branch, type CaptureMethod, type Item, type Recall, type Trip } from './db';
-import { gtinOk, isInStoreCode } from './barcode';
+import { canonicalBarcode, gtinOk, isInStoreCode } from './barcode';
 import { dbConfig, getSupabase } from './supabase';
 import { logEvent } from './events';
 import { shrinkImage } from './thumb';
@@ -134,7 +134,8 @@ async function findBranch(client: SupabaseClient, branch: Branch, signal?: Abort
 /** Uploads one trip. Safe to repeat: products and sightings that are already there are skipped. */
 async function shareTrip(client: SupabaseClient, trip: Trip, branch: Branch): Promise<number> {
   const all = await db.items.where('tripId').equals(trip.id!).toArray();
-  const items = all.filter(shareable);
+  // Items saved before 006 may hold UPC-A in its 13-digit form, which the database now refuses.
+  const items = all.filter(shareable).map((it) => ({ ...it, barcode: canonicalBarcode(it.barcode!) }));
   if (!items.length) return 0;
 
   // Give each item its upload id before sending, so a retry after a dropped connection can't double-count.

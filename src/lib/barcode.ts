@@ -20,14 +20,21 @@ export function gtinOk(code: string): boolean {
  */
 export const isInStoreCode = (code: string) => code.length === 13 && code.startsWith('2');
 
-/** UPC-E expands to UPC-A; everything else is used as read. 12-digit UPC-A is kept as is (no leading 0). */
+/**
+ * One form per product: UPC-A stays 12 digits. Some phones report it, and some brand lists write it, as
+ * 13 digits with a leading 0. That's the same can, and the shared database refuses that form (migration 006),
+ * so the 0 is dropped. The check digit is unchanged by a leading 0.
+ */
+export const canonicalBarcode = (code: string) => (code.length === 13 && code.startsWith('0') ? code.slice(1) : code);
+
+/** UPC-E expands to UPC-A; UPC-A read as 13 digits loses its leading 0; everything else is used as read. */
 export function normalizeBarcode(raw: string, format: string): string | null {
   const code = raw.replace(/\D/g, '');
   if (format === 'upc_e' && code.length === 8) {
     const expanded = expandUpcE(code);
     return expanded && gtinOk(expanded) ? expanded : null;
   }
-  return gtinOk(code) ? code : null;
+  return gtinOk(code) ? canonicalBarcode(code) : null;
 }
 
 function expandUpcE(e: string): string | null {

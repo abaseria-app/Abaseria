@@ -58,7 +58,11 @@ create table public.products (
   created_at  timestamptz not null default now(),
   -- 13-digit codes starting with 2 are printed in-store (deli, meat, produce scales) and often contain
   -- the weight or price, so the same "product" would get a new barcode every day. Keep them out.
-  check (not (char_length(barcode) = 13 and barcode like '2%'))
+  check (not (char_length(barcode) = 13 and barcode like '2%')),
+  -- One form per product. UPC-A is stored as 12 digits, the way Chrome's scanner reads it. The same code
+  -- written as 13 digits with a leading 0 would become a second copy of the same can (migration 006).
+  constraint products_barcode_upca_12
+  check (not (char_length(barcode) = 13 and barcode like '0%'))
 );
 
 

@@ -9,7 +9,7 @@ The app can connect and read from it (Settings → Check connection). Uploading 
 | Table | One row per | Notes |
 |---|---|---|
 | `branches` | physical store | id is made on the phone; lat/lng is the store's position, never a shopper's |
-| `products` | barcode | 8/12/13/14 digits with a valid check digit. In-store scale codes (13 digits starting with 2) are rejected because they change daily. `image_path` names the product's one reference image |
+| `products` | barcode | 8/12/13/14 digits with a valid check digit. In-store scale codes (13 digits starting with 2) are rejected because they change daily. UPC-A is stored as 12 digits; the same code as 13 digits with a leading 0 is refused, so one can never becomes two products (006). `image_path` names the product's one reference image |
 | `price_sightings` | confirmed price | day only (no time), never edited by the app, `client_id` stops double uploads |
 | `latest_prices` (view) | barcode × branch | newest sighting |
 
