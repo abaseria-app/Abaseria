@@ -62,7 +62,7 @@ To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick 
 
 ### Facebook: one-time setup, about 30 minutes
 
-Facebook needs a public privacy page with data-deletion instructions before anyone outside your app's roles can sign in. That's `public/privacy.html`, served at `/Abaseria/dev/privacy.html` once this branch is on `dev` and `/Abaseria/privacy.html` once it's on `main`. Replace `CONTACT_EMAIL` in it first (3 places).
+Facebook needs a public privacy page with data-deletion instructions before anyone outside your app's roles can sign in. That's `public/privacy.html`, served at `/Abaseria/dev/privacy.html` once this branch is on `dev` and `/Abaseria/privacy.html` once it's on `main`. Its contact address is abaseria.app@gmail.com (Nov 8).
 
 **Meta for Developers** (developers.facebook.com, signed in with your personal Facebook profile, not the Mako Moto page):
 
