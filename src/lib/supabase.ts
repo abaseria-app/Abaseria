@@ -61,7 +61,10 @@ let clientPromise: Promise<SupabaseClient | null> | null = null;
 export function getSupabase(): Promise<SupabaseClient | null> {
   if (!dbConfig) return Promise.resolve(null);
   const { url, key } = dbConfig;
-  clientPromise ??= import('@supabase/supabase-js').then(({ createClient }) => createClient(url, key));
+  // PKCE: Google or Facebook sends back a one-time code (not the tokens themselves) that only this phone can redeem.
+  clientPromise ??= import('@supabase/supabase-js').then(({ createClient }) =>
+    createClient(url, key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } }),
+  );
   return clientPromise;
 }
 

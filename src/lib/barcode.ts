@@ -20,14 +20,21 @@ export function gtinOk(code: string): boolean {
  */
 export const isInStoreCode = (code: string) => code.length === 13 && code.startsWith('2');
 
-/** UPC-E expands to UPC-A; everything else is used as read. 12-digit UPC-A is kept as is (no leading 0). */
+/**
+ * One form per product: UPC-A stays 12 digits. Some phones report it, and some brand lists write it, as
+ * 13 digits with a leading 0. That's the same can, and the shared database refuses that form (migration 006),
+ * so the 0 is dropped. The check digit is unchanged by a leading 0.
+ */
+export const canonicalBarcode = (code: string) => (code.length === 13 && code.startsWith('0') ? code.slice(1) : code);
+
+/** UPC-E expands to UPC-A; UPC-A read as 13 digits loses its leading 0; everything else is used as read. */
 export function normalizeBarcode(raw: string, format: string): string | null {
   const code = raw.replace(/\D/g, '');
   if (format === 'upc_e' && code.length === 8) {
     const expanded = expandUpcE(code);
     return expanded && gtinOk(expanded) ? expanded : null;
   }
-  return gtinOk(code) ? code : null;
+  return gtinOk(code) ? canonicalBarcode(code) : null;
 }
 
 function expandUpcE(e: string): string | null {
@@ -89,4 +96,15 @@ export async function scanFrame(detector: BarcodeDetectorLike, video: HTMLVideoE
     return { code: isInStoreCode(code) ? null : code, raw: code };
   }
   return null;
+}
+
+/**
+ * Digits grouped the way they're printed under the bars, so a shopper can check them against the package:
+ * EAN-13 "4 800016 644115", UPC-A "0 36000 29145 2", EAN-8 "9638 5074". Anything else is shown as is.
+ */
+export function formatBarcode(code: string): string {
+  if (/^\d{13}$/.test(code)) return `${code[0]} ${code.slice(1, 7)} ${code.slice(7)}`;
+  if (/^\d{12}$/.test(code)) return `${code[0]} ${code.slice(1, 6)} ${code.slice(6, 11)} ${code[11]}`;
+  if (/^\d{8}$/.test(code)) return `${code.slice(0, 4)} ${code.slice(4)}`;
+  return code;
 }

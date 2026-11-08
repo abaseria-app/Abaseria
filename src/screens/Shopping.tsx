@@ -3,8 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { S } from '../strings';
 import { db, recentLabels, setSetting, storeName, type Item } from '../lib/db';
 import { formatKg, formatPeso, lineTotal } from '../lib/money';
+import { formatBarcode } from '../lib/barcode';
+import { CATEGORY_BY_ID, categoryOf } from '../lib/categories';
 import { logEvent } from '../lib/events';
 import { Capture } from './Capture';
+import { AddFromSearch } from './AddFromSearch';
+import { storeKeyOf } from '../lib/catalog';
 import { ItemEditor, type ItemSubmit } from './ItemEditor';
 
 interface Props {
@@ -16,8 +20,14 @@ interface Props {
 
 export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId]);
+  const branch = useLiveQuery(
+    () => (trip?.branchUuid ? db.branches.where('uuid').equals(trip.branchUuid).first() : undefined),
+    [trip?.branchUuid],
+  );
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).toArray(), [tripId]) ?? [];
-  const [capture, setCapture] = useState<null | 'tag' | 'typed'>(null);
+  const [capture, setCapture] = useState<null | 'tag' | 'typed' | 'search'>(null);
+  /** What was in the search box when the shopper chose to type the item in instead. */
+  const [typedName, setTypedName] = useState('');
   const [editing, setEditing] = useState<Item | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [undo, setUndo] = useState<Item | null>(null);
@@ -55,6 +65,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
     const id = await db.items.add({
       tripId,
       barcode: v.barcode ?? null,
+      thumb: v.thumb ?? null,
       label: v.label,
       priceType: v.priceType,
       unitPriceCentavos: v.unitPriceCentavos,
@@ -114,12 +125,30 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
     setUndo(null);
   }
 
+  if (capture === 'search') {
+    return (
+      <AddFromSearch
+        tripId={tripId}
+        storeKey={trip ? storeKeyOf(trip, branch) : null}
+        recent={recent}
+        fallbackName={S.item.unnamed(unnamedCount + 1)}
+        onAdd={addItem}
+        onType={(text) => {
+          setTypedName(text);
+          setCapture('typed');
+        }}
+        onClose={() => setCapture(null)}
+      />
+    );
+  }
+
   if (capture) {
     return (
       <Capture
         tripId={tripId}
         branchUuid={trip?.branchUuid ?? null}
         startTyped={capture === 'typed'}
+        startName={capture === 'typed' ? typedName : undefined}
         recent={recent}
         fallbackName={S.item.unnamed(unnamedCount + 1)}
         onAdd={addItem}
@@ -175,6 +204,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
         {live.map((i) => (
           <li key={i.id}>
             <button className="item-row" onClick={() => setEditing(i)}>
+              <Thumb item={i} />
               <span className="item-name">
                 {i.label}
                 <small>
@@ -186,6 +216,7 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
                   {i.priceType !== 'perkg' && i.quantity > 1 ? ` × ${i.quantity}` : ''}
                   {i.isPromo ? ' · promo' : ''}
                 </small>
+                {i.barcode && <small className="item-code">{formatBarcode(i.barcode)}</small>}
               </span>
               <strong>{formatPeso(i.lineTotalCentavos)}</strong>
             </button>
@@ -215,10 +246,24 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
       <footer className="action-bar">
         <button className="btn finish" onClick={onFinish}>{S.shop.finish}</button>
         <div className="row">
-          <button className="btn secondary big" onClick={() => setCapture('typed')}>{S.shop.type}</button>
+          <button className="btn secondary big" onClick={() => {
+            setTypedName('');
+            setCapture('search');
+          }}>{S.shop.search}</button>
           <button className="btn primary big snap" onClick={() => setCapture('tag')}>{S.shop.snap}</button>
         </div>
       </footer>
     </main>
+  );
+}
+
+/** The item's photo, or its first letter on the category color when there's no photo. */
+function Thumb({ item }: { item: Item }) {
+  if (item.thumb) return <img className="item-thumb" src={item.thumb} alt="" />;
+  const cat = CATEGORY_BY_ID[categoryOf(item)];
+  return (
+    <span className="item-thumb blank" style={{ background: cat.color, color: cat.ink }} aria-hidden="true">
+      {item.label.trim().charAt(0).toUpperCase() || '•'}
+    </span>
   );
 }

@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['icons/*.png'],
         manifest: {
-          name: live ? 'Abeseria' : 'Abeseria Dev',
-          short_name: live ? 'Abeseria' : 'Abeseria Dev',
+          name: live ? 'Abaseria' : 'Abaseria Dev',
+          short_name: live ? 'Abaseria' : 'Abaseria Dev',
           description: 'Grocery tally: snap the shelf tag, watch your total.',
           theme_color: '#1a3555',
           background_color: '#ffffff',

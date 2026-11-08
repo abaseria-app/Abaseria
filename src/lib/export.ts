@@ -193,7 +193,7 @@ export async function exportCsvFiles(): Promise<'shared' | 'downloaded'> {
   ];
   if (navigator.canShare?.({ files })) {
     try {
-      await navigator.share({ files, title: 'Abeseria test data' });
+      await navigator.share({ files, title: 'Abaseria test data' });
       return 'shared';
     } catch (e) {
       if ((e as Error).name === 'AbortError') return 'shared';

@@ -4,6 +4,7 @@ import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type Pri
 import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
 import { CATEGORIES, guessCategory, type CategoryId } from '../lib/categories';
+import { formatBarcode } from '../lib/barcode';
 
 export interface ItemSubmit {
   label: string;
@@ -23,6 +24,8 @@ export interface ItemSubmit {
   priceTouched: boolean;
   /** Filled in by the capture screen, not the editor. */
   barcode?: string | null;
+  /** Filled in by the capture screen, not the editor. */
+  thumb?: string | null;
 }
 
 interface Props {
@@ -34,9 +37,13 @@ interface Props {
   initial?: Item;
   /** Name already known for this barcode; used instead of the tag's guess. */
   knownName?: string | null;
+  /** Category already known for this barcode; used instead of guessing from the name. */
+  knownCategory?: CategoryId | null;
   /** Shown above the form, e.g. where a recalled price came from. */
   recallNote?: string | null;
   barcode?: string | null;
+  /** How the price is sold when there's no starting price, e.g. per kilo for meat found by search. */
+  startPriceType?: PriceType;
   recent: string[];
   fallbackName: string;
   notice?: string | null;
@@ -61,7 +68,7 @@ export function ItemEditor(p: Props) {
   const [label, setLabel] = useState(init?.label ?? p.knownName ?? p.nameGuess ?? '');
   const [chosen, setChosen] = useState<number | null>(top ? 0 : null);
   const [edited, setEdited] = useState(false);
-  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? priceTypeFor(top));
+  const [priceType, setPriceType] = useState<PriceType>(init?.priceType ?? (top ? priceTypeFor(top) : (p.startPriceType ?? 'each')));
   const [priceText, setPriceText] = useState(
     init ? plain(init.unitPriceCentavos) : top && !top.bundleQty ? plain(perKgCentavos(top) ?? top.centavos) : '',
   );
@@ -72,7 +79,7 @@ export function ItemEditor(p: Props) {
   );
   const [qty, setQty] = useState(init?.quantity ?? 1);
   // The guess follows the name until the shopper taps a category themselves.
-  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? null);
+  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? p.knownCategory ?? null);
   const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
@@ -146,7 +153,7 @@ export function ItemEditor(p: Props) {
 
       {p.notice && <p className="notice">{p.notice}</p>}
       {p.recallNote && <p className="notice">{p.recallNote}</p>}
-      {p.barcode && <p className="hint small">{S.item.barcodeLine(p.barcode)}</p>}
+      {p.barcode && <p className="hint small">{S.item.barcodeLine(formatBarcode(p.barcode))}</p>}
 
       {p.candidates && p.candidates.length > 0 && (
         <section>

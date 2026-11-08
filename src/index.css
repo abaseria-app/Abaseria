@@ -105,8 +105,11 @@ h2 { font-size: 1.05rem; margin: 18px 0 10px; }
 .items { list-style: none; padding: 0; margin: 0; }
 .items .empty { color: var(--muted); text-align: center; padding: 40px 12px; font-size: 1.1rem; }
 .item-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: var(--card); border: 0; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; min-height: 64px; box-shadow: var(--shadow-card); }
-.item-name { display: flex; flex-direction: column; font-weight: 600; font-size: 1.05rem; min-width: 0; }
+.item-name { display: flex; flex-direction: column; font-weight: 600; font-size: 1.05rem; min-width: 0; flex: 1; }
+.item-thumb { flex: none; width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--line); }
+.item-thumb.blank { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; }
 .item-name small { color: var(--muted); font-weight: 400; font-size: .9rem; }
+.item-name small.item-code { font-size: .75rem; font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .02em; margin-top: 2px; }
 .item-row strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--card); border-top: 1px solid var(--line); padding: 4px 12px calc(12px + env(safe-area-inset-bottom)); }
@@ -139,6 +142,15 @@ h2 { font-size: 1.05rem; margin: 18px 0 10px; }
 .shutter { width: 84px; height: 84px; border-radius: 50%; border: 6px solid #fff; background: var(--lilac); }
 .shutter:active { transform: scale(.94); }
 .nocam { padding: 80px 24px; text-align: center; }
+.product-card { position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 2; display: flex; gap: 12px; align-items: center; background: var(--card); color: var(--ink); border-radius: 14px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,.35); text-align: left; }
+.nocam .product-card { position: static; margin-bottom: 24px; }
+.product-card img, .product-card-blank { flex: none; width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: var(--line); }
+.product-card-blank { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.3rem; color: var(--purple); background: var(--lilac); }
+.product-card div { display: flex; flex-direction: column; min-width: 0; }
+.product-card strong { font-size: 1.05rem; line-height: 1.25; }
+.product-card small { color: var(--muted); font-size: .85rem; line-height: 1.3; }
+.product-card small.product-card-action { color: var(--purple); font-weight: 700; margin-top: 2px; }
+.product-card small.item-code { font-size: .75rem; font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .02em; }
 .nocam .btn { margin-top: 16px; }
 .spinner { width: 84px; height: 84px; border-radius: 50%; border: 6px solid rgba(255,255,255,.3); border-top-color: var(--yellow); animation: spin .8s linear infinite; }
 .spinner.dark { width: 32px; height: 32px; border-width: 4px; border-color: var(--line); border-top-color: var(--navy); }
@@ -235,6 +247,17 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
   opacity: .9;
 }
 
+/* In-app install: appears only when Chrome reports the app as installable. */
+.install-button {
+  position: fixed; right: 12px; top: calc(10px + env(safe-area-inset-top));
+  z-index: 1000;
+  min-height: 40px; padding: 0 16px; border-radius: 999px;
+  background: var(--lilac); color: var(--purple); border: 2px solid var(--purple);
+  font: 700 14px/1 system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}
+.install-button[hidden] { display: none; }
+
 /* Launch video (see LaunchScreen.tsx). White like the video and the install splash, so the hand-off is invisible. */
 .launch { position: fixed; inset: 0; z-index: 2000; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity .25s ease; }
 .launch.out { opacity: 0; pointer-events: none; }
@@ -248,3 +271,55 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 }
 /* The fade behind the bottom button matches the white page, not the off-white one. */
 .screen.home .bottom { background: linear-gradient(rgba(255, 255, 255, 0), #fff 30%); }
+
+/* Search (screens/Search.tsx) and its entry on Home */
+.search-open { width: 100%; display: flex; align-items: center; gap: 10px; min-height: var(--tap); margin: 8px 0 4px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--purple); background: var(--card); color: var(--charcoal); font-size: 1rem; text-align: left; box-shadow: var(--shadow-card); }
+.search-icon { flex: none; width: 22px; height: 22px; color: var(--purple); }
+.search-box { position: relative; margin: 8px 0 4px; }
+.search-box input { display: block; width: 100%; min-height: var(--tap); border-radius: 999px; border: 2px solid var(--purple); background: var(--card); padding: 0 52px 0 18px; font-size: 1.1rem; -webkit-appearance: none; appearance: none; }
+.search-box input:focus { outline: none; box-shadow: 0 0 0 3px var(--lilac); }
+.search-box input::-webkit-search-cancel-button { display: none; }
+.search-clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border: 0; border-radius: 50%; background: none; font-size: 1.6rem; color: var(--charcoal); }
+.search-looking { margin: 6px 4px 8px; font-size: .85rem; color: var(--purple); font-weight: 600; }
+.search-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; }
+.filter-btn.on { background: var(--lilac); border-color: var(--purple); color: var(--purple); }
+.sort { display: flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--muted); font-weight: 600; }
+.sort select, .filter-select { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-weight: 600; padding: 0 10px; }
+.filter-select { width: 100%; }
+.filter-panel { background: var(--card); border-radius: var(--radius); padding: 2px 14px 14px; margin: 4px 0 8px; box-shadow: var(--shadow-card); }
+.filter-panel h3 { font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; }
+.price-range input { flex: 1; min-width: 0; min-height: 52px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); padding: 0 12px; font-size: 1.05rem; }
+.price-range input:focus { outline: none; border-color: var(--navy); }
+.filter-actions { margin-top: 12px; }
+.filter-actions .btn { flex: 1; min-height: 52px; font-size: 1rem; }
+.filter-actions .btn:disabled { opacity: .5; }
+.search-source { font-size: .85rem; color: var(--muted); margin: 6px 4px; }
+.link.inline { min-height: 0; padding: 0; text-decoration: underline; }
+.search-count { font-weight: 700; margin: 4px 4px 8px; }
+.result-row .result-price { display: flex; flex-direction: column; align-items: flex-end; text-align: right; flex: none; }
+.result-row .item-name small.result-where { color: var(--navy); font-weight: 600; font-size: .85rem; }
+.result-row .item-name small.item-code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-row .result-price small { color: var(--muted); font-size: .8rem; }
+.result-row .result-price small.promo-tag { color: var(--red); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.result-row.open { border-radius: 12px 12px 0 0; margin-bottom: 0; }
+.store-prices { list-style: none; margin: 0 0 8px; padding: 2px 14px 8px 82px; background: var(--card); border-radius: 0 0 12px 12px; box-shadow: var(--shadow-card); }
+.store-prices li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.store-prices li span { display: flex; flex-direction: column; min-width: 0; }
+.store-prices small { color: var(--muted); font-size: .8rem; }
+.store-prices li > strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.search .items .empty { padding: 28px 12px; font-size: 1rem; }
+
+/* Sign-in */
+.screen.login { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 48px; padding-bottom: 48px; }
+.login-logo { border-radius: 24px; box-shadow: var(--shadow-card); margin-bottom: 20px; }
+.login-pitch { font-size: 1.05rem; margin: 8px 0 28px; max-width: 34ch; }
+.screen.login .btn.huge { max-width: 360px; }
+.login-buttons { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+/* Facebook's own blue, so shoppers recognize the button at a glance. */
+.btn.facebook { background: #1877f2; color: #fff; border: 2px solid #1877f2; }
+.btn.facebook:disabled { background: var(--line); color: var(--charcoal); border-color: var(--line); }
+.screen.login .login-privacy { margin-top: 4px; color: var(--purple); font-weight: 600; }
+.login-status { font-size: 1.05rem; color: var(--ink); }
+.login-error { color: var(--red); font-weight: 600; }
+.screen.login .hint.small { margin-top: 24px; max-width: 38ch; }
+.account-actions { display: flex; flex-direction: column; gap: 8px; }

@@ -34,6 +34,11 @@ export interface Branch {
   lat: number | null;
   lng: number | null;
   createdAt: string;
+  /**
+   * This store's id in the shared database, once known. Usually the same as `uuid`; different when another
+   * phone added the same store first.
+   */
+  remoteId?: string | null;
 }
 
 export interface Trip {
@@ -55,13 +60,16 @@ export interface Trip {
   receiptMatched: boolean | null;
   receiptTotalCentavos: number | null;
   receiptItemCount: number | null;
+  /** When this trip's prices were shared (or the trip was looked at and had nothing to share). */
+  sharedAt?: string | null;
 }
 
 /**
  * tag: price read from the shelf tag and accepted. tag+typed: read, then corrected. typed: typed in.
  * recall: price filled in from this barcode's last price at this branch and accepted without changes.
+ * shared: price filled in from another shopper's latest price at this branch and accepted without changes.
  */
-export type CaptureMethod = 'tag' | 'tag+typed' | 'typed' | 'recall';
+export type CaptureMethod = 'tag' | 'tag+typed' | 'typed' | 'recall' | 'shared';
 
 /**
  * One row per item on a trip. The price fields are what was seen on the shelf at that store and time,
@@ -72,6 +80,8 @@ export interface Item {
   tripId: number;
   /** Product barcode from the package. Missing for items logged by tag or typing only. */
   barcode?: string | null;
+  /** The product's reference image, shrunk and kept on the phone so the list shows it offline. Not in CSV exports. */
+  thumb?: string | null;
   label: string;
   priceType: PriceType;
   unitPriceCentavos: number;
@@ -87,6 +97,8 @@ export interface Item {
   captureMethod: CaptureMethod;
   removed: boolean;
   createdAt: string;
+  /** Made just before this item's price is first uploaded; the shared database ignores a second upload with the same id. */
+  shareId?: string | null;
 }
 
 export interface AppEvent {
@@ -104,11 +116,19 @@ export interface Setting {
 
 /**
  * The live app and the dev app (/dev/) share one web address, so they'd share phone storage too.
- * Only production builds use the original name, which keeps existing testers' trips where they are.
+ * Each build gets its own name so the two never touch each other's trips.
  */
-export const DB_NAME = import.meta.env.MODE === 'production' ? 'abeseria' : 'abeseria-dev';
+export const DB_NAME = import.meta.env.MODE === 'production' ? 'abaseria' : 'abaseria-dev';
 
-class AbeseriaDB extends Dexie {
+/**
+ * Nov 6, 2026: the app was renamed from the misspelled "Abeseria". Trips saved under the old name
+ * on the phone are dropped (Brad's call); everything already uploaded stays in Supabase.
+ * Each build only removes its own old copy, so the dev app never wipes the live app's storage.
+ */
+const OLD_DB_NAME = import.meta.env.MODE === 'production' ? 'abeseria' : 'abeseria-dev';
+Dexie.delete(OLD_DB_NAME).catch(() => {});
+
+class AbaseriaDB extends Dexie {
   trips!: Table<Trip, number>;
   items!: Table<Item, number>;
   events!: Table<AppEvent, number>;
@@ -147,6 +167,10 @@ export interface Recall {
   item: Item;
   /** True when `item` was logged at the branch being shopped now, so its price applies here. */
   sameBranch: boolean;
+  /** True when the price came from other shoppers through the shared database, not from this phone. */
+  shared?: boolean;
+  /** Where `item` was logged, for "Last ₱25.00 at SM Center Imus". Missing on shared recalls. */
+  storeLabel?: string;
 }
 
 /** What this phone already knows about a barcode. Works offline; the shared database comes later. */
@@ -161,9 +185,9 @@ export async function recallBarcode(code: string, branchUuid: string | null | un
   if (!rows.length) return null;
   if (branchUuid) {
     const hit = rows.find((r) => trips.get(r.tripId)?.branchUuid === branchUuid);
-    if (hit) return { item: hit, sameBranch: true };
+    if (hit) return { item: hit, sameBranch: true, storeLabel: storeName(trips.get(hit.tripId)!) };
   }
-  return { item: rows[0], sameBranch: false };
+  return { item: rows[0], sameBranch: false, storeLabel: storeName(trips.get(rows[0].tripId)!) };
 }
 
 /** RFC 4122 v4. crypto.randomUUID only exists on HTTPS, and the dev server runs over plain Wi-Fi HTTP. */
@@ -191,7 +215,7 @@ export async function branchesByRecent(): Promise<Branch[]> {
   return branches.sort((a, b) => key(b).localeCompare(key(a)) || b.createdAt.localeCompare(a.createdAt));
 }
 
-export const db = new AbeseriaDB();
+export const db = new AbaseriaDB();
 
 export async function getSetting(key: string): Promise<string | null> {
   return (await db.settings.get(key))?.value ?? null;

@@ -1,4 +1,4 @@
-# Abeseria prototype
+# Abaseria prototype
 
 A grocery tally PWA for the 10-shopper test in Imus. The shopper snaps the shelf tag, picks the price, and watches a running total against their budget. At the counter they compare with the register and count the receipt lines.
 
@@ -6,12 +6,13 @@ The test answers one question: **will people keep logging past item 15?**
 
 ## How it works
 
-- **Barcode first.** Scan item opens the camera on the package barcode; it reads on its own, no tap. If this phone logged that barcode at this branch before, the name and last price fill in and the shopper checks the tag and taps Add. If not, the camera switches to the shelf tag. "No barcode" skips to the tag (loose produce, meat). Store scale stickers (13 digits starting with 2) go to the tag step too. Phones without a built-in barcode reader (iPhones today) start at the tag.
+- **Barcode first.** Scan item opens the camera on the package barcode; it reads on its own, no tap. If this phone logged that barcode at this branch before, the name and last price fill in and the shopper checks the tag and taps Add. If not, the camera switches to the shelf tag. The product is still recognized at any store: its name, category and image come from this phone's earlier trips or the shared database, and the camera shows it with "No price here yet" and the last price elsewhere as a hint (never filled in). "No barcode" skips to the tag (loose produce, meat). Store scale stickers (13 digits starting with 2) go to the tag step too. Phones without a built-in barcode reader (iPhones today) start at the tag.
 - **Tag reading.** One photo of the shelf tag gives the price and usually the name. OCR runs on the phone with Tesseract.js.
 - **Price chips, not a guess.** The parser finds every price on the tag and ranks them by text size and ₱/P marker. The top chip is preselected, so a good read is one tap on Add.
 - **Offline.** The app, OCR engine and language data are cached by a service worker. After one visit with signal, it works in a mall basement.
 - **Money** is integer centavos everywhere. Items are sold each, as a bundle ("3 for ₱100") or per kilo (price per kg × amount bought, e.g. ₱320/kg × 0.75 kg = ₱240). A per-kg or per-100g price on a tag switches the item to per kilo.
-- **Everything stays on the phone** (IndexedDB). No login, no backend, no ads, no analytics.
+- **Phone first.** Trips live on the phone (IndexedDB) and work offline. No ads, no analytics.
+- **Shared prices (dev app only for now).** When a trip ends, each item with a real barcode uploads its product, store, price and day to the shared database; with no signal it waits and retries the next time the app opens online. Scanning a barcode this phone hasn't logged at this store asks the database for other shoppers' latest price there (2 seconds at most) and offers it to check against the tag. Location, time of day, tester ids and items without a barcode never leave the phone. The live app turns this on once the consent screen exists.
 - **Store picker.** New trip takes one location reading and preselects the nearest saved branch. Two stores within 100 m of each other means the shopper taps. The first time at a store, the shopper adds it and the phone's position becomes the branch location.
 
 ## What gets measured
@@ -55,12 +56,12 @@ One GitHub Pages site holds two apps:
 
 | Address | Built from | Database | Phone storage |
 |---|---|---|---|
-| `https://<user>.github.io/<repo>/` | `main` | abeseria-prod | `abeseria` |
-| `https://<user>.github.io/<repo>/dev/` | `dev` | abeseria-dev | `abeseria-dev` |
+| `https://<user>.github.io/<repo>/` | `main` | abaseria-prod | `abaseria` |
+| `https://<user>.github.io/<repo>/dev/` | `dev` | abaseria-dev | `abaseria-dev` |
 
 - **Pushing to `dev`** runs `.github/workflows/dev.yml`: tests, then a rebuild that updates `/dev/` only. Test new features here on a real phone.
 - **Merging `dev` into `main`** runs `.github/workflows/deploy.yml` and updates the live app (and `/dev/` along with it).
-- The dev app shows a red **DEV · test data** badge and installs as "Abeseria Dev", so the two can sit side by side on one phone without sharing trips or offline files.
+- The dev app shows a red **DEV · test data** badge and installs as "Abaseria Dev", so the two can sit side by side on one phone without sharing trips or offline files.
 
 In the repo: Settings → Pages → Source: **GitHub Actions**.
 
@@ -73,8 +74,12 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/money.ts` | Centavo formatting and line totals |
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
 | `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
+| `src/lib/thumb.ts` | Shrinks the product's reference image (from the shared database) to the list thumbnail kept on the phone |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
-| `.env.development` | Dev database address and publishable key (abeseria-dev) |
+| `.env.development` | Dev database address and publishable key (abaseria-dev) |
+| `src/lib/sync.ts` | Uploading finished trips and looking up other shoppers' prices |
+| `src/lib/search.ts` | Item search: reads names, barcodes, prices and sizes from one box; filters and sorting |
+| `src/lib/catalog.ts` | The list search looks through: this phone's items merged with shared products and prices |
 | `src/lib/supabase.ts` | Connection to the shared price database; picks dev or prod and refuses a mismatch |
 | `supabase/` | Shared price database schema, setup steps for the dev and prod projects, schema checks |
 | `src/strings.ts` | Every user-facing string, ready for translation |

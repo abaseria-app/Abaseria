@@ -1,13 +1,15 @@
 // Spending categories. Every item gets one: the app guesses from the name, the shopper can change it with one tap.
 //
-// meat       fresh, frozen and processed meat, poultry and seafood (liempo, manok, bangus, hotdog, longganisa)
+// meat       fresh, frozen and processed meat and seafood (liempo, bangus, hotdog, longganisa, chicken hotdog)
+// poultry    chicken, duck and other birds, fresh or frozen, and eggs (manok, wings, nuggets, itlog, balut)
 // vegetables vegetables, fruit and fresh herbs (kamatis, kangkong, saging, calamansi)
-// pantry     packaged food that isn't a staple: canned goods, sauces, oil, dairy, eggs, bread, snacks, drinks
+// dairy      milk, cheese, butter and yogurt (Bear Brand, Eden, Alaska)
+// pantry     packaged food that isn't a staple: canned goods, sauces, oil, bread, snacks, drinks
 // dry        staples: rice, noodles, pasta, flour, sugar, coffee, cereal, dried beans
 // household  things you don't eat: detergent, soap, shampoo, tissue, diapers
 // other      anything the app can't place
 
-export type CategoryId = 'meat' | 'vegetables' | 'pantry' | 'dry' | 'household' | 'other';
+export type CategoryId = 'meat' | 'poultry' | 'vegetables' | 'dairy' | 'pantry' | 'dry' | 'household' | 'other';
 
 export interface Category {
   id: CategoryId;
@@ -22,8 +24,12 @@ const NAVY = '#1a3555'; // same as --navy in index.css
 
 export const CATEGORIES: Category[] = [
   { id: 'meat', label: 'Meat & seafood', color: '#c2410c', ink: WHITE },
+  // Deep pink from the logo's wordmark; no other category is pink.
+  { id: 'poultry', label: 'Poultry & eggs', color: '#be185d', ink: WHITE },
   // A step darker than #16a34a: white on the old green was 3.3:1.
   { id: 'vegetables', label: 'Vegetables & fruit', color: '#15803d', ink: WHITE },
+  // Light sky blue reads as "milk" and stays clear of Household's darker blue.
+  { id: 'dairy', label: 'Dairy', color: '#7dd3fc', ink: NAVY },
   { id: 'pantry', label: 'Pantry', color: '#d4a017', ink: NAVY },
   // Dark purple from the app's button borders; no other category is purple.
   { id: 'dry', label: 'Dry goods', color: '#4b1f6f', ink: WHITE },
@@ -35,7 +41,8 @@ export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]
 
 // Checked in this order, first match wins. Order settles the overlaps:
 // "Lucky Me chicken" is noodles (dry), "corned beef" and "Century tuna" are canned (pantry),
-// "tomato sauce" is a sauce (pantry), "chicken breast" is meat.
+// "tomato sauce" is a sauce (pantry), "coconut milk" and "peanut butter" are pantry, not dairy,
+// "chicken hotdog" is processed meat, "chicken breast" is poultry.
 const RULES: Array<[CategoryId, string[]]> = [
   ['household', [
     'detergent', 'sabon', 'soap', 'shampoo', 'conditioner', 'toothpaste', 'toothbrush', 'colgate', 'tissue', 'toilet paper',
@@ -50,22 +57,33 @@ const RULES: Array<[CategoryId, string[]]> = [
     'sugar', 'asukal', 'coffee', 'kape', 'nescafe', 'kopiko', 'great taste', 'cereal', 'oats', 'oatmeal', 'quaker', 'mongo',
     'munggo', 'monggo', 'cornstarch', 'salt', 'asin', 'breadcrumbs',
   ]],
+  // Dairy-sounding pantry goods, before Dairy can claim them.
+  ['pantry', ['coconut milk', 'gata', 'peanut butter']],
+  ['dairy', [
+    'milk', 'gatas', 'bear brand', 'alaska', 'evap', 'evaporated', 'condensed', 'cheese', 'eden', 'butter', 'margarine',
+    'yogurt', 'yoghurt', 'ice cream', 'dairy',
+  ]],
   ['pantry', [
     'canned', 'de lata', 'sardines', 'sardinas', 'ligo', 'mega', 'corned', 'century', '555', 'tuna', 'pork and beans',
     'meat loaf', 'luncheon', 'spam', 'vienna', 'sauce', 'toyo', 'soy', 'suka', 'vinegar', 'patis', 'bagoong', 'ketchup',
-    'catsup', 'mayo', 'mayonnaise', 'oil', 'mantika', 'butter', 'margarine', 'cheese', 'eden', 'milk', 'gatas', 'bear brand',
-    'alaska', 'evap', 'evaporated', 'condensed', 'cream', 'egg', 'eggs', 'itlog', 'bread', 'tinapay', 'pandesal', 'loaf',
+    'catsup', 'mayo', 'mayonnaise', 'oil', 'mantika', 'cream', 'bread', 'tinapay', 'pandesal', 'loaf',
     'gardenia', 'biscuit', 'biscuits', 'cracker', 'crackers', 'skyflakes', 'chips', 'snack', 'chocolate', 'juice', 'soda',
     'coke', 'pepsi', 'sprite', 'royal', 'softdrinks', 'water', 'tubig', 'tea', 'milo', 'ovaltine', 'knorr', 'magic sarap',
     'maggi', 'mama sita', 'seasoning', 'bouillon', 'cubes', 'paminta', 'black pepper', 'jam', 'peanut butter', 'lady s choice',
-    'honey', 'yogurt', 'ice cream', 'gata', 'coconut milk', 'tomato paste',
+    'honey', 'gata', 'coconut milk', 'tomato paste',
+  ]],
+  // Processed meat first, so "chicken hotdog" stays here.
+  ['meat', [
+    'hotdog', 'hot dog', 'longganisa', 'longanisa', 'tocino', 'tapa', 'bacon', 'ham', 'sausage', 'chorizo', 'embutido',
+  ]],
+  ['poultry', [
+    'chicken', 'manok', 'wings', 'drumstick', 'drumsticks', 'thigh', 'thighs', 'breast', 'nuggets', 'turkey',
+    'duck', 'pato', 'itik', 'quail', 'pugo', 'poultry', 'egg', 'eggs', 'itlog', 'balut', 'penoy',
   ]],
   ['meat', [
-    'pork', 'baboy', 'liempo', 'kasim', 'pigue', 'pata', 'chicken', 'manok', 'beef', 'baka', 'giniling', 'ground', 'meat',
-    'karne', 'steak', 'wings', 'drumstick', 'thigh', 'breast', 'fish', 'isda', 'bangus', 'tilapia', 'galunggong', 'tamban',
-    'salmon', 'lapu', 'shrimp', 'hipon', 'squid', 'pusit', 'crab', 'alimango', 'alimasag', 'tahong', 'mussels', 'seafood',
-    'hotdog', 'hot dog', 'longganisa', 'longanisa', 'tocino', 'tapa', 'bacon', 'ham', 'sausage', 'chorizo', 'embutido',
-    'lechon', 'atay', 'liver',
+    'pork', 'baboy', 'liempo', 'kasim', 'pigue', 'pata', 'beef', 'baka', 'giniling', 'ground', 'meat', 'karne', 'steak',
+    'fish', 'isda', 'bangus', 'tilapia', 'galunggong', 'tamban', 'salmon', 'lapu', 'shrimp', 'hipon', 'squid', 'pusit',
+    'crab', 'alimango', 'alimasag', 'tahong', 'mussels', 'seafood', 'lechon', 'atay', 'liver',
   ]],
   ['vegetables', [
     'vegetable', 'vegetables', 'gulay', 'kamatis', 'tomato', 'tomatoes', 'sibuyas', 'onion', 'onions', 'bawang', 'garlic',

@@ -2,7 +2,7 @@
 // then checks the read/add/no-edit rules. Run before pasting a changed schema into either Supabase project.
 // Usage: npm run test:schema
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const db = new PGlite();
@@ -19,8 +19,21 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  -- Like Supabase: new functions in public are granted to anon and authenticated directly.
+  alter default privileges in schema public grant execute on functions to anon, authenticated;
+  -- Stand-in for Supabase Storage: just what the checks use. Supabase turns on RLS for objects itself.
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text);
+  alter table storage.objects enable row level security;
+  grant usage on schema storage to anon, authenticated;
+  grant select, insert, update, delete on storage.objects to anon, authenticated;
 `);
 await db.exec(schema);
+// Migrations must apply cleanly on top of the current schema too.
+for (const f of readdirSync(new URL('./migrations/', import.meta.url)).filter((n) => n.endsWith('.sql')).sort()) {
+  await db.exec(readFileSync(new URL(`./migrations/${f}`, import.meta.url), 'utf8'));
+}
 
 let pass = 0, fail = 0;
 async function as(role, uid, sql) {
@@ -50,11 +63,62 @@ await refused('same sighting uploaded twice', 'authenticated', U1, sighting('c00
 await refused('sighting older than 14 days', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000002', '2020-01-01'));
 await refused('bundle missing its price', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000003', today, 'x'));
 await refused('faked contributor id', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method, contributor) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 100, 'tag', '${U2}')`);
+await ok('a shared price can be confirmed', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000009', '4800016644818', '${B1}', '${today}', 'each', 11500, 'shared')`);
+await refused('unknown capture method', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 11500, 'guess')`);
+await ok('re-upload of a known product is ignored, not an error', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Other name') on conflict (barcode) do nothing`);
+await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
 await refused('edit a sighting', 'authenticated', U1, `update public.price_sightings set unit_price_centavos = 1`);
 await refused('delete a sighting', 'authenticated', U1, `delete from public.price_sightings`);
 await refused('edit a product', 'authenticated', U1, `update public.products set name = 'x'`);
+
+// Pending / Published (004, 005): shoppers see Published products and their own Pending ones; prices always show.
+const P = '4800888123459';
+await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'poultry')`);
+await ok('...and is Pending in the database', 'postgres', null, `select status from public.products where barcode = '${P}'`, (r) => r.rows[0]?.status === 'pending');
+await refused('phone publishes its own product', 'authenticated', U1, `insert into public.products (barcode, name, status) values ('4800777123454', 'X', 'published')`);
+await refused('phone publishes a product later', 'authenticated', U1, `update public.products set status = 'published'`);
+await ok('the shopper who added it still sees it', 'authenticated', U1, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+await ok('other shoppers don\'t see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('logged-out phones don\'t see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('price for a Pending product can be added', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000020', '${P}', '${B1}', '${today}', 'each', 18900, 'tag')`);
+await ok('other shoppers see a Pending product\'s price', 'authenticated', U2, `select unit_price_centavos from public.latest_prices where barcode = '${P}'`, (r) => r.rows[0]?.unit_price_centavos === 18900);
+await ok('known_barcodes finds a Pending barcode', 'authenticated', U2, `select * from public.known_barcodes(array['${P}', '4800016644818', '4800777123454'])`, (r) => r.rows.length === 2);
+await refused('logged-out phone calls known_barcodes', 'anon', null, `select * from public.known_barcodes(array['${P}'])`);
+await ok('Dairy is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy')`);
+await refused('unknown category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'snacks')`);
+await db.exec(`update public.products set status = 'published' where barcode = '${P}'`);
+await ok('Published, other shoppers see it', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+
+// Product images: set in the dashboard, readable by anyone, never set by the app.
+await db.exec(`update public.products set image_path = '4800016644818.jpg', status = 'published' where barcode = '4800016644818'`);
+await ok('logged-out phone reads a product image name', 'anon', null, `select image_path from public.products where barcode = '4800016644818'`, (r) => r.rows[0]?.image_path === '4800016644818.jpg');
+await refused('app sets an image when adding a product', 'authenticated', U1, `insert into public.products (barcode, name, image_path) values ('4800016644115', 'X', 'x.jpg')`);
+await refused('app changes a product image', 'authenticated', U1, `update public.products set image_path = 'other.jpg'`);
+await refused('image name with a path trick', 'postgres', null, `update public.products set image_path = '../secret' where barcode = '4800016644818'`);
+await ok('image bucket is public', 'postgres', null, `select public from storage.buckets where id = 'product-images'`, (r) => r.rows[0]?.public === true);
+await refused('app uploads an image file', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', 'x.jpg')`);
+await refused('logged-out phone uploads an image file', 'anon', null, `insert into storage.objects (bucket_id, name) values ('product-images', 'y.jpg')`);
+
+// One barcode form (006): UPC-A is 12 digits, never 13 with a leading 0.
+await refused('UPC-A written as 13 digits', 'authenticated', U1, `insert into public.products (barcode, name) values ('0024000010623', 'Del Monte peaches')`);
+await ok('UPC-A as 12 digits', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('024000010623', 'Del Monte Sliced Peaches', '825g')`);
+// Replay the Nov 8 dev data: a 13-digit twin with a photo, and a lone 13-digit row with a price.
+await db.exec(`
+  alter table public.products drop constraint products_barcode_upca_12;
+  insert into public.products (barcode, name, image_path) values ('0024000010623', 'Del Monte Yellow Cling Peach Halves', '0024000010623.jpg');
+  insert into public.products (barcode, name) values ('0024000163022', 'Del Monte Whole Kernel Corn');
+  insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method)
+    values ('c0000000-0000-4000-8000-000000000060', '0024000163022', '${B1}', '${today}', 'each', 5250, 'tag');
+`);
+await db.exec(readFileSync(new URL('./migrations/006_one_barcode_form.sql', import.meta.url), 'utf8'));
+await ok('006: twin merged, 12-digit name kept, photo added', 'postgres', null, `select name, size, image_path from public.products where barcode = '024000010623'`,
+  (r) => r.rows[0]?.name === 'Del Monte Sliced Peaches' && r.rows[0]?.size === '825g' && r.rows[0]?.image_path === '0024000010623.jpg');
+await ok('006: lone 13-digit row moved to 12 digits with its price', 'postgres', null,
+  `select count(*)::int n from public.price_sightings where barcode = '024000163022'`, (r) => r.rows[0]?.n === 1);
+await ok('006: no 13-digit 0 rows left', 'postgres', null, `select count(*)::int n from public.products where char_length(barcode) = 13 and barcode like '0%'`, (r) => r.rows[0]?.n === 0);
+await refused('006: check is back on', 'postgres', null, `insert into public.products (barcode, name) values ('0024000010920', 'X')`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

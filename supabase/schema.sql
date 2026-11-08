@@ -1,4 +1,4 @@
--- Abeseria shared price database.
+-- Abaseria shared price database.
 -- Run once in the Supabase SQL Editor on a new project. Safe to read top to bottom: nothing here deletes data.
 --
 -- Three tables:
@@ -8,7 +8,7 @@
 -- plus a latest_prices view: the newest sighting per barcode per branch.
 --
 -- Who can do what (enforced by row-level security below):
---   anyone with the app's public key can READ branches, products, sightings and latest_prices
+--   anyone with the app's public key can READ branches, Published products, sightings and latest_prices
 --   a signed-in phone (anonymous sign-in is fine) can ADD rows, stamped with its own user id
 --   nobody can edit or delete rows from the app; fixes are done here by you
 --   which phone added a sighting (contributor) is stored but never readable through the app
@@ -48,12 +48,21 @@ create table public.products (
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
   category    text not null default 'other'
-              check (category in ('meat', 'vegetables', 'pantry', 'dry', 'household', 'other')),
+              constraint products_category_check
+              check (category in ('meat', 'poultry', 'vegetables', 'dairy', 'pantry', 'dry', 'household', 'other')),
+  -- New products wait as Pending until a Product Manager or Admin publishes them. Phones can't set this.
+  status      text not null default 'pending' check (status in ('pending', 'published')),
+  -- Reference image: a file name in the public 'product-images' bucket. Set in the dashboard, never by the app.
+  image_path  text check (image_path is null or image_path ~ '^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$'),
   created_by  uuid default auth.uid() references auth.users (id) on delete set null,
   created_at  timestamptz not null default now(),
   -- 13-digit codes starting with 2 are printed in-store (deli, meat, produce scales) and often contain
   -- the weight or price, so the same "product" would get a new barcode every day. Keep them out.
-  check (not (char_length(barcode) = 13 and barcode like '2%'))
+  check (not (char_length(barcode) = 13 and barcode like '2%')),
+  -- One form per product. UPC-A is stored as 12 digits, the way Chrome's scanner reads it. The same code
+  -- written as 13 digits with a leading 0 would become a second copy of the same can (migration 006).
+  constraint products_barcode_upca_12
+  check (not (char_length(barcode) = 13 and barcode like '0%'))
 );
 
 
@@ -73,7 +82,8 @@ create table public.price_sightings (
   is_promo               boolean not null default false,
   -- 'tag' = price read from the shelf tag and accepted as is; 'tag+typed' = read then corrected; 'typed' = typed.
   -- 'recall' = this phone's last price for the barcode at this branch, accepted after checking the tag.
-  capture_method         text not null check (capture_method in ('tag', 'tag+typed', 'typed', 'recall')),
+  -- 'shared' = another shopper's latest price at this branch, accepted after checking the tag.
+  capture_method         text not null check (capture_method in ('tag', 'tag+typed', 'typed', 'recall', 'shared')),
   contributor            uuid default auth.uid() references auth.users (id) on delete set null,
   check ((price_type = 'bundle') = (bundle_qty is not null and bundle_price_centavos is not null))
 );
@@ -96,7 +106,10 @@ alter table public.products        enable row level security;
 alter table public.price_sightings enable row level security;
 
 create policy "read branches"  on public.branches        for select to anon, authenticated using (true);
-create policy "read products"  on public.products        for select to anon, authenticated using (true);
+-- Shoppers see Published products, plus the Pending ones they added themselves. A Pending product's prices
+-- still show (sightings and latest_prices aren't filtered), so a scan gets the price and the shopper types the name.
+create policy "read products"  on public.products        for select to anon, authenticated
+  using (status = 'published' or created_by = auth.uid());
 create policy "read sightings" on public.price_sightings for select to anon, authenticated using (true);
 
 create policy "add branches" on public.branches
@@ -121,3 +134,27 @@ grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_cen
               bundle_price_centavos, is_promo, capture_method)
   on public.price_sightings to authenticated;
 grant select on public.latest_prices to anon, authenticated;
+
+-- Uploading a price needs to know its barcode is already in the database, Pending or not.
+-- This answers only that: which of these barcodes exist (200 at most per call). No names, no status.
+create or replace function public.known_barcodes(codes text[])
+returns setof text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.barcode from public.products p where p.barcode = any (codes[1:200]);
+$$;
+revoke all on function public.known_barcodes(text[]) from public;
+-- Supabase also grants new functions to anon directly, so revoke that too: signed-in phones only.
+revoke execute on function public.known_barcodes(text[]) from anon;
+grant execute on function public.known_barcodes(text[]) to authenticated;
+
+
+-- Product images ---------------------------------------------------------------------------------------
+-- One reference image per product, set by you (and later the admin dashboard), never by shoppers' phones.
+-- Anyone can view the bucket; with no storage policies for it, the app's keys can't upload, replace or delete.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('product-images', 'product-images', true, 524288, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;

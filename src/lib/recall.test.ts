@@ -55,6 +55,13 @@ describe('recallBarcode', () => {
     expect(r?.item.label).toBe('Lucky Me Pancit Canton');
   });
 
+  it('recognizes the product at a different chain and says where its last price is from', async () => {
+    const sm = await db.trips.add({ ...trip('sm-center-imus', '2026-11-04T08:00:00Z'), chain: 'SM Supermarket', customStore: 'Center Imus' });
+    await db.items.add(item(sm, 2500, '2026-11-04T08:10:00Z', { label: 'Ligo sardines in tomato with chili', category: 'pantry' }));
+    const r = await recallBarcode('4800016644115', 'puregold-anabu');
+    expect(r).toMatchObject({ sameBranch: false, storeLabel: 'SM Supermarket Center Imus', item: { label: 'Ligo sardines in tomato with chili', category: 'pantry' } });
+  });
+
   it('ignores removed items', async () => {
     const imus = await db.trips.add(trip('imus', '2026-10-20T08:00:00Z'));
     await db.items.add(item(imus, 1500, '2026-10-20T08:10:00Z', { removed: true }));
