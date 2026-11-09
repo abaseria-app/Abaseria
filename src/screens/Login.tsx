@@ -12,6 +12,12 @@ interface Props {
 const LOGO = `${import.meta.env.BASE_URL}icons/icon-192.png`;
 const PRIVACY = `${import.meta.env.BASE_URL}privacy.html`;
 
+// Facebook sign-in is hidden until the Meta app is published (Nov 9): while it's unpublished, only people
+// with a role on the Meta app can sign in, and everyone else hits Facebook's "Feature Unavailable" page.
+// To test it anyway, open the app with ?facebook on the end of the address. To show it to everyone, set this to true.
+const FACEBOOK_FOR_EVERYONE = false;
+const showFacebook = () => FACEBOOK_FOR_EVERYONE || new URLSearchParams(window.location.search).has('facebook');
+
 const returnMessage = (error: string) => (isMissingEmail(error) ? S.login.noEmail : S.login.returned(error));
 
 export function Login({ finishing, error }: Props) {
@@ -40,9 +46,11 @@ export function Login({ finishing, error }: Props) {
           <button className="btn primary huge" disabled={!!going} onClick={() => go('google')}>
             {going === 'google' ? S.login.going('google') : S.login.google}
           </button>
-          <button className="btn facebook huge" disabled={!!going} onClick={() => go('facebook')}>
-            {going === 'facebook' ? S.login.going('facebook') : S.login.facebook}
-          </button>
+          {showFacebook() && (
+            <button className="btn facebook huge" disabled={!!going} onClick={() => go('facebook')}>
+              {going === 'facebook' ? S.login.going('facebook') : S.login.facebook}
+            </button>
+          )}
         </div>
       )}
       {msg && <p className="hint login-error" role="alert">{msg}</p>}
