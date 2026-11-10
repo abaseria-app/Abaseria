@@ -40,8 +40,9 @@ async function call(path, { method = 'GET', headers = {}, body } = {}) {
   return { status: res.status, json, text: text.slice(0, 200) };
 }
 const code = (r) => r.json?.code ?? r.json?.error ?? '';
-// Refused: no privilege, not signed in, schema not exposed, or the table/function doesn't exist (yet).
-const isRefused = (r) => r.status === 401 || r.status === 403 || ['42501', 'PGRST106', 'PGRST205', 'PGRST202'].includes(code(r));
+// Refused: no privilege, not signed in, schema not exposed, the table/function doesn't exist (yet),
+// or (55000) the view can't be written through at all.
+const isRefused = (r) => r.status === 401 || r.status === 403 || ['42501', '55000', 'PGRST106', 'PGRST205', 'PGRST202'].includes(code(r));
 
 let pass = 0;
 const failures = [];
