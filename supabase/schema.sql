@@ -45,7 +45,9 @@ create unique index branches_chain_name_key on public.branches (lower(chain), lo
 
 
 create table public.products (
-  barcode     text primary key check (public.gtin_ok(barcode)),
+  id          bigint generated always as identity primary key,
+  -- Unique when present. A bad check digit or no barcode is accepted and flagged in barcode_status (migration 008).
+  barcode     text constraint products_barcode_key unique,
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
   category    text not null default 'other'
@@ -63,8 +65,26 @@ create table public.products (
   -- One form per product. UPC-A is stored as 12 digits, the way Chrome's scanner reads it. The same code
   -- written as 13 digits with a leading 0 would become a second copy of the same can (migration 006).
   constraint products_barcode_upca_12
-  check (not (char_length(barcode) = 13 and barcode like '0%'))
+  check (not (char_length(barcode) = 13 and barcode like '0%')),
+  -- For review lists: 'valid', 'invalid' (bad check digit) or 'missing'. Computed, never typed.
+  barcode_status text generated always as (
+    case when barcode is null then 'missing' when public.gtin_ok(barcode) then 'valid' else 'invalid' end
+  ) stored
 );
+create index products_barcode_status_idx on public.products (barcode_status) where barcode_status <> 'valid';
+
+
+-- Holding table for spreadsheet uploads (migration 009). Rows are checked, de-duplicated and moved into
+-- products, then cleared. RLS on with no policies and no grants: only the server key can use it.
+create table public.product_import (
+  barcode     text,
+  name        text,
+  size        text,
+  category    text,
+  uploaded_at timestamptz not null default now()
+);
+comment on table public.product_import is 'Holding table for CSV uploads from the dashboard. No rules here; rows are checked, de-duplicated and moved into products, then cleared.';
+alter table public.product_import enable row level security;
 
 
 create table public.price_sightings (
@@ -121,10 +141,10 @@ create policy "add sightings" on public.price_sightings
 -- No update or delete policies: the app can only add.
 
 -- Supabase grants every table to the app roles by default. Narrow that to read + add.
-revoke all on public.branches, public.products, public.price_sightings from anon, authenticated;
+revoke all on public.branches, public.products, public.price_sightings, public.product_import from anon, authenticated;
 -- Every column except created_by is readable. A column added later stays hidden until a migration grants it.
 grant select (id, chain, name, lat, lng, created_at) on public.branches to anon, authenticated;
-grant select (barcode, name, size, category, status, image_path, created_at) on public.products to anon, authenticated;
+grant select (id, barcode, name, size, category, status, image_path, created_at, barcode_status) on public.products to anon, authenticated;
 grant insert (id, chain, name, lat, lng) on public.branches to authenticated;
 grant insert (barcode, name, size, category) on public.products to authenticated;
 -- Every sighting column except contributor is readable.
