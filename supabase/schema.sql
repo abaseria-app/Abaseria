@@ -179,3 +179,7 @@ grant execute on function public.known_barcodes(text[]) to authenticated;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('product-images', 'product-images', true, 524288, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do nothing;
+
+
+-- Breach tripwires and shopper notices --------------------------------------------------------------------
+-- On a new project, run supabase/migrations/011_tripwires_and_notices.sql after this file.

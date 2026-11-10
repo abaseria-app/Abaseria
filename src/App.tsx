@@ -15,6 +15,8 @@ import { Explore } from './screens/Explore';
 import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
 import type { CategoryId } from './lib/categories';
 import { Login } from './screens/Login';
+import { NoticeBanner } from './components/NoticeBanner';
+import { dismissNotice, loadNotices, type Notice } from './lib/notices';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
 type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon';
@@ -37,6 +39,17 @@ export default function App() {
   const [back, setBack] = useState<Base>('explore');
   const [searchCategory, setSearchCategory] = useState<CategoryId | null>(null);
   const [soon, setSoon] = useState<SoonFeature>('community');
+  const [notices, setNotices] = useState<Notice[]>([]);
+
+  // Notices from Abaseria (incl. a breach notice): checked on open and whenever the app comes back to the front.
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === 'visible') loadNotices().then(setNotices);
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, []);
 
   useEffect(() => {
     requestPersistentStorage();
@@ -114,107 +127,126 @@ export default function App() {
     setRoute('soon');
   }
 
-  switch (route) {
-    case 'loading':
-      return <main className="screen" />;
-    case 'login':
-      return <Login key={loginError ?? ''} finishing={finishing} error={loginError} />;
-    case 'explore':
-      return (
-        <Explore
-          activeTripId={tripId}
-          onScan={() => scan('explore')}
-          onSearch={(category) => search('explore', category)}
-          onCart={() => setRoute('home')}
-          onCommunity={() => openSoon('community')}
-          onProfile={() => openSoon('profile')}
-        />
-      );
-    case 'soon':
-      return (
-        <ComingSoon
-          key={soon}
-          feature={soon}
-          onExplore={() => setRoute('explore')}
-          onCart={() => setRoute('home')}
-          onScan={() => scan('explore')}
-          onCommunity={() => openSoon('community')}
-          onProfile={() => openSoon('profile')}
-          onSettings={() => setRoute('settings')}
-        />
-      );
-    case 'home':
-      return (
-        <Home
-          activeTripId={tripId}
-          toast={toast}
-          onStart={() => scan('home')}
-          onContinue={() => setRoute('shop')}
-          onSettings={() => setRoute('settings')}
-          onSearch={() => search('home')}
-          onExplore={() => setRoute('explore')}
-          onCommunity={() => openSoon('community')}
-          onProfile={() => openSoon('profile')}
-        />
-      );
-    case 'start':
-      return (
-        <StartTrip
-          testMode={testMode}
-          onBack={() => setRoute(back)}
-          onStarted={async (id) => {
-            await setSetting('activeTripId', String(id));
-            setTripId(id);
-            setRoute('shop');
-          }}
-        />
-      );
-    case 'shop':
-      return (
-        <Shopping
-          tripId={tripId!}
-          onFinish={() => setRoute('cashier')}
-          onHome={() => setRoute('home')}
-          onCancelled={() => {
-            setTripId(null);
-            setToast(S.shop.cancelled);
-            setRoute('home');
-          }}
-        />
-      );
-    case 'cashier':
-      return (
-        <Cashier
-          tripId={tripId!}
-          testMode={testMode}
-          onBack={() => setRoute('shop')}
-          onEnded={() => {
-            sharePending();
-            setTripId(null);
-            setToast(S.cashier.thanks);
-            setRoute('home');
-          }}
-        />
-      );
-    case 'settings':
-      return (
-        <Settings
-          account={account}
-          testMode={testMode}
-          onTestMode={async (on) => {
-            setTestMode(on);
-            await setSetting('testMode', on ? '1' : '0');
-          }}
-          onOcrCheck={() => setRoute('ocrcheck')}
-          onResults={() => setRoute('results')}
-          onBack={() => setRoute('home')}
-        />
-      );
-    case 'ocrcheck':
-      return <OcrCheck onBack={() => setRoute('settings')} />;
-    case 'results':
-      return <Results onBack={() => setRoute('settings')} />;
-    case 'search':
-      return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
+  const notice = route === 'loading' ? null : notices[0];
+  const banner = notice && (
+    <NoticeBanner
+      notice={notice}
+      onClose={() => {
+        void dismissNotice(notice.id);
+        setNotices((list) => list.filter((n) => n.id !== notice.id));
+      }}
+    />
+  );
+  return (
+    <>
+      {banner}
+      {screen()}
+    </>
+  );
+
+  function screen() {
+    switch (route) {
+      case 'loading':
+        return <main className="screen" />;
+      case 'login':
+        return <Login key={loginError ?? ''} finishing={finishing} error={loginError} />;
+      case 'explore':
+        return (
+          <Explore
+            activeTripId={tripId}
+            onScan={() => scan('explore')}
+            onSearch={(category) => search('explore', category)}
+            onCart={() => setRoute('home')}
+            onCommunity={() => openSoon('community')}
+            onProfile={() => openSoon('profile')}
+          />
+        );
+      case 'soon':
+        return (
+          <ComingSoon
+            key={soon}
+            feature={soon}
+            onExplore={() => setRoute('explore')}
+            onCart={() => setRoute('home')}
+            onScan={() => scan('explore')}
+            onCommunity={() => openSoon('community')}
+            onProfile={() => openSoon('profile')}
+            onSettings={() => setRoute('settings')}
+          />
+        );
+      case 'home':
+        return (
+          <Home
+            activeTripId={tripId}
+            toast={toast}
+            onStart={() => scan('home')}
+            onContinue={() => setRoute('shop')}
+            onSettings={() => setRoute('settings')}
+            onSearch={() => search('home')}
+            onExplore={() => setRoute('explore')}
+            onCommunity={() => openSoon('community')}
+            onProfile={() => openSoon('profile')}
+          />
+        );
+      case 'start':
+        return (
+          <StartTrip
+            testMode={testMode}
+            onBack={() => setRoute(back)}
+            onStarted={async (id) => {
+              await setSetting('activeTripId', String(id));
+              setTripId(id);
+              setRoute('shop');
+            }}
+          />
+        );
+      case 'shop':
+        return (
+          <Shopping
+            tripId={tripId!}
+            onFinish={() => setRoute('cashier')}
+            onHome={() => setRoute('home')}
+            onCancelled={() => {
+              setTripId(null);
+              setToast(S.shop.cancelled);
+              setRoute('home');
+            }}
+          />
+        );
+      case 'cashier':
+        return (
+          <Cashier
+            tripId={tripId!}
+            testMode={testMode}
+            onBack={() => setRoute('shop')}
+            onEnded={() => {
+              sharePending();
+              setTripId(null);
+              setToast(S.cashier.thanks);
+              setRoute('home');
+            }}
+          />
+        );
+      case 'settings':
+        return (
+          <Settings
+            account={account}
+            testMode={testMode}
+            onTestMode={async (on) => {
+              setTestMode(on);
+              await setSetting('testMode', on ? '1' : '0');
+            }}
+            onOcrCheck={() => setRoute('ocrcheck')}
+            onResults={() => setRoute('results')}
+            onBack={() => setRoute('home')}
+          />
+        );
+      case 'ocrcheck':
+        return <OcrCheck onBack={() => setRoute('settings')} />;
+      case 'results':
+        return <Results onBack={() => setRoute('settings')} />;
+      case 'search':
+        return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
+    }
   }
 }
