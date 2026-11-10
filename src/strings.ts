@@ -327,4 +327,74 @@ export const S = {
     medianSec: (s: number) => `Median time per tag item: ${s.toFixed(1)} s`,
     cols: ['Tester', 'Basket', 'Coverage', 'Trips', 'Came back'],
   },
+
+  nav: {
+    label: 'Main',
+    explore: 'Explore',
+    cart: 'Cart',
+    scan: 'Scan',
+    scanLabel: 'Scan an item',
+    community: 'Community',
+    profile: 'Profile',
+    soon: 'Soon',
+  },
+
+  explore: {
+    sections: 'Explore sections',
+    tabs: { products: 'Products', recipes: 'Recipes', budget: 'Budget', pantry: 'Pantry', articles: 'Articles' },
+    soonAria: (label: string) => `${label}, coming soon`,
+    tipsLabel: 'Tips',
+    tipOf: (i: number, n: number) => `Tip ${i} of ${n}`,
+    tips: [
+      { title: 'Snap the shelf tag, watch your total', body: 'Know your bill before the counter.' },
+      { title: 'Set a budget before you go', body: 'Abaseria tells you the moment your cart goes over it.' },
+      { title: 'Check your total at the counter', body: 'Count the receipt lines and match the register in seconds.' },
+    ],
+    startShopping: 'Start shopping',
+    continueTrip: 'Continue your trip',
+    sampleTotal: 'Total',
+    sampleBudget: 'of ₱1,200 budget',
+    categories: 'Shop by category',
+    usual: 'Your usual items',
+    usualSoon: 'The things you buy most, one tap away.',
+    chat: 'Ask Abaseria, coming soon',
+    chatSoon: 'Ask Abaseria is coming soon.',
+  },
+
+  soon: {
+    badge: 'Coming soon',
+    titles: {
+      recipes: 'Recipes are on the way',
+      budget: 'Budget tools are on the way',
+      pantry: 'Your pantry is on the way',
+      articles: 'Articles are on the way',
+      community: 'Community is on the way',
+      profile: 'Your profile is on the way',
+    } as Record<string, string>,
+    body: 'We’re still building this. Scanning and your cart work today.',
+    bodies: {
+      budget: 'Your spending by week, month and year is on the Cart tab for now.',
+      community: 'Price tips and deals from shoppers near you. Scanning and your cart work today.',
+      profile: 'Your account, sign-out and test mode are in Settings for now.',
+    } as Record<string, string>,
+    backToProducts: 'Back to products',
+    openCart: 'Open Cart',
+    openSettings: 'Open Settings',
+  },
+
+  ads: {
+    ad: 'Ad',
+    sponsored: 'Sponsored',
+    space: 'Ad space',
+    banner: '320×50 banner',
+    mrec: '300×250 medium rectangle',
+  },
+
+  sponsor: {
+    label: 'Sponsored message',
+    close: 'Close',
+    notToday: 'Don’t show again today',
+    placeholder: 'Sponsor creative',
+    placeholderSize: '3:5 portrait, 600×1000 image',
+  },
 };

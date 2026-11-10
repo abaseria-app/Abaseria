@@ -11,10 +11,15 @@ import { Settings } from './screens/Settings';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
 import { Search } from './screens/Search';
+import { Explore } from './screens/Explore';
+import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
+import type { CategoryId } from './lib/categories';
 import { Login } from './screens/Login';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
-type Route = 'loading' | 'login' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search';
+type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon';
+/** Screens a back button can return to. */
+type Base = 'explore' | 'home';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('loading');
@@ -28,19 +33,23 @@ export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  // Where Search and New trip go back to, and which coming-soon tab is open.
+  const [back, setBack] = useState<Base>('explore');
+  const [searchCategory, setSearchCategory] = useState<CategoryId | null>(null);
+  const [soon, setSoon] = useState<SoonFeature>('community');
 
   useEffect(() => {
     requestPersistentStorage();
     // Start the OCR engine now so the first tag photo doesn't wait for it.
     warmOcr().catch((e) => console.warn('OCR warm-up failed', e));
 
-    /** Where the app opens once the shopper is signed in. Reopening mid-trip goes straight back to the list. */
+    /** Where the app opens once the shopper is signed in: Explore. Reopening mid-trip goes straight back to the list. */
     async function enter() {
       const active = Number(await getSetting('activeTripId'));
       if (active) {
         setTripId(active);
         setRoute('shop');
-      } else setRoute('home');
+      } else setRoute('explore');
     }
 
     const stop = onAccountChange((a) => {
@@ -89,27 +98,70 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  /** Scan in the bottom bar: back into the trip in progress, or start one. */
+  function scan(from: Base) {
+    if (tripId) return setRoute('shop');
+    setBack(from);
+    setRoute('start');
+  }
+  function search(from: Base, category?: CategoryId) {
+    setBack(from);
+    setSearchCategory(category ?? null);
+    setRoute('search');
+  }
+  function openSoon(feature: SoonFeature) {
+    setSoon(feature);
+    setRoute('soon');
+  }
+
   switch (route) {
     case 'loading':
       return <main className="screen" />;
     case 'login':
       return <Login key={loginError ?? ''} finishing={finishing} error={loginError} />;
+    case 'explore':
+      return (
+        <Explore
+          activeTripId={tripId}
+          onScan={() => scan('explore')}
+          onSearch={(category) => search('explore', category)}
+          onCart={() => setRoute('home')}
+          onCommunity={() => openSoon('community')}
+          onProfile={() => openSoon('profile')}
+        />
+      );
+    case 'soon':
+      return (
+        <ComingSoon
+          key={soon}
+          feature={soon}
+          onExplore={() => setRoute('explore')}
+          onCart={() => setRoute('home')}
+          onScan={() => scan('explore')}
+          onCommunity={() => openSoon('community')}
+          onProfile={() => openSoon('profile')}
+          onSettings={() => setRoute('settings')}
+        />
+      );
     case 'home':
       return (
         <Home
           activeTripId={tripId}
           toast={toast}
-          onStart={() => setRoute('start')}
+          onStart={() => scan('home')}
           onContinue={() => setRoute('shop')}
           onSettings={() => setRoute('settings')}
-          onSearch={() => setRoute('search')}
+          onSearch={() => search('home')}
+          onExplore={() => setRoute('explore')}
+          onCommunity={() => openSoon('community')}
+          onProfile={() => openSoon('profile')}
         />
       );
     case 'start':
       return (
         <StartTrip
           testMode={testMode}
-          onBack={() => setRoute('home')}
+          onBack={() => setRoute(back)}
           onStarted={async (id) => {
             await setSetting('activeTripId', String(id));
             setTripId(id);
@@ -163,6 +215,6 @@ export default function App() {
     case 'results':
       return <Results onBack={() => setRoute('settings')} />;
     case 'search':
-      return <Search onBack={() => setRoute('home')} />;
+      return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
   }
 }
