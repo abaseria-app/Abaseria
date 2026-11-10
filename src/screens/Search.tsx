@@ -25,6 +25,8 @@ import {
 
 interface Props {
   onBack: () => void;
+  /** Opened from a category tile on Explore: start with that category filtered. */
+  initialCategory?: CategoryId | null;
   /**
    * Picking an item to add to the trip (from the shopping list). Tapping a row picks it instead of opening it,
    * rows show this store's price first, and a button at the bottom types a new item in.
@@ -42,9 +44,9 @@ interface Props {
 const PAGE = 60;
 const dayFmt = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' });
 
-export function Search({ onBack, pick }: Props) {
+export function Search({ onBack, pick, initialCategory }: Props) {
   const [text, setText] = useState('');
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [filters, setFilters] = useState<Filters>(initialCategory ? { ...NO_FILTERS, categories: [initialCategory] } : NO_FILTERS);
   const [sort, setSort] = useState<SortKey>('best');
   const [panel, setPanel] = useState(false);
   const [phone, setPhone] = useState<CatalogItem[] | null>(null);
