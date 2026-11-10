@@ -55,7 +55,14 @@ await refused('duplicate branch (same chain + name, any case)', 'authenticated',
 await refused('swapped lat/lng', 'authenticated', U1, `insert into public.branches (id, chain, name, lat, lng) values (gen_random_uuid(), 'SM', 'Bacoor', 120.9, 14.4)`);
 await refused('logged-out phone adds a branch', 'anon', null, `insert into public.branches (id, chain, name) values (gen_random_uuid(), 'SM', 'Molino')`);
 await ok('signed-in phone adds a product', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4800016644818', 'Test product', '250 ml')`);
-await refused('bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad')`);
+// 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
+await ok('bad check digit accepted', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
+await ok('...and flagged invalid', 'postgres', null, `select barcode_status from public.products where barcode = '4800016644819'`, (r) => r.rows[0]?.barcode_status === 'invalid');
+await ok('missing barcode flagged missing', 'postgres', null, `insert into public.products (barcode, name) values (null, 'Loose galunggong') returning barcode_status`, (r) => r.rows[0]?.barcode_status === 'missing');
+await refused('same barcode twice', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644819', 'Again')`);
+await refused('phone sets barcode_status', 'authenticated', U1, `insert into public.products (barcode, name, barcode_status) values ('4800016644115', 'X', 'valid')`);
+await refused('app reads the import table', 'authenticated', U1, `select * from public.product_import`);
+await refused('app writes the import table', 'anon', null, `insert into public.product_import (barcode, name) values ('1', 'x')`);
 await refused('in-store scale code', 'authenticated', U1, `insert into public.products (barcode, name) values ('2000000000008', 'Scale')`);
 const sighting = (cid, day = today, extra = '') => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method${extra ? ', bundle_qty' : ''}) values ('${cid}', '4800016644818', '${B1}', '${day}', ${extra ? "'bundle'" : "'each'"}, 11500, 'tag'${extra ? ', 3' : ''})`;
 await ok('signed-in phone adds a sighting', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000001'));

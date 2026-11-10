@@ -124,9 +124,14 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
 | `003_product_images.sql` | `products.image_path` and the public `product-images` bucket; images set in the dashboard only | Before adding images | Before images show in the live app |
 | `004_poultry_dairy_product_status.sql` | Poultry and Dairy categories; `products.status` (pending / published), new products Pending | Done Nov 5 | Before the next `dev` → `main` merge |
-| `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Same time as 004 |
+| `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Done Nov 8 (replaced by 007) |
+| `006_one_barcode_form.sql` | UPC-A stored as 12 digits only; merges 13-digit twins | Done Nov 8 | Done Nov 8 |
+| `007_all_products_visible.sql` | Everyone sees every product, Pending or Published (Nov 9) | Done Nov 9 | Done by hand Nov 9 |
+| `008_flag_invalid_and_missing_barcodes.sql` | Products get a numeric `id`; a bad check digit or no barcode is accepted and flagged in `barcode_status` | Done Nov 9 | Not yet: run 008, 009, then 010 again |
+| `009_product_import_holding_table.sql` | `product_import` holding table for spreadsheet uploads, server key only | Done Nov 9 | Not yet (with 008) |
+| `010_security_review.sql` | Hides `created_by` on products and branches; `latest_prices` read-only; function fixes | Done Nov 11 | Done Nov 11. Run again after 008 so the new columns are readable |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 42 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 65 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 
