@@ -86,6 +86,8 @@ for (const [name, w] of [
   ['delete a store', write('/rest/v1/branches?id=eq.00000000-0000-4000-8000-000000000000', 'DELETE')],
   ['write through latest_prices', write('/rest/v1/latest_prices', 'POST', { barcode: '0' })],
   ['add a notice', write('/rest/v1/notices', 'POST', { title_en: '' })],
+  ['edit a notice', write('/rest/v1/notices?id=eq.-1', 'PATCH', { title_en: 'x' })],
+  ['delete a notice', write('/rest/v1/notices?id=eq.-1', 'DELETE')],
   ['logged-out known_barcodes call', write('/rest/v1/rpc/known_barcodes', 'POST', { codes: ['0'] })],
 ]) await mustRefuse(`logged out: ${name}`, w.path, w.opts);
 

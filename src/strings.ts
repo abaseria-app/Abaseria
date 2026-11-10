@@ -397,4 +397,7 @@ export const S = {
     placeholder: 'Sponsor creative',
     placeholderSize: '3:5 portrait, 600×1000 image',
   },
+  notices: {
+    close: 'Close notice',
+  },
 };

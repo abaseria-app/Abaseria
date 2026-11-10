@@ -421,3 +421,12 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .sponsor-creative img { object-fit: cover; }
 .sponsor-placeholder { flex: 1; border: 2px dashed var(--charcoal); border-radius: 10px; background: var(--sun); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 16px; }
 .sponsor-placeholder span { font-size: .85rem; color: var(--charcoal); }
+
+/* Notices from Abaseria (public.notices). Sits above every screen until closed. */
+.app-notice { position: fixed; top: 0; left: 0; right: 0; z-index: 60; margin: 8px; padding: 12px 44px 12px 14px;
+  border-radius: 12px; background: var(--sky); color: var(--navy); box-shadow: var(--shadow-card); }
+.app-notice.incident { background: var(--sun); border-left: 6px solid var(--red); }
+.app-notice p { margin: 4px 0 0; font-size: .95rem; line-height: 1.35; }
+.app-notice-tl { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(26, 53, 85, .2); }
+.app-notice-close { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; border: 0;
+  background: transparent; color: var(--navy); display: grid; place-items: center; }

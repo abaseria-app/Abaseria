@@ -139,5 +139,71 @@ await ok('006: lone 13-digit row moved to 12 digits with its price', 'postgres',
 await ok('006: no 13-digit 0 rows left', 'postgres', null, `select count(*)::int n from public.products where char_length(barcode) = 13 and barcode like '0%'`, (r) => r.rows[0]?.n === 0);
 await refused('006: check is back on', 'postgres', null, `insert into public.products (barcode, name) values ('0024000010920', 'X')`);
 
+// Tripwires and notices (011) -------------------------------------------------------------------------------
+const one = async (sql) => (await db.query(sql)).rows[0];
+const events = async (kind) => Number((await one(`select count(*)::int n from security.events where kind = '${kind}'`)).n);
+for (const t of ['events', 'settings', 'paused_accounts', 'daily_counts']) {
+  await refused(`logged-out phone reads security.${t}`, 'anon', null, `select * from security.${t}`);
+  await refused(`signed-in phone reads security.${t}`, 'authenticated', U1, `select * from security.${t}`);
+}
+await refused('signed-in phone writes an alert', 'authenticated', U1, `select security.alert('fake', '{}')`);
+await refused('signed-in phone pauses someone', 'authenticated', U1, `insert into security.paused_accounts (user_id, reason) values ('${U2}', 'x')`);
+await ok('prices are counted per account per day', 'postgres', null,
+  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => r.rows[0]?.n >= 3);
+const before = Number((await one(`select n from security.daily_counts where user_id = '${U1}' and day = security.today()`)).n);
+await as('authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
+await ok('a re-upload is not counted', 'postgres', null,
+  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => Number(r.rows[0]?.n) === before);
+
+// Flood: a third account crosses lowered limits; everyone else's counts are cleared so only it is affected.
+const U3 = '33333333-3333-4333-8333-333333333333';
+await db.exec(`insert into auth.users values ('${U3}'); delete from security.daily_counts where user_id <> '00000000-0000-0000-0000-000000000000';
+               update security.settings set value = 1 where key = 'price_alert_per_day'; update security.settings set value = 2 where key = 'price_block_per_day'`);
+const price = (n, cents) => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}', '4800777123454', '${B1}', '${today}', 'each', ${cents}, 'tag')`;
+const recorded = async (name, kind, n) => { if ((await events(kind)) === n) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
+await ok('first price goes in', 'authenticated', U3, price(1, 9900));
+await recorded('crossing the alert line records a price_flood alert', 'price_flood', 1);
+await ok('price at the limit goes in', 'authenticated', U3, price(2, 9900));
+await recorded('reaching the limit records price_limit_reached', 'price_limit_reached', 1);
+await refused('price past the daily limit is refused', 'authenticated', U3, price(3, 9900));
+await refused('...also when it is part of a batch', 'authenticated', U3,
+  `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000199', '4800777123454', '${B1}', '${today}', 'each', 1, 'tag'), ('c0000000-0000-4000-8000-000000000198', '4800777123454', '${B1}', '${today}', 'each', 1, 'tag')`);
+await ok('other accounts can still add prices', 'authenticated', U1, price(50, 9800));
+await recorded('a second account crossing the line gets its own alert', 'price_flood', 2);
+await db.exec(`update security.settings set value = 300 where key = 'price_alert_per_day'; update security.settings set value = 1000 where key = 'price_block_per_day'; delete from security.daily_counts where user_id = '${U3}'`);
+await ok('limit reset: the account can add again', 'authenticated', U3, price(4, 9850));
+await db.exec(`delete from security.daily_counts where user_id <> '00000000-0000-0000-0000-000000000000'`);
+await ok('U2 adds the newest price', 'authenticated', U2, price(5, 9700));
+
+// Pause: U2's prices vanish from the app and new ones are refused.
+await ok('before pausing, U2\'s price is the latest', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9700);
+await db.exec(`insert into security.paused_accounts (user_id, reason) values ('${U2}', 'test: fake prices')`);
+await ok('after pausing, the latest price is someone else\'s', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9850);
+await ok('a paused account\'s prices are hidden from signed-in phones too', 'authenticated', U1, `select count(*)::int n from public.price_sightings where unit_price_centavos = 9700`, (r) => r.rows[0]?.n === 0);
+await refused('a paused account can\'t add prices', 'authenticated', U2, price(6, 9600));
+await db.exec(`delete from security.paused_accounts where user_id = '${U2}'`);
+await ok('unpaused: prices are back', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9700);
+
+// Deletes alert, unless marked as maintenance.
+const delBefore = await events('rows_deleted');
+await db.exec(`delete from public.price_sightings where client_id = 'c0000000-0000-4000-8000-000000000150'`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS deleting a price records an alert'); } else { fail++; console.log('FAIL deleting a price records an alert'); }
+await db.exec(`begin; set local abaseria.maintenance = 'on'; delete from public.price_sightings where client_id = 'c0000000-0000-4000-8000-000000000104'; commit;`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS maintenance delete records no alert'); } else { fail++; console.log('FAIL maintenance delete records no alert'); }
+await db.exec(`delete from public.price_sightings where id = -1`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS a delete that removes nothing records no alert'); } else { fail++; console.log('FAIL a delete that removes nothing records no alert'); }
+await db.exec(`create table public.staff_test (id int); create trigger w after insert or update or delete on public.staff_test for each statement execute function security.watch_changes(); insert into public.staff_test values (1); drop table public.staff_test;`);
+if ((await events('watched_table_changed')) === 1) { pass++; console.log('PASS watched table change records an alert'); } else { fail++; console.log('FAIL watched table change records an alert'); }
+await ok('alerts wait unsent when email isn\'t set up', 'postgres', null, `select count(*)::int n from security.events where sent`, (r) => r.rows[0]?.n === 0);
+
+// Notices.
+await db.exec(`insert into public.notices (kind, title_en, body_en, title_tl, body_tl) values ('incident', 'We''re sorry', 'Body', 'Paumanhin po', 'Katawan');
+               insert into public.notices (title_en, body_en, ends_at) values ('Old', 'Expired', now() - interval '1 day');
+               insert into public.notices (title_en, body_en, starts_at) values ('Later', 'Not yet', now() + interval '1 day');`);
+await ok('logged-out phone sees only the current notice', 'anon', null, `select id, kind, title_en, body_en, title_tl, body_tl, starts_at, ends_at from public.notices`, (r) => r.rows.length === 1 && r.rows[0].title_tl === 'Paumanhin po');
+await refused('phone adds a notice', 'authenticated', U1, `insert into public.notices (title_en, body_en) values ('x', 'y')`);
+await refused('phone edits a notice', 'authenticated', U1, `update public.notices set title_en = 'x'`);
+await refused('phone deletes a notice', 'authenticated', U1, `delete from public.notices`);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
