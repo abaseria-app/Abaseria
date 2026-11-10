@@ -1,0 +1,45 @@
+name: Nightly attacker test
+
+# Every morning, tries what a stranger with the public key could try against abaseria-dev and abaseria-prod.
+# A failed run emails the repo owner (GitHub sends scheduled-run failures to whoever last edited the schedule).
+# Note: GitHub switches off scheduled runs in a public repo after 60 days with no commits. If that email
+# arrives, re-enable it under Actions → Nightly attacker test.
+
+on:
+  schedule:
+    - cron: '17 22 * * *' # 6:17 AM Manila
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/attacker-test.mjs
+      - .github/workflows/attacker-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  attack:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [dev, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run against abaseria-${{ matrix.project }}
+        env:
+          PROJECT_NAME: abaseria-${{ matrix.project }}
+          PROD_URL: ${{ vars.SUPABASE_PROD_URL }}
+          PROD_KEY: ${{ vars.SUPABASE_PROD_PUBLISHABLE_KEY }}
+        run: |
+          if [ "${{ matrix.project }}" = dev ]; then
+            set -a; . ./.env.development; set +a
+            export SUPABASE_URL="$VITE_SUPABASE_URL" SUPABASE_PUBLISHABLE_KEY="$VITE_SUPABASE_PUBLISHABLE_KEY"
+          else
+            if [ -z "$PROD_URL" ] || [ -z "$PROD_KEY" ]; then echo "Prod variables missing"; exit 1; fi
+            export SUPABASE_URL="$PROD_URL" SUPABASE_PUBLISHABLE_KEY="$PROD_KEY"
+          fi
+          node scripts/attacker-test.mjs
