@@ -8,10 +8,10 @@
 -- plus a latest_prices view: the newest sighting per barcode per branch.
 --
 -- Who can do what (enforced by row-level security below):
---   anyone with the app's public key can READ branches, Published products, sightings and latest_prices
+--   anyone with the app's public key can READ branches, products (Pending and Published), sightings and latest_prices
 --   a signed-in phone (anonymous sign-in is fine) can ADD rows, stamped with its own user id
 --   nobody can edit or delete rows from the app; fixes are done here by you
---   which phone added a sighting (contributor) is stored but never readable through the app
+--   who added a sighting, product or store (contributor / created_by) is stored but never readable through the app
 
 
 -- Barcode check: 8, 12, 13 or 14 digits with a valid GTIN check digit.
@@ -19,6 +19,7 @@ create or replace function public.gtin_ok(code text)
 returns boolean
 language sql
 immutable
+set search_path = ''
 as $$
   select code ~ '^([0-9]{8}|[0-9]{12,14})$'
      and (
@@ -106,10 +107,8 @@ alter table public.products        enable row level security;
 alter table public.price_sightings enable row level security;
 
 create policy "read branches"  on public.branches        for select to anon, authenticated using (true);
--- Shoppers see Published products, plus the Pending ones they added themselves. A Pending product's prices
--- still show (sightings and latest_prices aren't filtered), so a scan gets the price and the shopper types the name.
-create policy "read products"  on public.products        for select to anon, authenticated
-  using (status = 'published' or created_by = auth.uid());
+-- Everyone sees every product, Pending or Published (Nov 9 decision).
+create policy "read products"  on public.products        for select to anon, authenticated using (true);
 create policy "read sightings" on public.price_sightings for select to anon, authenticated using (true);
 
 create policy "add branches" on public.branches
@@ -123,7 +122,9 @@ create policy "add sightings" on public.price_sightings
 
 -- Supabase grants every table to the app roles by default. Narrow that to read + add.
 revoke all on public.branches, public.products, public.price_sightings from anon, authenticated;
-grant select on public.branches, public.products to anon, authenticated;
+-- Every column except created_by is readable. A column added later stays hidden until a migration grants it.
+grant select (id, chain, name, lat, lng, created_at) on public.branches to anon, authenticated;
+grant select (barcode, name, size, category, status, image_path, created_at) on public.products to anon, authenticated;
 grant insert (id, chain, name, lat, lng) on public.branches to authenticated;
 grant insert (barcode, name, size, category) on public.products to authenticated;
 -- Every sighting column except contributor is readable.
@@ -136,12 +137,12 @@ grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_cen
 grant select on public.latest_prices to anon, authenticated;
 
 -- Uploading a price needs to know its barcode is already in the database, Pending or not.
--- This answers only that: which of these barcodes exist (200 at most per call). No names, no status.
+-- This answers only that: which of these barcodes exist (200 at most per call). Runs with the caller's rights.
 create or replace function public.known_barcodes(codes text[])
 returns setof text
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select p.barcode from public.products p where p.barcode = any (codes[1:200]);

@@ -69,19 +69,31 @@ await ok('re-upload of a known product is ignored, not an error', 'authenticated
 await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
+// Security review (010): who added a product or store is hidden too; the view is read-only.
+await refused('product created_by hidden from logged-out phones', 'anon', null, `select created_by from public.products`);
+await refused('product created_by hidden from signed-in phones', 'authenticated', U2, `select created_by from public.products`);
+await refused('branch created_by hidden from logged-out phones', 'anon', null, `select created_by from public.branches`);
+await refused('branch created_by hidden from signed-in phones', 'authenticated', U2, `select created_by from public.branches`);
+await refused('select * on products (hidden column)', 'anon', null, `select * from public.products`);
+await ok('logged-out phone reads every other product column', 'anon', null, `select barcode, name, size, category, status, image_path, created_at from public.products`, (r) => r.rows.length >= 1);
+await ok('logged-out phone reads every other branch column', 'anon', null, `select id, chain, name, lat, lng, created_at from public.branches`, (r) => r.rows.length >= 1);
+await ok('connection-check counts still work', 'anon', null, `select (select count(barcode) from public.products) + (select count(id) from public.branches) + (select count(barcode) from public.latest_prices) as n`, (r) => r.rows[0]?.n >= 3);
+await refused('write through latest_prices', 'authenticated', U1, `insert into public.latest_prices (barcode, branch_id, seen_on, price_type, unit_price_centavos) values ('4800016644818', '${B1}', '${today}', 'each', 1)`);
+await ok('known_barcodes runs with the caller\'s rights', 'postgres', null, `select prosecdef from pg_proc where proname = 'known_barcodes'`, (r) => r.rows[0]?.prosecdef === false);
+await ok('gtin_ok has a fixed search path', 'postgres', null, `select proconfig from pg_proc where proname = 'gtin_ok'`, (r) => String(r.rows[0]?.proconfig).includes('search_path'));
 await refused('edit a sighting', 'authenticated', U1, `update public.price_sightings set unit_price_centavos = 1`);
 await refused('delete a sighting', 'authenticated', U1, `delete from public.price_sightings`);
 await refused('edit a product', 'authenticated', U1, `update public.products set name = 'x'`);
 
-// Pending / Published (004, 005): shoppers see Published products and their own Pending ones; prices always show.
+// Pending / Published (004, 005, 010): Pending products wait for a Product Manager, but everyone sees them (Nov 9).
 const P = '4800888123459';
 await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'poultry')`);
 await ok('...and is Pending in the database', 'postgres', null, `select status from public.products where barcode = '${P}'`, (r) => r.rows[0]?.status === 'pending');
 await refused('phone publishes its own product', 'authenticated', U1, `insert into public.products (barcode, name, status) values ('4800777123454', 'X', 'published')`);
 await refused('phone publishes a product later', 'authenticated', U1, `update public.products set status = 'published'`);
 await ok('the shopper who added it still sees it', 'authenticated', U1, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
-await ok('other shoppers don\'t see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
-await ok('logged-out phones don\'t see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('other shoppers see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+await ok('logged-out phones see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
 await ok('price for a Pending product can be added', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000020', '${P}', '${B1}', '${today}', 'each', 18900, 'tag')`);
 await ok('other shoppers see a Pending product\'s price', 'authenticated', U2, `select unit_price_centavos from public.latest_prices where barcode = '${P}'`, (r) => r.rows[0]?.unit_price_centavos === 18900);
 await ok('known_barcodes finds a Pending barcode', 'authenticated', U2, `select * from public.known_barcodes(array['${P}', '4800016644818', '4800777123454'])`, (r) => r.rows.length === 2);
