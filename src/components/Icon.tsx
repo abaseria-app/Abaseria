@@ -21,6 +21,16 @@ const PATHS = {
   dry: 'M3 11h18a9 9 0 0 1-18 0z M8 8c0-2 1-3 2-4 M13 8c0-2 1-3 2-4',
   household: 'M9 9h6v12H9z M10 9V5h5l2 2 M15 5h3',
   other: 'M5 12h.01 M12 12h.01 M19 12h.01',
+  condiments: 'M11 2h2v4 M9 6h6l1 4v11H8V10z M8 14h8',
+  bread: 'M4 9a4 4 0 0 1 4-5h8a4 4 0 0 1 4 5h-1v11H5V9z',
+  candy: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M9 12L4 8v8z M15 12l5-4v8z',
+  drink: 'M6 8h12l-1.5 13h-9z M12 8l2-5h3',
+  frozen: 'M12 2v20 M3.3 7l17.4 10 M3.3 17L20.7 7 M9 4l3 2 3-2 M9 20l3-2 3 2',
+  personalCare: 'M8 10h8v11H8z M12 10V6 M10 6h6 M16 6v2',
+  baby: 'M12 21a8 8 0 1 0 0-16a8 8 0 0 0 0 16z M12 5c0-2 2-3 3-2 M9.5 12h.01 M14.5 12h.01 M10 16a2.5 1.5 0 0 0 4 0',
+  health: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
+  pet: 'M12 13c-3 0-6 3-6 6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2c0-3-3-6-6-6z M5 10a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M8.5 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M12.5 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M16 10a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0',
+  cupcake: 'M5 11h14l-2 10H7z M5 11a7 5 0 0 1 14 0 M12 4v2',
 } as const;
 
 export type IconName = keyof typeof PATHS;

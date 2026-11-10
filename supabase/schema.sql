@@ -48,9 +48,13 @@ create table public.products (
   barcode     text primary key check (public.gtin_ok(barcode)),
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
-  category    text not null default 'other'
+  -- One of Brad's 16 (011, Nov 11 2026), or null when nobody has sorted the product yet.
+  category    text
               constraint products_category_check
-              check (category in ('meat', 'poultry', 'vegetables', 'dairy', 'pantry', 'dry', 'household', 'other')),
+              check (category in ('pantry staples', 'fruits & vegetables', 'meat, poultry & seafood', 'dairy & eggs',
+                'canned & preserved food', 'cooking essentials & condiments', 'bread & bakery', 'snacks, candies & sweets',
+                'beverages', 'frozen & ready-to-eat food', 'household & cleaning supplies', 'personal care & hygiene',
+                'baby & kids', 'health & wellness', 'pet supplies', 'baking and desserts')),
   -- New products wait as Pending until a Product Manager or Admin publishes them. Phones can't set this.
   status      text not null default 'pending' check (status in ('pending', 'published')),
   -- Reference image: a file name in the public 'product-images' bucket. Set in the dashboard, never by the app.
