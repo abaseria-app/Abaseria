@@ -92,7 +92,7 @@ function item(over: Partial<Item>): Item {
   return {
     tripId: 1, barcode: '4800016644818', label: 'Joy Lemon 250ml', priceType: 'each', unitPriceCentavos: 11500,
     bundleQty: null, bundlePriceCentavos: null, isPromo: false, quantity: 1, weightGrams: null, lineTotalCentavos: 11500,
-    category: 'household', captureMethod: 'tag', removed: false, createdAt: iso(0), ...over,
+    category: 'household & cleaning supplies', captureMethod: 'tag', removed: false, createdAt: iso(0), ...over,
   };
 }
 
@@ -264,8 +264,8 @@ describe('sharedPrice', () => {
 
 describe('sharedProduct', () => {
   it('recognizes a barcode named at any store, with no price needed', async () => {
-    store.products.push({ barcode: '4800163443036', name: 'Ligo sardines in tomato with chili', category: 'pantry', image_path: '4800163443036.jpg' });
-    expect(await sync.sharedProduct('4800163443036')).toEqual({ label: 'Ligo sardines in tomato with chili', category: 'pantry', imagePath: '4800163443036.jpg' });
+    store.products.push({ barcode: '4800163443036', name: 'Ligo sardines in tomato with chili', category: 'canned & preserved food', image_path: '4800163443036.jpg' });
+    expect(await sync.sharedProduct('4800163443036')).toEqual({ label: 'Ligo sardines in tomato with chili', category: 'canned & preserved food', imagePath: '4800163443036.jpg' });
   });
 
   it('returns nothing for a barcode nobody has named', async () => {
@@ -290,5 +290,12 @@ describe('productImage', () => {
 
   it('never sends an image when the app adds a product', () => {
     expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'category']);
+  });
+
+  it('uploads one of the 16 categories, or none when the item is unsorted', () => {
+    expect(sync.productRow(item({})).category).toBe('household & cleaning supplies');
+    // Saved on the phone before Nov 11 with an old id.
+    expect(sync.productRow(item({ label: 'Safeguard Soap', category: 'household' })).category).toBe('personal care & hygiene');
+    expect(sync.productRow(item({ label: 'Item •03', category: null })).category).toBeNull();
   });
 });

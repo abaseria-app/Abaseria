@@ -87,7 +87,7 @@ await refused('edit a product', 'authenticated', U1, `update public.products set
 
 // Pending / Published (004, 005, 010): Pending products wait for a Product Manager, but everyone sees them (Nov 9).
 const P = '4800888123459';
-await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'poultry')`);
+await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'meat, poultry & seafood')`);
 await ok('...and is Pending in the database', 'postgres', null, `select status from public.products where barcode = '${P}'`, (r) => r.rows[0]?.status === 'pending');
 await refused('phone publishes its own product', 'authenticated', U1, `insert into public.products (barcode, name, status) values ('4800777123454', 'X', 'published')`);
 await refused('phone publishes a product later', 'authenticated', U1, `update public.products set status = 'published'`);
@@ -98,8 +98,10 @@ await ok('price for a Pending product can be added', 'authenticated', U1, `inser
 await ok('other shoppers see a Pending product\'s price', 'authenticated', U2, `select unit_price_centavos from public.latest_prices where barcode = '${P}'`, (r) => r.rows[0]?.unit_price_centavos === 18900);
 await ok('known_barcodes finds a Pending barcode', 'authenticated', U2, `select * from public.known_barcodes(array['${P}', '4800016644818', '4800777123454'])`, (r) => r.rows.length === 2);
 await refused('logged-out phone calls known_barcodes', 'anon', null, `select * from public.known_barcodes(array['${P}'])`);
-await ok('Dairy is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy')`);
+await ok('Dairy & eggs is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy & eggs')`);
 await refused('unknown category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'snacks')`);
+await refused('old category id (before Nov 11)', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'dairy')`);
+await ok('unsorted product has no category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644122', 'Mystery', null)`);
 await db.exec(`update public.products set status = 'published' where barcode = '${P}'`);
 await ok('Published, other shoppers see it', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
 
