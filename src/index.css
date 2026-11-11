@@ -388,8 +388,10 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .dots span.on { width: 18px; opacity: 1; }
 
 .cat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.cat-tile { min-height: 88px; border: 0; border-radius: var(--radius); padding: 12px; display: flex; justify-content: space-between; gap: 6px; text-align: left; box-shadow: var(--shadow-card); }
-.cat-tile span { align-self: flex-end; font-size: 1rem; font-weight: 800; line-height: 1.2; }
+.cat-grid { gap: 8px; }
+/* 16 tiles: shorter than the old 8 so the section stays about one and a half screens. */
+.cat-tile { min-height: 68px; border: 0; border-radius: var(--radius); padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; text-align: left; box-shadow: var(--shadow-card); }
+.cat-tile span { align-self: flex-end; font-size: .92rem; font-weight: 800; line-height: 1.2; }
 .cat-tile svg { flex-shrink: 0; opacity: .9; }
 
 .reserved { position: relative; background: var(--card); border-radius: var(--radius); padding: 14px; overflow: hidden; box-shadow: var(--shadow-card); }

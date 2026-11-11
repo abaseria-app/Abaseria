@@ -16,17 +16,17 @@ describe('categoryBreakdown', () => {
           { label: 'Pork Liempo', lineTotalCentavos: 32000 },
           { label: 'Kamatis', lineTotalCentavos: 4000 },
           { label: 'Jasmine Rice 5kg', lineTotalCentavos: 29000 },
-          { label: 'Mystery', category: 'pantry', lineTotalCentavos: 5000 },
+          { label: 'Mystery', category: 'canned & preserved food', lineTotalCentavos: 5000 },
         ],
       },
     ];
     const b = categoryBreakdown(trips, START, END);
     expect(b.total).toBe(70000);
     expect(b.slices).toEqual([
-      { id: 'meat', centavos: 32000 },
-      { id: 'dry', centavos: 29000 },
-      { id: 'pantry', centavos: 5000 },
-      { id: 'vegetables', centavos: 4000 },
+      { id: 'meat, poultry & seafood', centavos: 32000 },
+      { id: 'pantry staples', centavos: 29000 },
+      { id: 'canned & preserved food', centavos: 5000 },
+      { id: 'fruits & vegetables', centavos: 4000 },
     ]);
   });
 

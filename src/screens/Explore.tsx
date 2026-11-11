@@ -12,13 +12,22 @@ type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
 const TABS: Tab[] = ['products', 'recipes', 'budget', 'pantry', 'articles'];
 
 const CATEGORY_ICON: Record<CategoryId, IconName> = {
-  meat: 'meat',
-  poultry: 'poultry',
-  vegetables: 'vegetables',
-  dairy: 'dairy',
-  pantry: 'pantryCan',
-  dry: 'dry',
-  household: 'household',
+  'pantry staples': 'dry',
+  'fruits & vegetables': 'vegetables',
+  'meat, poultry & seafood': 'meat',
+  'dairy & eggs': 'dairy',
+  'canned & preserved food': 'pantryCan',
+  'cooking essentials & condiments': 'condiments',
+  'bread & bakery': 'bread',
+  'snacks, candies & sweets': 'candy',
+  beverages: 'drink',
+  'frozen & ready-to-eat food': 'frozen',
+  'household & cleaning supplies': 'household',
+  'personal care & hygiene': 'personalCare',
+  'baby & kids': 'baby',
+  'health & wellness': 'health',
+  'pet supplies': 'pet',
+  'baking and desserts': 'cupcake',
   other: 'other',
 };
 
@@ -138,7 +147,7 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
                 {CATEGORIES.map((c) => (
                   <button key={c.id} className="cat-tile" style={{ background: c.color, color: c.ink }} onClick={() => onSearch(c.id)}>
                     <span>{c.label}</span>
-                    <Icon name={CATEGORY_ICON[c.id]} size={30} stroke={1.8} />
+                    <Icon name={CATEGORY_ICON[c.id]} size={26} stroke={1.8} />
                   </button>
                 ))}
               </div>

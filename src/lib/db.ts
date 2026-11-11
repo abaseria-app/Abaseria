@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { PriceType } from './money';
-import type { CategoryId } from './categories';
+import type { CategoryId, LegacyCategoryId } from './categories';
 
 export const STORE_CHAINS = [
   '7-Eleven',
@@ -92,8 +92,11 @@ export interface Item {
   /** Per-kilo items only: amount bought in grams. unitPriceCentavos is then the price per kilo. */
   weightGrams?: number | null;
   lineTotalCentavos: number;
-  /** Missing on items saved before categories existed; categoryOf() guesses from the name. */
-  category?: CategoryId | null;
+  /**
+   * Missing on items saved before categories existed, and one of the 8 old ids on items saved before Nov 11 2026.
+   * Read it through categoryOf(), which maps both to today's categories.
+   */
+  category?: CategoryId | LegacyCategoryId | null;
   captureMethod: CaptureMethod;
   removed: boolean;
   createdAt: string;

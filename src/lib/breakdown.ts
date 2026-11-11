@@ -3,7 +3,8 @@ import { categoryOf, type CategoryId } from './categories';
 export interface BreakdownTrip {
   startedAt: string;
   receiptCentavos: number | null;
-  items: Array<{ label: string; category?: CategoryId | null; lineTotalCentavos: number }>;
+  /** `category` may be an old id from before Nov 11 2026; categoryOf() maps it. */
+  items: Array<{ label: string; category?: string | null; lineTotalCentavos: number }>;
 }
 
 export type SliceId = CategoryId | 'unitemized';

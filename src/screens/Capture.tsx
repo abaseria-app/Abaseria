@@ -6,6 +6,7 @@ import { logEvent } from '../lib/events';
 import { formatBarcode, getDetector, scanFrame } from '../lib/barcode';
 import { db, recallBarcode, type CaptureMethod, type Item, type Recall } from '../lib/db';
 import { formatPeso } from '../lib/money';
+import { categoryOf, type CategoryId } from '../lib/categories';
 import { SHARING_ON, isPlaceholderName, productImage, sharedPrice, sharedProduct, type SharedProduct } from '../lib/sync';
 
 /**
@@ -29,7 +30,7 @@ interface Props {
 
 interface Known {
   label: string;
-  category: Item['category'];
+  category: CategoryId | null;
   elsewhere: { price: number; store: string; at: string; priceType: Item['priceType'] } | null;
 }
 
@@ -167,7 +168,7 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
     if (label) {
       setKnown({
         label,
-        category: (ownName ? local!.item.category : p?.category) ?? null,
+        category: (ownName ? (local!.item.category ? categoryOf(local!.item) : null) : p?.category) ?? null,
         // This phone's price at another store: shown as a hint, never filled in.
         elsewhere: local && !local.sameBranch ? { price: local.item.unitPriceCentavos, store: local.storeLabel ?? '', at: local.item.createdAt, priceType: local.item.priceType } : null,
       });

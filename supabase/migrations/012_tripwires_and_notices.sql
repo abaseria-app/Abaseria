@@ -1,4 +1,4 @@
--- 011: breach tripwires and shopper notices (Nov 11, 2026). See the project docs Abaseria_Breach_Plan.md and
+-- 012: breach tripwires and shopper notices (Nov 11, 2026). See the project docs Abaseria_Breach_Plan.md and
 -- Abaseria_Security_Review.md. Run once in each project, dev first. Safe to run twice. Changes no existing data.
 --
 -- What this adds:
