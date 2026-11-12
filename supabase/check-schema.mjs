@@ -38,7 +38,8 @@ for (const f of readdirSync(new URL('./migrations/', import.meta.url)).filter((n
 let pass = 0, fail = 0;
 async function as(role, uid, sql) {
   await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid ?? ''}', false); set role ${role};`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
+  // Back to the owner with no signed-in account, as in the SQL Editor.
+  try { return await db.query(sql); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
 }
 async function ok(name, role, uid, sql, check = () => true) {
   try { const r = await as(role, uid, sql); if (check(r)) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name, JSON.stringify(r.rows)); } }
@@ -151,7 +152,7 @@ for (const t of ['events', 'settings', 'paused_accounts', 'daily_counts']) {
 await refused('signed-in phone writes an alert', 'authenticated', U1, `select security.alert('fake', '{}')`);
 await refused('signed-in phone pauses someone', 'authenticated', U1, `insert into security.paused_accounts (user_id, reason) values ('${U2}', 'x')`);
 await ok('prices are counted per account per day', 'postgres', null,
-  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => r.rows[0]?.n >= 3);
+  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => r.rows[0]?.n >= 2); // U1's two uploads above
 const before = Number((await one(`select n from security.daily_counts where user_id = '${U1}' and day = security.today()`)).n);
 await as('authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
 await ok('a re-upload is not counted', 'postgres', null,
@@ -206,6 +207,77 @@ await ok('logged-out phone sees only the current notice', 'anon', null, `select 
 await refused('phone adds a notice', 'authenticated', U1, `insert into public.notices (title_en, body_en) values ('x', 'y')`);
 await refused('phone edits a notice', 'authenticated', U1, `update public.notices set title_en = 'x'`);
 await refused('phone deletes a notice', 'authenticated', U1, `delete from public.notices`);
+
+// Staff roles (013) ------------------------------------------------------------------------------------------
+// Two Admins (like Brad and Jovie), a Data Entry volunteer added through the API, and U1 as a plain shopper.
+const UA = 'aaaaaaaa-0000-4000-8000-00000000000a', UJ = 'aaaaaaaa-0000-4000-8000-00000000000b', UD = 'aaaaaaaa-0000-4000-8000-00000000000d';
+await db.exec(`insert into auth.users values ('${UA}'), ('${UJ}'), ('${UD}');
+               insert into public.staff (user_id, role) values ('${UA}', 'admin'), ('${UJ}', 'admin');`);
+const staffCount = async () => Number((await one(`select count(*)::int n from public.staff`)).n);
+const check = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
+await ok('first Admins seeded by hand', 'postgres', null, `select role, trusted, added_by from public.staff where user_id = '${UA}'`,
+  (r) => r.rows[0]?.role === 'admin' && r.rows[0]?.trusted === true && r.rows[0]?.added_by === null);
+await ok('seeding records staff_changed alerts', 'postgres', null, `select count(*)::int n from security.events where kind = 'staff_changed'`, (r) => r.rows[0]?.n === 2);
+for (const f of ['is_staff', 'staff_role', 'is_admin']) {
+  await refused(`logged-out phone calls ${f}()`, 'anon', null, `select public.${f}()`);
+  await ok(`${f}() is security definer with a fixed search path`, 'postgres', null,
+    `select prosecdef, proconfig from pg_proc where proname = '${f}' and pronamespace = 'public'::regnamespace`,
+    (r) => r.rows[0]?.prosecdef === true && String(r.rows[0]?.proconfig).includes('search_path'));
+}
+await refused('logged-out phone reads staff', 'anon', null, `select user_id from public.staff`);
+await refused('logged-out phone adds staff', 'anon', null, `insert into public.staff (user_id, role) values ('${U2}', 'admin')`);
+await ok('shopper reads staff: empty list', 'authenticated', U1, `select * from public.staff`, (r) => r.rows.length === 0);
+await ok('shopper is not staff', 'authenticated', U1, `select public.is_staff() s, public.staff_role() r, public.is_admin() a`,
+  (r) => r.rows[0]?.s === false && r.rows[0]?.r === null && r.rows[0]?.a === false);
+const attempts = await events('staff_write_attempt');
+await ok('shopper makes itself Admin: nothing added', 'authenticated', U1, `insert into public.staff (user_id, role) values ('${U1}', 'admin')`);
+check('...staff table unchanged', (await staffCount()) === 2);
+check('...and a staff_write_attempt alert is recorded', (await events('staff_write_attempt')) === attempts + 1);
+await refused('shopper demotes an Admin', 'authenticated', U1, `update public.staff set role = 'data_entry' where user_id = '${UA}'`);
+await refused('shopper removes an Admin', 'authenticated', U1, `delete from public.staff where user_id = '${UA}'`);
+check('...both attempts recorded', (await events('staff_write_attempt')) === attempts + 3);
+
+await ok('Admin adds a Data Entry volunteer through the API', 'authenticated', UA, `insert into public.staff (user_id, role) values ('${UD}', 'data_entry')`);
+await ok('...stamped with who added it, trusted by default', 'postgres', null, `select added_by, trusted, trust_changed_by from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.added_by === UA && r.rows[0]?.trusted === true && r.rows[0]?.trust_changed_by === null);
+check('...and an Admin\'s change is not an attempt', (await events('staff_write_attempt')) === attempts + 3);
+await refused('Admin fakes added_by', 'authenticated', UA, `insert into public.staff (user_id, role, added_by) values ('${U2}', 'data_entry', '${UJ}')`);
+await refused('unknown role', 'authenticated', UA, `insert into public.staff (user_id, role) values ('${U2}', 'owner')`);
+await refused('account that doesn\'t exist', 'authenticated', UA, `insert into public.staff (user_id, role) values ('99999999-9999-4999-8999-999999999999', 'data_entry')`);
+await ok('volunteer reads only their own row', 'authenticated', UD, `select user_id, role from public.staff`,
+  (r) => r.rows.length === 1 && r.rows[0].user_id === UD && r.rows[0].role === 'data_entry');
+await ok('volunteer\'s helpers', 'authenticated', UD, `select public.is_staff() s, public.staff_role() r, public.is_admin() a`,
+  (r) => r.rows[0]?.s === true && r.rows[0]?.r === 'data_entry' && r.rows[0]?.a === false);
+await refused('volunteer promotes themselves', 'authenticated', UD, `update public.staff set role = 'admin' where user_id = '${UD}'`);
+await refused('volunteer turns their own trust back on', 'authenticated', UD, `update public.staff set trusted = true`);
+await refused('volunteer removes their own row', 'authenticated', UD, `delete from public.staff where user_id = '${UD}'`);
+await ok('...volunteer row unchanged', 'postgres', null, `select role from public.staff where user_id = '${UD}'`, (r) => r.rows[0]?.role === 'data_entry');
+await ok('Admin reads every row', 'authenticated', UJ, `select user_id from public.staff`, (r) => r.rows.length === 3);
+await ok('Admin switches trust off', 'authenticated', UJ, `update public.staff set trusted = false where user_id = '${UD}'`);
+await ok('...stamped with who and when', 'postgres', null, `select trusted, trust_changed_by, trust_changed_at from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.trusted === false && r.rows[0]?.trust_changed_by === UJ && r.rows[0]?.trust_changed_at !== null);
+await ok('changing role keeps the trust stamp', 'authenticated', UJ, `update public.staff set role = 'product_manager' where user_id = '${UD}'`);
+await ok('...still stamped', 'postgres', null, `select trust_changed_by, added_by from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.trust_changed_by === UJ && r.rows[0]?.added_by === UA);
+await refused('Admin moves a row to another account', 'authenticated', UA, `update public.staff set user_id = '${U2}' where user_id = '${UD}'`);
+
+// The last Admin.
+await refused('removing both Admins at once', 'authenticated', UA, `delete from public.staff where role = 'admin'`);
+await ok('Admin demotes the other Admin', 'authenticated', UA, `update public.staff set role = 'product_manager' where user_id = '${UJ}'`);
+await refused('the last Admin demotes themselves', 'authenticated', UA, `update public.staff set role = 'data_entry' where user_id = '${UA}'`);
+await refused('the last Admin removes themselves', 'authenticated', UA, `delete from public.staff where user_id = '${UA}'`);
+await refused('the last Admin\'s account is deleted', 'postgres', null, `delete from auth.users where id = '${UA}'`);
+await ok('...still an Admin', 'postgres', null, `select count(*)::int n from public.staff where role = 'admin'`, (r) => r.rows[0]?.n === 1);
+await db.exec(`update public.staff set role = 'admin' where user_id = '${UJ}'`);
+await ok('with a second Admin, the first can step down', 'postgres', null,
+  `update public.staff set role = 'product_manager' where user_id = '${UA}' returning role`, (r) => r.rows[0]?.role === 'product_manager');
+await db.exec(`update public.staff set role = 'admin' where user_id = '${UA}'`);
+await ok('Admin removes a volunteer', 'authenticated', UA, `delete from public.staff where user_id = '${UD}'`, (r) => (r.affectedRows ?? 0) === 1);
+await db.exec(`insert into public.staff (user_id, role) values ('${UD}', 'data_entry')`);
+await ok('a deleted account leaves the staff table', 'postgres', null, `delete from auth.users where id = '${UD}'`);
+check('...row gone', (await staffCount()) === 2);
+await ok('staff changes are recorded', 'postgres', null, `select count(*)::int n from security.events where kind = 'staff_changed' and detail ->> 'operation' = 'DELETE'`, (r) => r.rows[0]?.n >= 2);
+await refused('signed-in phone reads the alerts', 'authenticated', UA, `select * from security.events`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
