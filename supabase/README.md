@@ -45,7 +45,7 @@ Phones that were already sharing anonymously keep their user id when they pick a
 2. **Google Auth Platform → Branding:** app name `Abaseria`, your support email. Skip the logo for now: uploading one sends the app to Google for review.
 3. **Audience:** User type **External**, leave it in **Testing**. Under Test users, add every Gmail that will sign in (you, Jovie, each tester). Testing mode allows 100. Before the app is public, press **Publish app** (name, email and profile scopes don't need Google's security review).
 4. **Clients → Create client → Web application**, name `Abaseria web`:
-   - Authorized JavaScript origins: `https://bkarkos86-mako.github.io` and `http://localhost:5173`
+   - Authorized JavaScript origins: `https://abaseria-app.github.io` and `http://localhost:5173`
    - Authorized redirect URIs: `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod)
 5. Copy the **Client ID** and **Client secret**. The secret goes into Supabase only, never into this repo or the app.
 
@@ -53,10 +53,10 @@ Phones that were already sharing anonymously keep their user id when they pick a
 
 1. **Authentication → Sign In / Providers → Google:** turn on, paste the Client ID and Client secret, save.
 2. Same page: turn on **Allow manual linking**. With it, old anonymous test phones keep their user id when they add Google. Without it, they sign in to Google as a new user and their past prices stay under the old anonymous id.
-3. **Authentication → URL Configuration:** Site URL `https://bkarkos86-mako.github.io/Abaseria/dev/`. Redirect URLs: add `https://bkarkos86-mako.github.io/**` and `http://localhost:5173/**`.
+3. **Authentication → URL Configuration:** Site URL `https://abaseria-app.github.io/Abaseria/dev/`. Redirect URLs: add `https://abaseria-app.github.io/**` and `http://localhost:5173/**`.
 4. Once your test phones have signed in with Google, turn **off** Allow anonymous sign-ins. The app no longer uses it, and leaving it on lets scripts create users.
 
-**abaseria-prod:** the same 4 steps with Site URL `https://bkarkos86-mako.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
+**abaseria-prod:** the same 4 steps with Site URL `https://abaseria-app.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
 
 To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick your account, and you land on Home. Settings → Account shows your name. In SQL Editor, `select email, is_anonymous from auth.users` shows your Gmail with `is_anonymous = false`.
 
@@ -69,7 +69,7 @@ Facebook needs a public privacy page with data-deletion instructions before anyo
 1. **My Apps → Create app.** Name `Abaseria`, your contact email. Use case: **Authenticate and request data from users with Facebook Login**. Skip connecting a business portfolio.
 2. **Use cases → Authentication and account creation → Customize:** next to `email`, press **Add**. `public_profile` is already on. Ask for nothing else: any other permission sends the app to Meta's App Review.
 3. **Facebook Login → Settings:** Valid OAuth Redirect URIs `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod). Leave Client OAuth login, Web OAuth login and Enforce HTTPS on. Save.
-4. **App settings → Basic:** Privacy Policy URL `https://bkarkos86-mako.github.io/Abaseria/dev/privacy.html`. User data deletion → **Data deletion instructions URL**, same address with `#delete` on the end. Category **Shopping**. Save, then copy the **App ID** and **App secret** (press Show). The secret goes into Supabase only, never into this repo or the app.
+4. **App settings → Basic:** Privacy Policy URL `https://abaseria-app.github.io/Abaseria/dev/privacy.html`. User data deletion → **Data deletion instructions URL**, same address with `#delete` on the end. Category **Shopping**. Save, then copy the **App ID** and **App secret** (press Show). The secret goes into Supabase only, never into this repo or the app.
 5. While the app is in **Development** mode, only people with a role on it can sign in. To let Jovie test first: **App roles → Roles → Add people → Testers**, and she accepts at developers.facebook.com/requests.
 6. When the dev app works: **Publish** (top of the dashboard). With only `email` and `public_profile`, Meta usually lets it go live without a review. Once it's on `main`, change both URLs in step 4 to the `/Abaseria/` addresses.
 
