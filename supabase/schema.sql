@@ -12,6 +12,7 @@
 --   a signed-in phone (anonymous sign-in is fine) can ADD rows, stamped with its own user id
 --   nobody can edit or delete rows from the app; fixes are done here by you
 --   who added a sighting, product or store (contributor / created_by) is stored but never readable through the app
+--   staff roles (013): Admins manage public.staff; a staff member reads only their own row; shoppers see nothing
 
 
 -- Barcode check: 8, 12, 13 or 14 digits with a valid GTIN check digit.
@@ -185,5 +186,9 @@ values ('product-images', 'product-images', true, 524288, array['image/jpeg', 'i
 on conflict (id) do nothing;
 
 
--- Breach tripwires and shopper notices --------------------------------------------------------------------
--- On a new project, run supabase/migrations/011_tripwires_and_notices.sql after this file.
+-- Breach tripwires, shopper notices and staff roles ------------------------------------------------------
+-- On a new project, run these after this file, in order:
+--   supabase/migrations/012_tripwires_and_notices.sql   security schema, alerts, notices
+--   supabase/migrations/013_staff_roles.sql             public.staff, is_staff() / staff_role() / is_admin(),
+--                                                       last-Admin guard and staff tripwires (needs 012's alerts)
+-- Then add the first Admins by hand (the insert at the top of 013).

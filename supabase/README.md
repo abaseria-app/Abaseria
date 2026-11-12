@@ -130,8 +130,11 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `008_flag_invalid_and_missing_barcodes.sql` | Products get a numeric `id`; a bad check digit or no barcode is accepted and flagged in `barcode_status` | Done Nov 9 | Not yet: run 008, 009, then 010 again |
 | `009_product_import_holding_table.sql` | `product_import` holding table for spreadsheet uploads, server key only | Done Nov 9 | Not yet (with 008) |
 | `010_security_review.sql` | Hides `created_by` on products and branches; `latest_prices` read-only; function fixes | Done Nov 11 | Done Nov 11. Run again after 008 so the new columns are readable |
+| `011_categories_v2.sql` | The 16 categories (Nov 11) | Done Nov 11 | Done Nov 11 |
+| `012_tripwires_and_notices.sql` | `security` schema: price-flood limits, paused accounts, delete alerts; `public.notices` | Done Nov 11 | Not yet (with 008, 009) |
+| `013_staff_roles.sql` | `public.staff` (Admin / Product Manager / Data Entry, trusted), `is_staff()` / `staff_role()` / `is_admin()`, last-Admin guard, staff tripwires. Needs 012. Then add the first Admins (insert at the top of the file) | Pending Brad's OK | With the next release, after 012 |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 65 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 
