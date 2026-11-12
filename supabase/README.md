@@ -83,7 +83,7 @@ To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Facebook, and
 
 - **No email, no sign-in.** Supabase needs an email from Facebook. Accounts made with a mobile number and no email are refused; the app tells the shopper to use Google or add an email in Facebook. Watch how often testers hit this.
 - **Same email, same account.** A shopper who signs in with Google on one phone and Facebook on another, both with the same email, lands on one Abaseria account. Different emails make two accounts, and their shared prices are split between them.
-- **Links opened inside Messenger or Facebook** open in Facebook's own browser. Facebook sign-in works there; Google sign-in may be refused in that browser. Testers should open the link in Chrome and add it to the home screen, as the tester sheet already says.
+- **Links opened inside Messenger, Facebook or Instagram** open in that app's own browser, where Google refuses sign-in. Since Nov 12 the sign-in screen spots those browsers, hides the Google button and offers Open in Chrome (Android) and Copy link (`src/lib/inAppBrowser.ts`; preview with `?inapp`). Testers should still add the app to the home screen from Chrome.
 
 ### CAPTCHA
 

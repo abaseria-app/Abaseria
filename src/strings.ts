@@ -23,6 +23,18 @@ export const S = {
       'Your Facebook account doesn’t have an email on it, so Abaseria can’t sign you in with it. Use Google, or add an email in Facebook (Settings → Accounts Center → Personal details) and try again.',
   },
 
+  // Shown on the sign-in screen inside Facebook's, Messenger's or Instagram's built-in browser.
+  inApp: {
+    apps: { facebook: 'Facebook', messenger: 'Messenger', instagram: 'Instagram' },
+    why: (app: string) => `Google doesn’t allow sign-in inside ${app}’s browser. Open Abaseria in Chrome to sign in.`,
+    openChrome: 'Open in Chrome',
+    copyLink: 'Copy link',
+    copied: 'Link copied. Open Chrome and paste it in the address bar.',
+    copyFailed: 'Press and hold the link below to copy it, then paste it in Chrome.',
+    // iPhone (no Android intent): the app's own menu opens the page in Safari.
+    otherPhone: 'Tap ⋯ at the top of the screen, then Open in browser.',
+  },
+
   home: {
     periods: { week: 'Week', month: 'Month', year: 'Year', ytd: 'YTD' } as Record<string, string>,
     spentLabel: {
