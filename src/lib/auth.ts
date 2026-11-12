@@ -245,3 +245,96 @@ export async function hasAccountSession(client: SupabaseClient): Promise<boolean
   const { data } = await client.auth.getSession();
   return !!accountFromUser(data.session?.user);
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Email code sign-in (Nov 13, 2026). For shoppers who'd rather not use Google: Supabase emails a 6-digit code
+// (sent through the Abaseria Gmail until there's a domain) and the shopper types it in. A code, not a link,
+// because a link in the email opens in whatever browser the mail app picks, which isn't the app, and the
+// sign-in can't finish there. Codes also work inside Messenger's and Facebook's browsers, where Google doesn't.
+//
+// The same email on Google and on a code is one account: Supabase links identities with the same verified email.
+
+/** How long a code stays usable, matching Email OTP Expiration in Supabase (README). */
+export const CODE_MINUTES = 10;
+const PENDING_KEY = 'emailCodePending';
+
+/** Trimmed and lower-cased, so "Juan@Gmail.com " and "juan@gmail.com" are the same account. */
+export const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
+
+/** A plausible address: something@something.tld, no spaces. The real check is whether the code arrives. */
+export const isEmail = (raw: string): boolean => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(raw.trim());
+
+/** Just the digits, at most 6: pasted codes often bring spaces or a trailing newline. */
+export const cleanCode = (raw: string): string => raw.replace(/\D/g, '').slice(0, 6);
+
+export interface PendingCode {
+  email: string;
+  sentAt: number;
+}
+
+/**
+ * The address a code was sent to, if it's still usable. Kept on the phone because Android often closes the
+ * app while the shopper is in Gmail reading the code; when they come back, the code box is still there.
+ */
+export function parsePending(raw: string | null, now: number): PendingCode | null {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as Partial<PendingCode>;
+    if (typeof p.email !== 'string' || typeof p.sentAt !== 'number') return null;
+    return now - p.sentAt < CODE_MINUTES * 60_000 ? { email: p.email, sentAt: p.sentAt } : null;
+  } catch {
+    return null;
+  }
+}
+
+export type CodeProblem = 'offline' | 'off' | 'wait' | 'tooMany' | 'badCode' | 'badEmail' | 'failed';
+
+/** Sorts Supabase's error messages into the few things a shopper can act on. */
+export function codeProblem(error: { message?: string; code?: string; status?: number } | null | undefined): CodeProblem {
+  const m = error?.message ?? '';
+  const c = error?.code ?? '';
+  if (c === 'over_email_send_rate_limit' || /only request this after|security purposes/i.test(m)) return 'wait';
+  if (c === 'over_request_rate_limit' || error?.status === 429 || /rate limit/i.test(m)) return 'tooMany';
+  if (c === 'otp_expired' || /expired|invalid.*(token|otp)|token.*invalid/i.test(m)) return 'badCode';
+  if (c === 'email_address_invalid' || c === 'validation_failed' || /invalid.*email|email.*invalid/i.test(m)) return 'badEmail';
+  return 'failed';
+}
+
+export async function pendingCode(): Promise<PendingCode | null> {
+  return parsePending(await getSetting(PENDING_KEY), Date.now());
+}
+
+export async function clearPendingCode(): Promise<void> {
+  await setSetting(PENDING_KEY, '');
+}
+
+export type CodeResult = { ok: true } | { ok: false; problem: CodeProblem };
+
+/** Emails a 6-digit code. A new address gets an account when the code is used, not before. */
+export async function sendEmailCode(rawEmail: string): Promise<CodeResult> {
+  if (!isEmail(rawEmail)) return { ok: false, problem: 'badEmail' };
+  if (!online()) return { ok: false, problem: 'offline' };
+  const client = await getSupabase().catch(() => null);
+  if (!client) return { ok: false, problem: 'off' };
+  const email = normalizeEmail(rawEmail);
+  const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) return { ok: false, problem: codeProblem(error) };
+  await setSetting(PENDING_KEY, JSON.stringify({ email, sentAt: Date.now() } satisfies PendingCode));
+  return { ok: true };
+}
+
+/** Checks the code. On success the phone is signed in and every screen hears about it. */
+export async function verifyEmailCode(email: string, rawCode: string): Promise<CodeResult> {
+  const token = cleanCode(rawCode);
+  if (token.length !== 6) return { ok: false, problem: 'badCode' };
+  if (!online()) return { ok: false, problem: 'offline' };
+  const client = await getSupabase().catch(() => null);
+  if (!client) return { ok: false, problem: 'off' };
+  const { data, error } = await client.auth.verifyOtp({ email: normalizeEmail(email), token, type: 'email' });
+  const account = accountFromUser(data?.user ?? data?.session?.user);
+  if (error || !account) return { ok: false, problem: codeProblem(error) };
+  await clearPendingCode();
+  await save(account);
+  announce(account);
+  return { ok: true };
+}

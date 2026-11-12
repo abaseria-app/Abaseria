@@ -324,6 +324,13 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .login-error { color: var(--red); font-weight: 600; }
 .login-inapp { font-weight: 600; color: var(--ink); max-width: 34ch; margin: 0 0 4px; }
 .login-buttons a.btn { text-decoration: none; text-align: center; box-sizing: border-box; }
+.email-code h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.email-code-form { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 360px; }
+.email-code-form label { align-self: flex-start; font-weight: 600; }
+.email-code-form input { width: 100%; box-sizing: border-box; min-height: var(--tap); font-size: 1.1rem; padding: 0 12px; border: 2px solid var(--purple); border-radius: var(--radius); }
+.email-code-form .code-input { font-size: 1.8rem; letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
+.email-code-form .hint { margin: 0; text-align: center; }
+.email-code .login-error { max-width: 34ch; text-align: center; }
 .login-link { width: 100%; max-width: 34ch; font-size: .85rem; padding: 8px; border: 1px solid var(--purple); border-radius: 8px; }
 .screen.login .hint.small { margin-top: 24px; max-width: 38ch; }
 .account-actions { display: flex; flex-direction: column; gap: 8px; }

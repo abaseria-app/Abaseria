@@ -33,7 +33,7 @@ To replace one, upload the new file under the same name, or a new name and chang
 
 ## Sign-in (Google and Facebook)
 
-Every shopper signs in with Google or Facebook on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
+Every shopper signs in on first open: Google, or a 6-digit code sent to their email (Facebook is hidden until Meta approves the app). After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
 
 Phones that were already sharing anonymously keep their user id when they pick a provider (manual linking), so their past prices stay credited to them. If that account already has an Abaseria user, the phone switches to it.
 
@@ -85,9 +85,25 @@ To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Facebook, and
 - **Same email, same account.** A shopper who signs in with Google on one phone and Facebook on another, both with the same email, lands on one Abaseria account. Different emails make two accounts, and their shared prices are split between them.
 - **Links opened inside Messenger, Facebook or Instagram** open in that app's own browser, where Google refuses sign-in. Since Nov 12 the sign-in screen spots those browsers, hides the Google button and offers Open in Chrome (Android) and Copy link (`src/lib/inAppBrowser.ts`; preview with `?inapp`). Testers should still add the app to the home screen from Chrome.
 
+### Email code: one-time setup, about 15 minutes per project
+
+Shoppers can sign in with an email address instead of Google: the app emails a 6-digit code and they type it in (Nov 13, 2026). No link to tap, because a link opens in whatever browser the mail app picks and the sign-in can't finish there. Codes also work inside Messenger's and Facebook's browsers, where Google doesn't. The same address on Google and on a code is one account.
+
+Until Abaseria has a domain, the codes go out through a Gmail account over SMTP (about 500 emails a day). Use a Gmail that **only** sends codes, not the one that owns GitHub, Supabase and Google Cloud: if Gmail ever flags it for automated sending, only the codes stop.
+
+1. **The sending Gmail:** turn on 2-Step Verification, then Google Account → Security → **App passwords** → create one named `Abaseria Supabase dev`. Copy the 16 characters. They go into Supabase only, never into chat or this repo.
+2. **Supabase → Authentication → Emails → SMTP Settings:** Enable custom SMTP. Sender email: the sending Gmail. Sender name: `Abaseria`. Host `smtp.gmail.com`, port `587`, username: the sending Gmail, password: the app password. Minimum interval between emails to the same user: `60` seconds (the app counts down from 60). Save.
+3. **Authentication → Sign In / Providers → Email:** Email provider on, Confirm email on, Email OTP Expiration `600` seconds (the app and the email both say 10 minutes), Email OTP Length `6`.
+4. **Authentication → Emails → Templates:** in both **Magic Link** and **Confirm signup**, set the subject to `Your Abaseria code: {{ .Token }}` and paste the body of `supabase/email-templates/sign-in-code.html`.
+5. **Authentication → Rate Limits:** check "emails sent per hour". It caps how much a bot could send through the Gmail; the default is fine for dev.
+
+To confirm: on the dev app, Continue with email → your address → Send me a code. The email arrives from Abaseria with a 6-digit code; type it and you land on Explore. Settings → Account shows your address. In SQL Editor, `select email, raw_app_meta_data->'providers' from auth.users` shows `"email"` in your providers (next to `"google"` if it's the same address).
+
+Before this reaches the live app: the same steps on abaseria-prod with its own app password, and Cloudflare Turnstile on the email form (see CAPTCHA below), since every code request sends a real email.
+
 ### CAPTCHA
 
-With Google and Facebook as the only ways in, their own sign-in pages do the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in (the admin dashboard's staff login, or email-link sign-in for shoppers).
+With Google and Facebook as the only ways in, their own sign-in pages do the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in. Email code sign-in (Nov 13) is that sign-in: Turnstile on the email form before it reaches the live app.
 
 ## Two databases
 

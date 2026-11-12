@@ -10,6 +10,7 @@ export const S = {
     title: 'Welcome to Abaseria',
     pitch: 'Know your total before you reach the cashier. Scan as you shop and watch it add up against your budget.',
     google: 'Continue with Google',
+    email: 'Continue with email',
     facebook: 'Continue with Facebook',
     going: (provider: 'google' | 'facebook') => (provider === 'google' ? 'Opening Google…' : 'Opening Facebook…'),
     finishing: 'Signing you in…',
@@ -23,10 +24,39 @@ export const S = {
       'Your Facebook account doesn’t have an email on it, so Abaseria can’t sign you in with it. Use Google, or add an email in Facebook (Settings → Accounts Center → Personal details) and try again.',
   },
 
+  // Email code sign-in (Nov 13). The shopper types a 6-digit code from the email; there's no link to tap.
+  emailCode: {
+    title: 'Sign in with email',
+    label: 'Your email address',
+    placeholder: 'juan@gmail.com',
+    send: 'Send me a code',
+    sending: 'Sending…',
+    sentTo: (email: string) =>
+      `We sent a 6-digit code to ${email}. It can take a minute. If it isn’t in your inbox, check Spam or Promotions.`,
+    codeLabel: '6-digit code',
+    verify: 'Sign in',
+    verifying: 'Checking…',
+    resend: 'Send a new code',
+    resendIn: (seconds: number) => `Send a new code in ${seconds}s`,
+    resent: 'New code sent. Use the newest one.',
+    otherEmail: 'Use a different email',
+    back: 'Back',
+    problems: {
+      offline: 'You’re offline. Connect to the internet to sign in.',
+      off: 'Sign-in isn’t set up in this build.',
+      wait: 'Wait a minute before asking for another code.',
+      tooMany: 'Too many tries. Wait a few minutes, then try again.',
+      badCode: 'That code is wrong or has expired. Use the newest email, or send a new code.',
+      badEmail: 'That doesn’t look like an email address. Check it and try again.',
+      failed: 'Something went wrong. Try again in a minute.',
+    },
+  },
+
   // Shown on the sign-in screen inside Facebook's, Messenger's or Instagram's built-in browser.
   inApp: {
     apps: { facebook: 'Facebook', messenger: 'Messenger', instagram: 'Instagram' },
-    why: (app: string) => `Google doesn’t allow sign-in inside ${app}’s browser. Open Abaseria in Chrome to sign in.`,
+    why: (app: string) =>
+      `Google doesn’t allow sign-in inside ${app}’s browser. Open Abaseria in Chrome, or sign in with your email here.`,
     openChrome: 'Open in Chrome',
     copyLink: 'Copy link',
     copied: 'Link copied. Open Chrome and paste it in the address bar.',
