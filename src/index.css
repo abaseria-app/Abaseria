@@ -323,6 +323,7 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .login-error { color: var(--red); font-weight: 600; }
 .screen.login .hint.small { margin-top: 24px; max-width: 38ch; }
 .account-actions { display: flex; flex-direction: column; gap: 8px; }
+.staff-role { margin: -6px 0 12px; color: var(--purple); }
 
 /* ---------------------------------------------------------------------------------------------------------
    Explore (landing), bottom bar, ad slots, coming-soon covers, sponsor popup */

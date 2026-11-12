@@ -89,6 +89,14 @@ for (const [name, w] of [
   ['edit a notice', write('/rest/v1/notices?id=eq.-1', 'PATCH', { title_en: 'x' })],
   ['delete a notice', write('/rest/v1/notices?id=eq.-1', 'DELETE')],
   ['logged-out known_barcodes call', write('/rest/v1/rpc/known_barcodes', 'POST', { codes: ['0'] })],
+  // Staff roles (013). The role 'x' and the made-up account break the table's checks, so even a broken rule adds no one.
+  ['make itself staff', write('/rest/v1/staff', 'POST', { user_id: crypto.randomUUID(), role: 'x' })],
+  ['promote a staff member', write('/rest/v1/staff?user_id=eq.00000000-0000-4000-8000-000000000000', 'PATCH', { role: 'admin' })],
+  ['switch a collector\'s trust', write('/rest/v1/staff?user_id=eq.00000000-0000-4000-8000-000000000000', 'PATCH', { trusted: true })],
+  ['remove a staff member', write('/rest/v1/staff?user_id=eq.00000000-0000-4000-8000-000000000000', 'DELETE')],
+  ['call is_admin()', write('/rest/v1/rpc/is_admin', 'POST', {})],
+  ['call is_staff()', write('/rest/v1/rpc/is_staff', 'POST', {})],
+  ['call staff_role()', write('/rest/v1/rpc/staff_role', 'POST', {})],
 ]) await mustRefuse(`logged out: ${name}`, w.path, w.opts);
 
 // 4. Private tables: not built yet (404) is fine, refused is fine, empty is fine. Any row is a leak.
@@ -98,6 +106,9 @@ for (const t of PRIVATE_TABLES) {
   const empty = r.status === 200 && Array.isArray(r.json) && r.json.length === 0;
   result(notBuilt || isRefused(r) || empty, `private table ${t}: no rows readable${notBuilt ? ' (not built yet)' : ''}`, r);
 }
+
+// Staff roles (013): logged out, the table is refused outright, not just empty.
+await mustRefuse('logged out: read staff', '/rest/v1/staff?select=user_id&limit=1');
 
 // 5. The security schema (alerts, counters, paused accounts) is never reachable through the API.
 await mustRefuse('security schema not exposed', '/rest/v1/events?select=*&limit=1', { headers: { 'Accept-Profile': 'security' } });

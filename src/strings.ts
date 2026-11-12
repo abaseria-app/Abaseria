@@ -262,6 +262,11 @@ export const S = {
     noPriceAnywhere: 'No price here yet. Type the price from the shelf tag.',
   },
 
+  staff: {
+    // Shown in Settings → Account for staff accounts. data_entry is called Collector in the app.
+    roles: { admin: 'Admin', product_manager: 'Product Manager', data_entry: 'Collector' },
+  },
+
   settings: {
     title: 'Settings',
     testMode: 'Test mode',
@@ -275,6 +280,7 @@ export const S = {
     account: 'Account',
     signedInAs: (name: string | null, email: string | null) =>
       name && email ? `Signed in as ${name} (${email})` : `Signed in as ${name ?? email ?? 'your account'}`,
+    staffRole: (label: string) => `Staff role: ${label}`,
     signOut: 'Sign out',
     signOutAsk: 'Sign out on this phone? Your trips stay here, and you’ll need to sign in again before the next trip.',
     signOutYes: 'Yes, sign out',
