@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { S } from '../strings';
-import { isMissingEmail, startSignIn, type Provider } from '../lib/auth';
+import { isMissingEmail, pendingCode, startSignIn, type Provider } from '../lib/auth';
+import { EmailCodeSignIn } from '../components/EmailCodeSignIn';
 import { chromeIntentUrl, currentInAppBrowser, isAndroid, pageToOpen } from '../lib/inAppBrowser';
 
 interface Props {
@@ -30,6 +31,14 @@ export function Login({ finishing, error }: Props) {
   const [going, setGoing] = useState<Provider | null>(null);
   const [msg, setMsg] = useState<string | null>(error ? returnMessage(error) : null);
   const [copy, setCopy] = useState<'copied' | 'failed' | null>(null);
+  const [withEmail, setWithEmail] = useState(false);
+
+  // A code was sent a few minutes ago and Android closed the app while the shopper read it: go straight back.
+  useEffect(() => {
+    let live = true;
+    pendingCode().then((p) => { if (live && p) setWithEmail(true); });
+    return () => { live = false; };
+  }, []);
 
   async function copyLink() {
     try {
@@ -57,6 +66,8 @@ export function Login({ finishing, error }: Props) {
       <p className="login-pitch">{S.login.pitch}</p>
       {finishing ? (
         <p className="hint login-status">{S.login.finishing}</p>
+      ) : withEmail ? (
+        <EmailCodeSignIn onBack={() => setWithEmail(false)} />
       ) : (
         <div className="login-buttons">
           {inApp ? (
@@ -81,6 +92,9 @@ export function Login({ finishing, error }: Props) {
               {going === 'google' ? S.login.going('google') : S.login.google}
             </button>
           )}
+          <button className="btn secondary wide" disabled={!!going} onClick={() => { setMsg(null); setWithEmail(true); }}>
+            {S.login.email}
+          </button>
           {showFacebook() && (
             <button className="btn facebook huge" disabled={!!going} onClick={() => go('facebook')}>
               {going === 'facebook' ? S.login.going('facebook') : S.login.facebook}
