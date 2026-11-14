@@ -341,6 +341,11 @@ export const S = {
     shareDone: (trips: number, prices: number) => `Shared ${prices} ${prices === 1 ? 'price' : 'prices'} from ${trips} ${trips === 1 ? 'trip' : 'trips'}.`,
     shareFailed: (message: string) => `Couldn’t share: ${message}. It will try again next time the app opens online.`,
     shareOff: 'Price sharing is off in this version. It turns on once the consent screen is added.',
+    // Nov 14: trips are saved only on the phone, by design. Say plainly what erases them; Abaseria itself never does.
+    tripsOnPhone: (sharing: boolean) =>
+      sharing
+        ? 'Your trips are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them, along with any prices not yet shared.'
+        : 'Your trips are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them.',
     back: 'Back',
     about: 'About',
     aboutText: 'Abaseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',

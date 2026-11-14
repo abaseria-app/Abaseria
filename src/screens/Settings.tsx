@@ -113,6 +113,7 @@ export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults,
         ) : (
           <p className="hint">{S.settings.dbOff}</p>
         )}
+        <p className="hint trips-on-phone">{S.settings.tripsOnPhone(SHARING_ON)}</p>
       </section>
 
       <section className="about">
