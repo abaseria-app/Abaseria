@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
 # One site, two apps:
-#   /<repo>/       the live app, built from main, talking to abaseria-prod
-#   /<repo>/dev/   the test app, built from the dev branch, talking to abaseria-dev
+#   <base>       the live app, built from main, talking to abaseria-prod
+#   <base>dev/   the test app, built from the dev branch, talking to abaseria-dev
+# <base> is the APP_BASE_PATH Actions variable (Settings → Secrets and variables → Actions → Variables).
+# Unset, it's /<repo>/ for the github.io address. With the custom domain app.abaseria.com it's /.
+# Change it in the same sitting as Settings → Pages → Custom domain, then rerun this workflow.
 # Pushing to main runs this. Pushing to dev runs dev.yml, which tests dev and then runs this on main.
 
 on:
@@ -35,7 +38,7 @@ jobs:
       - run: npm run test:schema
       - run: npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: ${{ vars.APP_BASE_PATH || format('/{0}/', github.event.repository.name) }}
           # Production database. Set these under Settings → Secrets and variables → Actions → Variables.
           # Left empty, the app builds phone-only, as before.
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_PROD_URL }}
@@ -55,7 +58,7 @@ jobs:
       - name: Build the test app
         working-directory: dev-src
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/dev/
+          BASE_PATH: ${{ vars.APP_BASE_PATH || format('/{0}/', github.event.repository.name) }}dev/
         run: |
           npm ci
           # Dev database settings come from the branch's own .env.development.
