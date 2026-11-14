@@ -56,8 +56,10 @@ One GitHub Pages site holds two apps:
 
 | Address | Built from | Database | Phone storage |
 |---|---|---|---|
-| `https://<user>.github.io/<repo>/` | `main` | abaseria-prod | `abaseria` |
-| `https://<user>.github.io/<repo>/dev/` | `dev` | abaseria-dev | `abaseria-dev` |
+| `https://<user>.github.io/<repo>/`, or `https://app.abaseria.com/` with the custom domain | `main` | abaseria-prod | `abaseria` |
+| `https://<user>.github.io/<repo>/dev/`, or `https://app.abaseria.com/dev/` | `dev` | abaseria-dev | `abaseria-dev` |
+
+**Custom domain (app.abaseria.com, Nov 14, 2026).** Bluehost DNS has `CNAME app → abaseria-app.github.io`. The address the app is built for comes from the `APP_BASE_PATH` Actions variable: unset means `/<repo>/` (the github.io address), `/` means the custom domain. To switch, in one sitting: set `APP_BASE_PATH` to `/`; Settings → Pages → Custom domain `app.abaseria.com` (tick Enforce HTTPS once offered); Actions → Deploy to GitHub Pages → Run workflow; then in both Supabase projects, Authentication → URL Configuration: Site URL to the new address and `https://app.abaseria.com/**` in Redirect URLs. To undo, clear both settings and rerun. Old github.io links forward to the custom domain by themselves, but anything saved only on a phone stays with the old address: share finished trips first.
 
 - **Pushing to `dev`** runs `.github/workflows/dev.yml`: tests, then a rebuild that updates `/dev/` only. Test new features here on a real phone.
 - **Merging `dev` into `main`** runs `.github/workflows/deploy.yml` and updates the live app (and `/dev/` along with it).
