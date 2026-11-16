@@ -138,6 +138,7 @@ create policy "read sightings" on public.price_sightings for select to anon, aut
 
 create policy "add branches" on public.branches
   for insert to authenticated with check (created_by = auth.uid());
+-- Phones need a real barcode; staff can add flagged ones from the dashboard (migration 014, after 013).
 create policy "add products" on public.products
   for insert to authenticated with check (created_by = auth.uid());
 create policy "add sightings" on public.price_sightings
@@ -192,3 +193,5 @@ on conflict (id) do nothing;
 --   supabase/migrations/013_staff_roles.sql             public.staff, is_staff() / staff_role() / is_admin(),
 --                                                       last-Admin guard and staff tripwires (needs 012's alerts)
 -- Then add the first Admins by hand (the insert at the top of 013).
+--   supabase/migrations/014_phones_need_valid_barcode.sql  phones need a real barcode; staff and imports don't
+--   supabase/migrations/015_shopper_profile.sql         consents, my_consents, has_consent(), shopper_profiles

@@ -57,10 +57,14 @@ await refused('swapped lat/lng', 'authenticated', U1, `insert into public.branch
 await refused('logged-out phone adds a branch', 'anon', null, `insert into public.branches (id, chain, name) values (gen_random_uuid(), 'SM', 'Molino')`);
 await ok('signed-in phone adds a product', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4800016644818', 'Test product', '250 ml')`);
 // 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
-await ok('bad check digit accepted', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
+// 014: phones need a real barcode; imports (server key, here postgres) and staff keep the Nov 9 rule.
+await refused('phone adds a bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
+await refused('phone adds a product with no barcode', 'authenticated', U1, `insert into public.products (barcode, name) values (null, 'No code')`);
+await refused('phone adds text as a barcode', 'authenticated', U1, `insert into public.products (barcode, name) values ('hello', 'Junk')`);
+await ok('import adds a bad check digit', 'postgres', null, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
 await ok('...and flagged invalid', 'postgres', null, `select barcode_status from public.products where barcode = '4800016644819'`, (r) => r.rows[0]?.barcode_status === 'invalid');
 await ok('missing barcode flagged missing', 'postgres', null, `insert into public.products (barcode, name) values (null, 'Loose galunggong') returning barcode_status`, (r) => r.rows[0]?.barcode_status === 'missing');
-await refused('same barcode twice', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644819', 'Again')`);
+await refused('same barcode twice', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Again')`);
 await refused('phone sets barcode_status', 'authenticated', U1, `insert into public.products (barcode, name, barcode_status) values ('4800016644115', 'X', 'valid')`);
 await refused('app reads the import table', 'authenticated', U1, `select * from public.product_import`);
 await refused('app writes the import table', 'anon', null, `insert into public.product_import (barcode, name) values ('1', 'x')`);
@@ -278,6 +282,67 @@ await ok('a deleted account leaves the staff table', 'postgres', null, `delete f
 check('...row gone', (await staffCount()) === 2);
 await ok('staff changes are recorded', 'postgres', null, `select count(*)::int n from security.events where kind = 'staff_changed' and detail ->> 'operation' = 'DELETE'`, (r) => r.rows[0]?.n >= 2);
 await refused('signed-in phone reads the alerts', 'authenticated', UA, `select * from security.events`);
+
+// Shopper profile and consents (015). U1 and U2 are shoppers, UA is an Admin.
+const YEAR = new Date().getFullYear();
+const sw = (p, g) => `insert into public.consents (purpose, granted, policy_version) values ('${p}', ${g}, '2026-11')`;
+const basics = `insert into public.shopper_profiles (birth_month, birth_year, gender, province_code, city_code)
+                values (3, 1988, 'woman', '0402100000', '0402109000')`;
+await refused('logged-out phone reads profiles', 'anon', null, `select user_id from public.shopper_profiles`);
+await refused('logged-out phone reads consents', 'anon', null, `select purpose from public.consents`);
+await refused('logged-out phone adds a consent', 'anon', null, sw('profile', true));
+await refused('logged-out phone calls has_consent', 'anon', null, `select public.has_consent('profile')`);
+await ok('no row means off', 'authenticated', U1, `select public.has_consent('profile') p`, (r) => r.rows[0]?.p === false);
+await refused('answers saved before the profile switch is on', 'authenticated', U1, basics);
+await refused('research on before profile', 'authenticated', U1, sw('research', true));
+await refused('offers on before profile', 'authenticated', U1, sw('offers', true));
+await ok('profile switch on', 'authenticated', U1, sw('profile', true));
+await ok('...has_consent says on', 'authenticated', U1, `select public.has_consent('profile') p`, (r) => r.rows[0]?.p === true);
+await ok('offers on', 'authenticated', U1, sw('offers', true));
+await ok('research on', 'authenticated', U1, sw('research', true));
+await ok('2nd-visit answers saved', 'authenticated', U1, basics);
+await ok('...birthday locked by the database', 'authenticated', U1, `select birthday_locked_at from public.shopper_profiles`, (r) => r.rows[0]?.birthday_locked_at != null);
+await ok('3rd-visit answers saved', 'authenticated', U1,
+  `update public.shopper_profiles set household_size_band = '3-4', has_kids_under_12 = 'yes', has_senior_60plus = 'no_answer',
+     payday_pattern = 'kinsenas_katapusan', grocery_budget_band = '6000_9999' where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('shopper reads own profile', 'authenticated', U1, `select gender, household_size_band from public.shopper_profiles`,
+  (r) => r.rows.length === 1 && r.rows[0].gender === 'woman' && r.rows[0].household_size_band === '3-4');
+await ok('my_consents shows the current switches', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
+  (r) => r.rows.map((x) => `${x.purpose}:${x.granted}`).join(',') === 'offers:true,profile:true,research:true');
+await ok('another shopper sees no profiles', 'authenticated', U2, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
+await ok('another shopper sees no consents', 'authenticated', U2, `select * from public.consents`, (r) => r.rows.length === 0);
+await ok('staff see no profiles', 'authenticated', UA, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
+await refused('another shopper changes the profile', 'authenticated', U2, `update public.shopper_profiles set gender = 'man' where user_id = '${U1}'`);
+await refused('another shopper deletes the profile', 'authenticated', U2, `delete from public.shopper_profiles where user_id = '${U1}'`);
+await ok('second shopper turns profile on', 'authenticated', U2, sw('profile', true));
+await refused('shopper adds a profile for someone else', 'authenticated', U2, `insert into public.shopper_profiles (user_id, gender) values ('${U1}', 'man')`);
+await refused('shopper adds a consent for someone else', 'authenticated', U2, `insert into public.consents (user_id, purpose, granted, policy_version) values ('${U1}', 'research', false, 'x')`);
+await refused('shopper edits a consent row', 'authenticated', U1, `update public.consents set granted = false`);
+await refused('shopper deletes a consent row', 'authenticated', U1, `delete from public.consents`);
+await refused('shopper sets the birthday lock', 'authenticated', U1, `update public.shopper_profiles set birthday_locked_at = null`);
+await refused('birthday changed after saving', 'authenticated', U1, `update public.shopper_profiles set birth_month = 4 where user_id = '${U1}'`);
+await ok('...birthday unchanged', 'authenticated', U1, `select birth_month from public.shopper_profiles`, (r) => r.rows[0]?.birth_month === 3);
+await refused('birth month without year', 'authenticated', U2, `insert into public.shopper_profiles (birth_month) values (5)`);
+await refused('under 18 is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (1, ${YEAR - 17})`);
+await refused('turning 18 later this year is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (12, ${YEAR - 18})`);
+await ok('an adult who skips the birthday is fine', 'authenticated', U2, `insert into public.shopper_profiles (gender) values ('no_answer')`);
+await refused('a made-up answer', 'authenticated', U2, `update public.shopper_profiles set payday_pattern = 'whenever' where user_id = '${U2}'`);
+await refused('a bad PSGC code', 'authenticated', U2, `update public.shopper_profiles set city_code = 'Imus' where user_id = '${U2}'`);
+await ok('clearing the birthday is allowed', 'authenticated', U1, `update public.shopper_profiles set birth_month = null, birth_year = null where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('...but a new one needs support', 'authenticated', U1, `update public.shopper_profiles set birth_month = 7, birth_year = 1988 where user_id = '${U1}'`);
+await ok('support corrects a birthday', 'postgres', null, `update public.shopper_profiles set birth_month = 4, birth_year = 1988 where user_id = '${U1}' returning birth_month, birthday_locked_at`,
+  (r) => r.rows[0]?.birth_month === 4 && r.rows[0]?.birthday_locked_at != null);
+await ok('profile switch off', 'authenticated', U1, sw('profile', false));
+await ok('...deletes the answers', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U1}'`, (r) => r.rows[0]?.n === 0);
+await ok('...and turns offers and research off', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
+  (r) => r.rows.map((x) => `${x.purpose}:${x.granted}`).join(',') === 'offers:false,profile:false,research:false');
+await ok('...with the history kept', 'authenticated', U1, `select count(*)::int n from public.consents`, (r) => r.rows[0]?.n === 6);
+await refused('answers after switching off', 'authenticated', U1, basics);
+await ok('shopper deletes own profile', 'authenticated', U2, `delete from public.shopper_profiles where user_id = '${U2}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('shopper answers again', 'authenticated', U2, `insert into public.shopper_profiles (gender) values ('man')`);
+await ok('deleting an account', 'postgres', null, `delete from auth.users where id = '${U2}'`);
+await ok('...removes the profile', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U2}'`, (r) => r.rows[0]?.n === 0);
+await ok('...keeps consent rows without the id', 'postgres', null, `select count(*)::int n from public.consents where user_id is null and purpose = 'profile'`, (r) => r.rows[0]?.n === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
