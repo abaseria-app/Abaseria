@@ -365,7 +365,7 @@ await db.exec(`insert into public.consents (user_id, purpose, granted, policy_ve
 check('guest reads no consents', (await asGuest(`select * from public.consents`)).rows.length === 0);
 check('guest reads no profile', (await asGuest(`select * from public.shopper_profiles`)).rows.length === 0);
 check('guest deletes nothing', ((await asGuest(`delete from public.shopper_profiles`)).affectedRows ?? 0) === 0);
-check('a real account still works after 016', (await as('authenticated', U1, `select public.is_real_account() r`)).rows[0]?.r === true);
+check('a real account still reads its own switches after 016', (await as('authenticated', U1, `select count(*)::int n from public.consents`)).rows[0]?.n === 6);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

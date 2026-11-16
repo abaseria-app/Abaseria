@@ -151,7 +151,7 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `013_staff_roles.sql` | `public.staff` (Admin / Product Manager / Data Entry, trusted), `is_staff()` / `staff_role()` / `is_admin()`, last-Admin guard, staff tripwires. Needs 012. Then add the first Admins (insert at the top of the file) | Pending Brad's OK | With the next release, after 012 |
 | `014_phones_need_valid_barcode.sql` | Phones can add a product only with a valid barcode; staff (dashboard) and imports keep the Nov 9 flag-for-review rule (security review G12) | Done Nov 16 | With 008, after 013 |
 | `015_shopper_profile.sql` | `consents` (4 switches, insert-only history), `my_consents`, `has_consent()`, `shopper_profiles` (own row only, needs the profile switch, birthday lock, under-18 refused) | Done Nov 16 (SQL Editor) | Not before the privacy page update, NPC registration and DPO |
-| `016_profile_real_accounts_only.sql` | `is_real_account()`; guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | With 015 |
+| `016_profile_real_accounts_only.sql` | Guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | With 015 |
 
 Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 

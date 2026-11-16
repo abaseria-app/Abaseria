@@ -5,34 +5,30 @@
 -- The app never saves profiles or switches from a guest session, but a script could create unlimited guest
 -- accounts and fill shopper_profiles with fake answers, which would poison the reports later. Guests now get
 -- nothing from either table, the same as the public key.
-
-create or replace function public.is_real_account() returns boolean
-language sql stable security invoker set search_path = ''
-as $$
-  select auth.uid() is not null and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false;
-$$;
-revoke all on function public.is_real_account() from public, anon;
-grant execute on function public.is_real_account() to authenticated;
+-- The guest test is written into each rule (not hidden in a function) so Supabase's security advisor can see it.
 
 drop policy if exists "read own consents" on public.consents;
 create policy "read own consents" on public.consents
-  for select to authenticated using (user_id = auth.uid() and public.is_real_account());
+  for select to authenticated using (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false);
 drop policy if exists "add own consents" on public.consents;
 create policy "add own consents" on public.consents
-  for insert to authenticated with check (user_id = auth.uid() and public.is_real_account());
+  for insert to authenticated with check (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false);
 
 drop policy if exists "read own profile" on public.shopper_profiles;
 create policy "read own profile" on public.shopper_profiles
-  for select to authenticated using (user_id = auth.uid() and public.is_real_account());
+  for select to authenticated using (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false);
 drop policy if exists "add own profile" on public.shopper_profiles;
 create policy "add own profile" on public.shopper_profiles
   for insert to authenticated
-  with check (user_id = auth.uid() and public.is_real_account() and public.has_consent('profile'));
+  with check (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false and public.has_consent('profile'));
 drop policy if exists "change own profile" on public.shopper_profiles;
 create policy "change own profile" on public.shopper_profiles
   for update to authenticated
-  using (user_id = auth.uid() and public.is_real_account())
-  with check (user_id = auth.uid() and public.is_real_account() and public.has_consent('profile'));
+  using (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false)
+  with check (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false and public.has_consent('profile'));
 drop policy if exists "delete own profile" on public.shopper_profiles;
 create policy "delete own profile" on public.shopper_profiles
-  for delete to authenticated using (user_id = auth.uid() and public.is_real_account());
+  for delete to authenticated using (user_id = auth.uid() and (select coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)) = false);
+
+-- An earlier draft of 016 used a helper function; the rules above no longer need it.
+drop function if exists public.is_real_account();
