@@ -374,5 +374,27 @@ check('guest reads no profile', (await asGuest(`select * from public.shopper_pro
 check('guest deletes nothing', ((await asGuest(`delete from public.shopper_profiles`)).affectedRows ?? 0) === 0);
 check('a real account still reads its own switches after 016', (await as('authenticated', U1, `select count(*)::int n from public.consents`)).rows[0]?.n === 6);
 
+// 018: profile photos. U1 owns one; U3 is another shopper; UG is a guest session.
+const PHOTO = (u) => `insert into storage.objects (bucket_id, name) values ('profile-photos', '${u}/photo')`;
+await ok('photo bucket is private with limits', 'postgres', null, `select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'profile-photos'`,
+  (r) => r.rows[0]?.public === false && Number(r.rows[0]?.file_size_limit) === 204800 && r.rows[0]?.allowed_mime_types?.length === 2);
+await ok('shopper uploads own photo', 'authenticated', U1, PHOTO(U1));
+await ok('shopper reads own photo', 'authenticated', U1, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 1 && r.rows[0].name === `${U1}/photo`);
+await ok('shopper replaces own photo', 'authenticated', U1, `update storage.objects set name = name where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('another shopper sees no photos', 'authenticated', U3, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 0);
+await refused('another shopper uploads into someone else’s spot', 'authenticated', U3, PHOTO(U1));
+await refused('another shopper replaces someone else’s photo', 'authenticated', U3, `update storage.objects set name = name where bucket_id = 'profile-photos'`);
+await refused('another shopper deletes someone else’s photo', 'authenticated', U3, `delete from storage.objects where bucket_id = 'profile-photos'`);
+await refused('shopper saves a second file', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('profile-photos', '${U1}/other')`);
+await refused('shopper saves under another name', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('profile-photos', '${U1}/photo.jpg')`);
+await refused('shopper moves the photo to another account', 'authenticated', U1, `update storage.objects set name = '${U3}/photo' where bucket_id = 'profile-photos' and name = '${U1}/photo'`);
+await ok('logged-out phone sees no photos', 'anon', null, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 0);
+await refused('logged-out phone uploads a photo', 'anon', null, PHOTO(U1));
+try { await asGuest(PHOTO(UG)); fail++; console.log('FAIL guest uploads a photo was allowed'); }
+catch (e) { pass++; console.log('PASS guest uploads a photo ::', e.message); }
+check('guest sees no photos', (await asGuest(`select name from storage.objects where bucket_id = 'profile-photos'`)).rows.length === 0);
+await refused('product images still need the server key', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', '${U1}/photo')`);
+await ok('shopper deletes own photo', 'authenticated', U1, `delete from storage.objects where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

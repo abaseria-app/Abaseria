@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { S } from '../strings';
 import { BottomNav } from '../components/BottomNav';
+import { ProfilePhoto } from '../components/ProfilePhoto';
 import type { Account } from '../lib/auth';
 import {
   CHOICES,
@@ -216,11 +217,7 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
         <button className="link" onClick={onSettings}>{S.profile.settings}</button>
       </header>
       <div className="explore-body">
-        {account && (
-          <section className="card">
-            <p className="hint">{S.settings.signedInAs(account.name, account.email)}</p>
-          </section>
-        )}
+        {account && <ProfilePhoto account={account} />}
         {errorLine}
         {note && <p className="hint" role="status">{note}</p>}
 

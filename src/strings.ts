@@ -536,6 +536,19 @@ export const S = {
     pricesTitle: 'Prices you scan',
     pricesText: 'Prices you scan are shared with other shoppers so everyone sees what things cost. Your name and account are never shown with them.',
 
+    photo: {
+      alt: 'Your profile photo',
+      onlyYou: 'Only you can see your photo.',
+      selfie: 'Take a selfie',
+      choose: 'Choose a photo',
+      remove: 'Remove photo',
+      hideGoogle: 'Hide my Google photo',
+      showGoogle: 'Show my Google photo',
+      saving: 'Saving photo…',
+      failed: 'That photo didn’t save. Please try again.',
+      offline: 'You’re offline. Connect to change your photo.',
+    },
+
     deleteAll: 'Delete all my answers',
     deleteAllAsk: 'Delete every answer above? Your switches stay as they are.',
     deleteAllYes: 'Yes, delete them',
