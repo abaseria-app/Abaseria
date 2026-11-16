@@ -30,6 +30,7 @@ interface Props {
 type Editing = ChoiceField | 'birth_year' | null;
 type Ask = 'turnOff' | 'removeYear' | 'deleteAll' | null;
 
+const PRIVACY = `${import.meta.env.BASE_URL}privacy.html#profile`;
 const CHOICE_FIELDS: ChoiceField[] = ['gender', 'household_size_band', 'has_kids_under_12', 'has_senior_60plus', 'payday_pattern', 'grocery_budget_band'];
 const label = (v: string) => S.profile.labels[v] ?? v;
 
@@ -224,6 +225,7 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
         <section className="card">
           <h2>{S.profile.aboutYou}</h2>
           <p className="hint">{S.profile.aboutYouHint}</p>
+          <a className="hint small" href={PRIVACY}>{S.profile.privacyLink}</a>
           {ask === 'turnOff' ? (
             <div className="account-actions">
               <p>{S.profile.turnOffAsk}</p>
