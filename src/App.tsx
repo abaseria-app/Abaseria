@@ -13,13 +13,14 @@ import { Results } from './screens/Results';
 import { Search } from './screens/Search';
 import { Explore } from './screens/Explore';
 import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
+import { Profile } from './screens/Profile';
 import type { CategoryId } from './lib/categories';
 import { Login } from './screens/Login';
 import { NoticeBanner } from './components/NoticeBanner';
 import { dismissNotice, loadNotices, type Notice } from './lib/notices';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
-type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon';
+type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile';
 /** Screens a back button can return to. */
 type Base = 'explore' | 'home';
 
@@ -158,7 +159,7 @@ export default function App() {
             onSearch={(category) => search('explore', category)}
             onCart={() => setRoute('home')}
             onCommunity={() => openSoon('community')}
-            onProfile={() => openSoon('profile')}
+            onProfile={() => setRoute('profile')}
           />
         );
       case 'soon':
@@ -170,7 +171,17 @@ export default function App() {
             onCart={() => setRoute('home')}
             onScan={() => scan('explore')}
             onCommunity={() => openSoon('community')}
-            onProfile={() => openSoon('profile')}
+            onProfile={() => setRoute('profile')}
+          />
+        );
+      case 'profile':
+        return (
+          <Profile
+            account={account}
+            onExplore={() => setRoute('explore')}
+            onCart={() => setRoute('home')}
+            onScan={() => scan('explore')}
+            onCommunity={() => openSoon('community')}
             onSettings={() => setRoute('settings')}
           />
         );
@@ -185,7 +196,7 @@ export default function App() {
             onSearch={() => search('home')}
             onExplore={() => setRoute('explore')}
             onCommunity={() => openSoon('community')}
-            onProfile={() => openSoon('profile')}
+            onProfile={() => setRoute('profile')}
           />
         );
       case 'start':
