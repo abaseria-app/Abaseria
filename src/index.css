@@ -459,3 +459,11 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .profile-year { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .profile-year select { flex: 1; min-height: 48px; font-size: 1rem; border: 2px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 0 10px; }
 .profile-error { color: var(--red); }
+
+/* Profile photo (P2b) */
+.profile-photo-top { display: flex; align-items: center; gap: 14px; }
+.avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex: none; border: 2px solid var(--purple); background: var(--lilac); }
+.avatar-initial { display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; color: var(--purple); }
+.profile-photo-who { display: flex; flex-direction: column; min-width: 0; }
+.profile-photo-who .hint { margin: 0; overflow-wrap: anywhere; }
+.profile-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
