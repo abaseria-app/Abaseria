@@ -289,8 +289,8 @@ await refused('signed-in phone reads the alerts', 'authenticated', UA, `select *
 // Shopper profile and consents (015). U1 and U2 are shoppers, UA is an Admin.
 const YEAR = new Date().getFullYear();
 const sw = (p, g) => `insert into public.consents (purpose, granted, policy_version) values ('${p}', ${g}, '2026-11')`;
-const basics = `insert into public.shopper_profiles (birth_month, birth_year, gender, province_code, city_code)
-                values (3, 1988, 'woman', '0402100000', '0402109000')`;
+const basics = `insert into public.shopper_profiles (birth_year, gender, province_code, city_code)
+                values (1988, 'woman', '0402100000', '0402109000')`;
 await refused('logged-out phone reads profiles', 'anon', null, `select user_id from public.shopper_profiles`);
 await refused('logged-out phone reads consents', 'anon', null, `select purpose from public.consents`);
 await refused('logged-out phone adds a consent', 'anon', null, sw('profile', true));
@@ -323,18 +323,25 @@ await refused('shopper adds a consent for someone else', 'authenticated', U2, `i
 await refused('shopper edits a consent row', 'authenticated', U1, `update public.consents set granted = false`);
 await refused('shopper deletes a consent row', 'authenticated', U1, `delete from public.consents`);
 await refused('shopper sets the birthday lock', 'authenticated', U1, `update public.shopper_profiles set birthday_locked_at = null`);
-await refused('birthday changed after saving', 'authenticated', U1, `update public.shopper_profiles set birth_month = 4 where user_id = '${U1}'`);
-await ok('...birthday unchanged', 'authenticated', U1, `select birth_month from public.shopper_profiles`, (r) => r.rows[0]?.birth_month === 3);
-await refused('birth month without year', 'authenticated', U2, `insert into public.shopper_profiles (birth_month) values (5)`);
-await refused('under 18 is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (1, ${YEAR - 17})`);
-await refused('turning 18 later this year is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (12, ${YEAR - 18})`);
+await refused('birth year changed after saving', 'authenticated', U1, `update public.shopper_profiles set birth_year = 1989 where user_id = '${U1}'`);
+await ok('...birth year unchanged', 'authenticated', U1, `select birth_year from public.shopper_profiles`, (r) => r.rows[0]?.birth_year === 1988);
+// 017: no birth month from the app until birthday offers launch.
+await refused('app saves a birth month', 'authenticated', U1, `update public.shopper_profiles set birth_month = 3 where user_id = '${U1}'`);
+await refused('app adds a profile with a birth month', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (5, 1990)`);
+await refused('birth month without a year (support)', 'postgres', null, `insert into public.shopper_profiles (user_id, birth_month) values ('${U2}', 5)`);
+await refused('under 18 is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_year) values (${YEAR - 17})`);
+await refused('turning 18 sometime this year is refused (Dec 31 rule)', 'authenticated', U2, `insert into public.shopper_profiles (birth_year) values (${YEAR - 18})`);
 await ok('an adult who skips the birthday is fine', 'authenticated', U2, `insert into public.shopper_profiles (gender) values ('no_answer')`);
 await refused('a made-up answer', 'authenticated', U2, `update public.shopper_profiles set payday_pattern = 'whenever' where user_id = '${U2}'`);
 await refused('a bad PSGC code', 'authenticated', U2, `update public.shopper_profiles set city_code = 'Imus' where user_id = '${U2}'`);
-await ok('clearing the birthday is allowed', 'authenticated', U1, `update public.shopper_profiles set birth_month = null, birth_year = null where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
-await refused('...but a new one needs support', 'authenticated', U1, `update public.shopper_profiles set birth_month = 7, birth_year = 1988 where user_id = '${U1}'`);
-await ok('support corrects a birthday', 'postgres', null, `update public.shopper_profiles set birth_month = 4, birth_year = 1988 where user_id = '${U1}' returning birth_month, birthday_locked_at`,
-  (r) => r.rows[0]?.birth_month === 4 && r.rows[0]?.birthday_locked_at != null);
+await ok('a month can be added later to a saved year (future birthday offers)', 'postgres', null,
+  `update public.shopper_profiles set birth_month = 3 where user_id = '${U1}' returning birth_month, birth_year`, (r) => r.rows[0]?.birth_month === 3 && r.rows[0]?.birth_year === 1988);
+await refused('clearing the year while a month is saved', 'authenticated', U1, `update public.shopper_profiles set birth_year = null where user_id = '${U1}'`);
+await db.exec(`update public.shopper_profiles set birth_month = null where user_id = '${U1}'`);
+await ok('shopper clears the birth year', 'authenticated', U1, `update public.shopper_profiles set birth_year = null where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('...then a new year from the app needs support', 'authenticated', U1, `update public.shopper_profiles set birth_year = 1990 where user_id = '${U1}'`);
+await ok('support corrects a birthday', 'postgres', null, `update public.shopper_profiles set birth_year = 1987 where user_id = '${U1}' returning birth_year, birthday_locked_at`,
+  (r) => r.rows[0]?.birth_year === 1987 && r.rows[0]?.birthday_locked_at != null);
 await ok('profile switch off', 'authenticated', U1, sw('profile', false));
 await ok('...deletes the answers', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U1}'`, (r) => r.rows[0]?.n === 0);
 await ok('...and turns offers and research off', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,

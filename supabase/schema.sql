@@ -196,3 +196,4 @@ on conflict (id) do nothing;
 --   supabase/migrations/014_phones_need_valid_barcode.sql  phones need a real barcode; staff and imports don't
 --   supabase/migrations/015_shopper_profile.sql         consents, my_consents, has_consent(), shopper_profiles
 --   supabase/migrations/016_profile_real_accounts_only.sql  guest (anonymous) sessions get nothing from those tables
+--   supabase/migrations/017_birth_year_only.sql         birth year alone; the app can't write birth month yet
