@@ -71,7 +71,22 @@ export function ProfilePhoto({ account }: { account: Account }) {
         <button className="chip" disabled={busy} onClick={() => selfie.current?.click()}>{S.profile.photo.selfie}</button>
         <button className="chip" disabled={busy} onClick={() => gallery.current?.click()}>{S.profile.photo.choose}</button>
         {state?.uploaded ? (
-          <button className="chip ghost" disabled={busy} onClick={() => void act(removePhoto)}>{S.profile.photo.remove}</button>
+          <button
+            className="chip ghost"
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                await removePhoto();
+                // Show the change at once, whatever the next check returns.
+                setState((old) => {
+                  if (old?.uploaded) URL.revokeObjectURL(old.uploaded);
+                  return old ? { ...old, uploaded: null } : old;
+                });
+              })
+            }
+          >
+            {S.profile.photo.remove}
+          </button>
         ) : (
           state?.google && (
             <button className="chip ghost" disabled={busy} onClick={() => void act(() => hideGooglePhoto(!state.googleHidden))}>
