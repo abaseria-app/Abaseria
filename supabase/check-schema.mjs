@@ -19,6 +19,9 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  create function auth.jwt() returns jsonb language sql stable as
+    $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+  grant execute on function auth.jwt() to anon, authenticated;
   -- Like Supabase: new functions in public are granted to anon and authenticated directly.
   alter default privileges in schema public grant execute on functions to anon, authenticated;
   -- Stand-in for Supabase Storage: just what the checks use. Supabase turns on RLS for objects itself.
@@ -343,6 +346,26 @@ await ok('shopper answers again', 'authenticated', U2, `insert into public.shopp
 await ok('deleting an account', 'postgres', null, `delete from auth.users where id = '${U2}'`);
 await ok('...removes the profile', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U2}'`, (r) => r.rows[0]?.n === 0);
 await ok('...keeps consent rows without the id', 'postgres', null, `select count(*)::int n from public.consents where user_id is null and purpose = 'profile'`, (r) => r.rows[0]?.n === 1);
+
+// 016: guest (anonymous) sessions get nothing from the profile tables.
+const UG = '44444444-4444-4444-8444-444444444444';
+await db.exec(`insert into auth.users values ('${UG}')`);
+async function asGuest(sql) {
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${UG}', false);
+                 select set_config('request.jwt.claims', '{"sub":"${UG}","is_anonymous":true}', false); set role authenticated;`);
+  try { return await db.query(sql); }
+  finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);`); }
+}
+try { await asGuest(sw('profile', true)); fail++; console.log('FAIL guest turns the profile switch on was allowed'); }
+catch (e) { pass++; console.log('PASS guest turns the profile switch on ::', e.message); }
+try { await asGuest(`insert into public.shopper_profiles (gender) values ('man')`); fail++; console.log('FAIL guest saves answers was allowed'); }
+catch (e) { pass++; console.log('PASS guest saves answers ::', e.message); }
+await db.exec(`insert into public.consents (user_id, purpose, granted, policy_version) values ('${UG}', 'profile', true, 'x');
+               insert into public.shopper_profiles (user_id, gender) values ('${UG}', 'man')`);
+check('guest reads no consents', (await asGuest(`select * from public.consents`)).rows.length === 0);
+check('guest reads no profile', (await asGuest(`select * from public.shopper_profiles`)).rows.length === 0);
+check('guest deletes nothing', ((await asGuest(`delete from public.shopper_profiles`)).affectedRows ?? 0) === 0);
+check('a real account still reads its own switches after 016', (await as('authenticated', U1, `select count(*)::int n from public.consents`)).rows[0]?.n === 6);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
