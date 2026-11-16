@@ -463,6 +463,7 @@ export const S = {
 
     aboutYou: 'About you',
     aboutYouHint: 'We’d like to get to know who shops with Abaseria. Every question is optional.',
+    privacyLink: 'How we use your answers and photo',
     saveSwitch: 'Save my answers',
     saveSwitchHint: 'Lets Abaseria keep the answers below for your budgeting and comparisons. Off: nothing is saved.',
     turnOffAsk: 'Turning this off deletes all your answers and also turns off personalized offers and anonymous reports. Turn it off?',

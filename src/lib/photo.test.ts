@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { googleHidden, googlePhoto, initial, photoPath, squareCrop } from './photo';
+import { googleHidden, googlePhoto, initial, photoPath, privateObjectUrl, squareCrop } from './photo';
 
 describe('squareCrop', () => {
   it('takes the centre of a tall photo', () => {
@@ -40,5 +40,13 @@ describe('initial and path', () => {
   });
   it('stores one file per account', () => {
     expect(photoPath('abc')).toBe('abc/photo');
+  });
+});
+
+describe('privateObjectUrl', () => {
+  it('builds the signed-in download address', () => {
+    expect(privateObjectUrl('https://abc.supabase.co/', 'profile-photos', 'u-1/photo')).toBe(
+      'https://abc.supabase.co/storage/v1/object/authenticated/profile-photos/u-1/photo',
+    );
   });
 });

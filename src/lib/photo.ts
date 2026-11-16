@@ -9,7 +9,7 @@
 // the file's hidden data (GPS location, camera model, date) is dropped. The storage rules (migration 018)
 // make sure nobody else can read, replace or delete the file.
 import type { User } from '@supabase/supabase-js';
-import { getSupabase } from './supabase';
+import { dbConfig, getSupabase } from './supabase';
 
 export const PHOTO_BUCKET = 'profile-photos';
 export const PHOTO_SIZE = 256;
@@ -17,6 +17,11 @@ export const PHOTO_MAX_BYTES = 200 * 1024;
 const HIDE_GOOGLE_KEY = 'abaseria_hide_google_photo';
 
 export const photoPath = (userId: string) => `${userId}/photo`;
+
+/** The signed-in download address for a private file. */
+export function privateObjectUrl(base: string, bucket: string, path: string): string {
+  return `${base.replace(/\/$/, '')}/storage/v1/object/authenticated/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`;
+}
 
 /** The centered square to cut from a w × h picture. */
 export function squareCrop(w: number, h: number): { sx: number; sy: number; side: number } {
@@ -109,9 +114,19 @@ async function session() {
 export async function loadPhoto(): Promise<PhotoState> {
   const { client, user } = await session();
   let uploaded: string | null = null;
-  if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    const { data } = await client.storage.from(PHOTO_BUCKET).download(photoPath(user.id));
-    if (data && data.size) uploaded = URL.createObjectURL(data);
+  if (dbConfig && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+    // Fetched by hand with cache: 'no-store'. The library's download() let the phone's browser answer from
+    // its cache, so a removed photo kept showing for up to a minute (Nov 16 phone test).
+    const { data } = await client.auth.getSession();
+    const token = data.session?.access_token;
+    const res = await fetch(privateObjectUrl(dbConfig.url, PHOTO_BUCKET, photoPath(user.id)), {
+      headers: { apikey: dbConfig.key, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      cache: 'no-store',
+    }).catch(() => null);
+    if (res?.ok) {
+      const blob = await res.blob();
+      if (blob.size) uploaded = URL.createObjectURL(blob);
+    }
   }
   return { userId: user.id, uploaded, google: googlePhoto(user), googleHidden: googleHidden(user) };
 }
@@ -122,7 +137,7 @@ export async function uploadPhoto(file: Blob): Promise<void> {
   const { client, user } = await session();
   const { error } = await client.storage
     .from(PHOTO_BUCKET)
-    .upload(photoPath(user.id), blob, { upsert: true, contentType: blob.type, cacheControl: '60' });
+    .upload(photoPath(user.id), blob, { upsert: true, contentType: blob.type, cacheControl: '0' });
   if (error) throw new Error(error.message);
 }
 

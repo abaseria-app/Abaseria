@@ -143,17 +143,17 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Done Nov 8 (replaced by 007) |
 | `006_one_barcode_form.sql` | UPC-A stored as 12 digits only; merges 13-digit twins | Done Nov 8 | Done Nov 8 |
 | `007_all_products_visible.sql` | Everyone sees every product, Pending or Published (Nov 9) | Done Nov 9 | Done by hand Nov 9 |
-| `008_flag_invalid_and_missing_barcodes.sql` | Products get a numeric `id`; a bad check digit or no barcode is accepted and flagged in `barcode_status` | Done Nov 9 | Not yet: run 008, 009, then 010 again |
-| `009_product_import_holding_table.sql` | `product_import` holding table for spreadsheet uploads, server key only | Done Nov 9 | Not yet (with 008) |
-| `010_security_review.sql` | Hides `created_by` on products and branches; `latest_prices` read-only; function fixes | Done Nov 11 | Done Nov 11. Run again after 008 so the new columns are readable |
+| `008_flag_invalid_and_missing_barcodes.sql` | Products get a numeric `id`; a bad check digit or no barcode is accepted and flagged in `barcode_status` | Done Nov 9 | Done Nov 16 |
+| `009_product_import_holding_table.sql` | `product_import` holding table for spreadsheet uploads, server key only | Done Nov 9 | Done Nov 16 |
+| `010_security_review.sql` | Hides `created_by` on products and branches; `latest_prices` read-only; function fixes | Done Nov 11 | Done Nov 11; run again Nov 16 after 008 |
 | `011_categories_v2.sql` | The 16 categories (Nov 11) | Done Nov 11 | Done Nov 11 |
-| `012_tripwires_and_notices.sql` | `security` schema: price-flood limits, paused accounts, delete alerts; `public.notices` | Done Nov 11 | Not yet (with 008, 009) |
-| `013_staff_roles.sql` | `public.staff` (Admin / Product Manager / Data Entry, trusted), `is_staff()` / `staff_role()` / `is_admin()`, last-Admin guard, staff tripwires. Needs 012. Then add the first Admins (insert at the top of the file) | Pending Brad's OK | With the next release, after 012 |
-| `014_phones_need_valid_barcode.sql` | Phones can add a product only with a valid barcode; staff (dashboard) and imports keep the Nov 9 flag-for-review rule (security review G12) | Done Nov 16 | With 008, after 013 |
-| `015_shopper_profile.sql` | `consents` (4 switches, insert-only history), `my_consents`, `has_consent()`, `shopper_profiles` (own row only, needs the profile switch, birthday lock, under-18 refused) | Done Nov 16 (SQL Editor) | Not before the privacy page update, NPC registration and DPO |
-| `016_profile_real_accounts_only.sql` | Guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | With 015 |
-| `017_birth_year_only.sql` | Birth year can be saved alone (under 18 checked against Dec 31); the app can't write birth month until birthday offers launch; year and month lock separately | Nov 16 | With 015 |
-| `018_profile_photos.sql` | Private `profile-photos` bucket (200 KB, WebP/JPEG); a real account reads, adds, replaces and deletes only `<user id>/photo` | Nov 16 | With 015 |
+| `012_tripwires_and_notices.sql` | `security` schema: price-flood limits, paused accounts, delete alerts; `public.notices` | Done Nov 11 | Done Nov 16 (alert emails need pg_net and the vault secrets) |
+| `013_staff_roles.sql` | `public.staff` (Admin / Product Manager / Data Entry, trusted), `is_staff()` / `staff_role()` / `is_admin()`, last-Admin guard, staff tripwires. Needs 012. Then add the first Admins (insert at the top of the file) | Pending Brad's OK | Done Nov 16 (first Admins still to add by hand) |
+| `014_phones_need_valid_barcode.sql` | Phones can add a product only with a valid barcode; staff (dashboard) and imports keep the Nov 9 flag-for-review rule (security review G12) | Done Nov 16 | Done Nov 16 |
+| `015_shopper_profile.sql` | `consents` (4 switches, insert-only history), `my_consents`, `has_consent()`, `shopper_profiles` (own row only, needs the profile switch, birthday lock, under-18 refused) | Done Nov 16 (SQL Editor) | Done Nov 16 (with the privacy page update) |
+| `016_profile_real_accounts_only.sql` | Guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | Done Nov 16 |
+| `017_birth_year_only.sql` | Birth year can be saved alone (under 18 checked against Dec 31); the app can't write birth month until birthday offers launch; year and month lock separately | Nov 16 | Done Nov 16 |
+| `018_profile_photos.sql` | Private `profile-photos` bucket (200 KB, WebP/JPEG); a real account reads, adds, replaces and deletes only `<user id>/photo` | Nov 16 | Done Nov 16 |
 
 Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
