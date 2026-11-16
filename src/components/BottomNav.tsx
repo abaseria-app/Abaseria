@@ -32,7 +32,7 @@ export function BottomNav({ current, onExplore, onCart, onScan, onCommunity, onP
         <span>{S.nav.scan}</span>
       </button>
       {tab('community', S.nav.community, 'community', onCommunity, true)}
-      {tab('profile', S.nav.profile, 'profile', onProfile, true)}
+      {tab('profile', S.nav.profile, 'profile', onProfile)}
     </nav>
   );
 }

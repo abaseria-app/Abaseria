@@ -444,3 +444,18 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .app-notice-tl { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(26, 53, 85, .2); }
 .app-notice-close { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; border: 0;
   background: transparent; color: var(--navy); display: grid; place-items: center; }
+
+/* Profile tab (P2) */
+.profile .soon-header { display: flex; justify-content: space-between; }
+.profile .card h2 { margin: 0 0 4px; }
+.profile-rows { margin-top: 8px; }
+.profile-row { border-top: 1px solid var(--line); padding: 10px 0; }
+.profile-q { display: flex; flex-direction: column; gap: 2px; }
+.profile-q small { color: var(--muted); font-size: .85rem; }
+.profile-a { font-weight: 700; color: var(--purple); margin-top: 4px; }
+.profile-a.empty { font-weight: 500; color: var(--muted); }
+.profile-actions { display: flex; gap: 12px; align-items: center; }
+.link.danger { color: var(--red); }
+.profile-year { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.profile-year select { flex: 1; min-height: 48px; font-size: 1rem; border: 2px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 0 10px; }
+.profile-error { color: var(--red); }
