@@ -8,11 +8,13 @@ import { BottomNav } from '../components/BottomNav';
 import { MrecSlot, TopBannerSlot, ADS_PREVIEW } from '../components/AdSlot';
 import { SponsorPopup } from '../components/SponsorPopup';
 import { Budget } from './Budget';
+import { RecipesPanel } from './Recipes';
+import { RECIPES_ON } from '../lib/recipes';
 
-type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
+export type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
 const TABS: Tab[] = ['products', 'recipes', 'budget', 'pantry', 'articles'];
 /** Tabs that are built. The rest carry a coming-soon cover. */
-const LIVE: Tab[] = ['products', 'budget'];
+const LIVE: Tab[] = ['products', 'budget', ...(RECIPES_ON ? (['recipes'] as Tab[]) : [])];
 
 const CATEGORY_ICON: Record<CategoryId, IconName> = {
   'pantry staples': 'dry',
@@ -41,11 +43,14 @@ interface Props {
   onCart: () => void;
   onCommunity: () => void;
   onProfile: () => void;
+  onRecipe: (slug: string) => void;
+  /** Opens on this tab (back from a recipe returns to Recipes). */
+  initialTab?: Tab;
 }
 
 /** The screen the app opens to: browse, search, and the way into a trip. Unbuilt sections carry a coming-soon cover. */
-export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile }: Props) {
-  const [tab, setTab] = useState<Tab>('products');
+export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile, onRecipe, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'products');
   const [tip, setTip] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
@@ -103,7 +108,7 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
       </nav>
 
       <div className="explore-body">
-        {tab !== 'budget' && (
+        {tab !== 'budget' && !(tab === 'recipes' && RECIPES_ON) && (
           <button className="search-open" onClick={() => onSearch()} aria-label={S.search.open}>
             <Icon name="search" size={22} stroke={2.5} />
             <span>{S.search.openHint}</span>
@@ -175,6 +180,8 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
           </>
         ) : tab === 'budget' ? (
           <Budget />
+        ) : tab === 'recipes' && RECIPES_ON ? (
+          <RecipesPanel onOpen={onRecipe} />
         ) : (
           <SoonPanel tab={tab} onBack={() => setTab('products')} />
         )}
