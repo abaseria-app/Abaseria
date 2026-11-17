@@ -504,3 +504,11 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .year-wheel-row { height: 56px; display: flex; align-items: center; justify-content: center; scroll-snap-align: center; font-size: 1.4rem; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
 .year-wheel-row.centre { font-size: 2rem; font-weight: 800; color: var(--purple); }
 .year-wheel-mark { position: absolute; left: 0; right: 0; top: 112px; height: 56px; border-top: 2px solid var(--purple); border-bottom: 2px solid var(--purple); pointer-events: none; }
+
+/* Under the trip budget field (MonthlyBudgetHint). */
+.monthly-budget { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: -4px 0 12px; }
+.monthly-budget .hint { margin: 0; }
+.monthly-budget .link { padding: 0; min-height: 32px; }
+.monthly-budget .field { width: 100%; }
+.monthly-budget .row-actions { display: flex; gap: 8px; width: 100%; }
+.monthly-budget .row-actions .btn { flex: 1; }

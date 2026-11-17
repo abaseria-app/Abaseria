@@ -3,8 +3,10 @@
 // Everything here lives in the database (migrations 015-017), never on the phone: the Profile screen loads it
 // when opened and saves each change straight away. The database enforces the rules (own row only, real
 // accounts only, answers need the profile switch, birth year locked once saved, under 18 refused); this file
-// only shapes requests and turns database answers into something the screen can show.
+// only shapes requests and turns database answers into something the screen can show. One exception: the budget
+// range answer sets a starting monthly grocery budget on the phone (monthlyBudget.ts), which budgets already are.
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { followProfileBand } from './monthlyBudget';
 import { getSupabase } from './supabase';
 
 /** Which privacy notice the shopper saw when they flipped a switch. Bump when the notice changes. */
@@ -127,7 +129,9 @@ export async function loadProfile(): Promise<Loaded> {
   ]);
   if (cons.error) fail(cons.error);
   if (prof.error) fail(prof.error);
-  return { consents: consentsFromRows(cons.data), profile: { ...EMPTY_PROFILE, ...((prof.data as Partial<Profile> | null) ?? {}) } };
+  const profile = { ...EMPTY_PROFILE, ...((prof.data as Partial<Profile> | null) ?? {}) };
+  void followProfileBand(profile.grocery_budget_band);
+  return { consents: consentsFromRows(cons.data), profile };
 }
 
 /** Flips one switch. The database turns offers and research off itself when profile goes off. */
@@ -147,6 +151,12 @@ export function cleanNickname(raw: string): string | null {
   return s || null;
 }
 
+/** The monthly grocery budget on the phone follows the budget range answer (see monthlyBudget.ts). */
+function saved(profile: Profile): Profile {
+  void followProfileBand(profile.grocery_budget_band);
+  return profile;
+}
+
 /** Saves (or clears, with null) answers: changes the shopper's row, or adds it the first time. */
 export async function saveAnswers(answer: Answer): Promise<Profile> {
   const c = await client();
@@ -155,9 +165,9 @@ export async function saveAnswers(answer: Answer): Promise<Profile> {
   if (!upd.data?.length) {
     const ins = await c.from('shopper_profiles').insert(answer).select(PROFILE_COLUMNS).single();
     if (ins.error) fail(ins.error);
-    return { ...EMPTY_PROFILE, ...(ins.data as Partial<Profile>) };
+    return saved({ ...EMPTY_PROFILE, ...(ins.data as Partial<Profile>) });
   }
-  return { ...EMPTY_PROFILE, ...(upd.data[0] as Partial<Profile>) };
+  return saved({ ...EMPTY_PROFILE, ...(upd.data[0] as Partial<Profile>) });
 }
 
 /** Deletes every answer (the switches stay as they are). */
@@ -165,4 +175,5 @@ export async function deleteAnswers(): Promise<void> {
   const c = await client();
   const { error } = await c.from('shopper_profiles').delete().not('user_id', 'is', null);
   if (error) fail(error);
+  void followProfileBand(null);
 }
