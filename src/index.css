@@ -467,3 +467,40 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .profile-photo-who { display: flex; flex-direction: column; min-width: 0; }
 .profile-photo-who .hint { margin: 0; overflow-wrap: anywhere; }
 .profile-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* One-question popups (QuestionFlow): profile questions on the 2nd and 3rd visit, and Change on the Profile tab. */
+.flow-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(30, 14, 44, 0.55); display: flex; align-items: flex-end; justify-content: center; }
+.flow-sheet { background: var(--card); width: 100%; max-width: 480px; max-height: 100dvh; border-radius: 24px 24px 0 0; padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; animation: flow-up 0.22s ease-out; }
+@media (min-height: 700px) { .flow-overlay { align-items: center; } .flow-sheet { border-radius: 24px; margin: 16px; } }
+@keyframes flow-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .flow-sheet { animation: none; } }
+.flow-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.flow-top .link { min-height: 44px; min-width: 44px; }
+.flow-dots { display: flex; gap: 6px; }
+.flow-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.flow-dots i.on { background: var(--purple); width: 20px; border-radius: 4px; }
+.flow-body { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 16px; overflow-y: auto; }
+.flow-body h2 { margin: 4px 0 0; text-align: center; font-size: 1.6rem; line-height: 1.2; color: var(--ink, #1d1b16); }
+.flow-sub { margin: 0; text-align: center; color: var(--muted); }
+.flow-sub.small { font-size: 0.85rem; }
+.flow-center { text-align: center; padding: 40px 0; }
+.flow-options { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.flow-option { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 60px; padding: 0 20px; border-radius: 18px; border: 2px solid var(--purple); background: var(--card); color: var(--purple); font-size: 1.15rem; font-weight: 700; }
+.flow-option.on { background: var(--lilac); }
+.flow-option:active { transform: scale(0.98); }
+.flow-option:disabled { opacity: 0.6; }
+.flow-input { min-height: 60px; border-radius: 18px; border: 2px solid var(--purple); padding: 0 18px; font-size: 1.3rem; text-align: center; background: var(--card); }
+.flow-input:focus { outline: 3px solid var(--lilac); outline-offset: 1px; }
+.flow-skip { align-self: center; min-height: 52px; min-width: 60%; border-radius: 999px; border: 2px solid var(--line); background: var(--card); font-weight: 700; font-size: 1.05rem; color: var(--charcoal); }
+.flow-under18 { align-self: center; min-height: 44px; }
+.profile-hello { text-align: center; font-weight: 700; font-size: 1.2rem; margin: 0; }
+
+/* Year wheel: the centre row is the pick. */
+.year-wheel { position: relative; height: 280px; margin: 4px auto; width: 100%; max-width: 260px; }
+.year-wheel-list { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.year-wheel-list::-webkit-scrollbar { display: none; }
+.year-wheel-list:focus-visible { outline: 3px solid var(--lilac); border-radius: 12px; }
+.year-wheel-row { height: 56px; display: flex; align-items: center; justify-content: center; scroll-snap-align: center; font-size: 1.4rem; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
+.year-wheel-row.centre { font-size: 2rem; font-weight: 800; color: var(--purple); }
+.year-wheel-mark { position: absolute; left: 0; right: 0; top: 112px; height: 56px; border-top: 2px solid var(--purple); border-bottom: 2px solid var(--purple); pointer-events: none; }

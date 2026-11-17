@@ -14,6 +14,8 @@ import { Search } from './screens/Search';
 import { Explore } from './screens/Explore';
 import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
 import { Profile } from './screens/Profile';
+import { QuestionFlow } from './components/QuestionFlow';
+import { markShown, recordVisit, type QuestionSet } from './lib/visits';
 import type { CategoryId } from './lib/categories';
 import { Login } from './screens/Login';
 import { NoticeBanner } from './components/NoticeBanner';
@@ -41,6 +43,19 @@ export default function App() {
   const [searchCategory, setSearchCategory] = useState<CategoryId | null>(null);
   const [soon, setSoon] = useState<SoonFeature>('community');
   const [notices, setNotices] = useState<Notice[]>([]);
+  // Profile questions due on this visit (2nd: about you, 3rd: household). Counted when the app comes to the front.
+  const [due, setDue] = useState<{ id: string; set: QuestionSet | null } | null>(null);
+  const accountId = account?.id;
+
+  useEffect(() => {
+    if (!accountId) return;
+    const check = () => {
+      if (document.visibilityState === 'visible') recordVisit(accountId).then((set) => setDue({ id: accountId, set })).catch(() => undefined);
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, [accountId]);
 
   // Notices from Abaseria (incl. a breach notice): checked on open and whenever the app comes back to the front.
   useEffect(() => {
@@ -138,10 +153,22 @@ export default function App() {
       }}
     />
   );
+  // Never over a trip, the cashier or sign-in: only where the shopper is browsing.
+  const askNow = account && due?.id === account.id && (route === 'explore' || route === 'profile') ? due.set : null;
+  const questions = askNow && account && (
+    <QuestionFlow
+      key={askNow}
+      set={askNow}
+      suggestedName={account.name}
+      onShown={() => void markShown(account.id, askNow)}
+      onClose={() => setDue(null)}
+    />
+  );
   return (
     <>
       {banner}
       {screen()}
+      {questions}
     </>
   );
 
