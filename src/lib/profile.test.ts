@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { birthYears, cleanNickname, consentsFromRows, explainError } from './profile';
+import { BUDGET_PESOS, birthYears, cleanNickname, consentsFromRows, explainError, formatBudget } from './profile';
 
 describe('birthYears', () => {
   it('starts at the newest year that is certainly 18+', () => {
@@ -55,5 +55,18 @@ describe('cleanNickname', () => {
   });
   it('keeps Filipino names intact', () => {
     expect(cleanNickname('Ma. Señora Ñiña')).toBe('Ma. Señora Ñiña');
+  });
+});
+
+describe('budget wheel', () => {
+  it('runs ₱1,000 to ₱15,000 in ₱1,000 steps, matching migration 020', () => {
+    expect(BUDGET_PESOS).toHaveLength(15);
+    expect(BUDGET_PESOS[0]).toBe(1000);
+    expect(BUDGET_PESOS.at(-1)).toBe(15000);
+    expect(BUDGET_PESOS.every((v) => v % 1000 === 0)).toBe(true);
+  });
+  it('reads the top as ₱15,000+', () => {
+    expect(formatBudget(6000)).toBe('₱6,000');
+    expect(formatBudget(15000)).toBe('₱15,000+');
   });
 });

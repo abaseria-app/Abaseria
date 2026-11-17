@@ -307,7 +307,7 @@ await ok('2nd-visit answers saved', 'authenticated', U1, basics);
 await ok('...birthday locked by the database', 'authenticated', U1, `select birthday_locked_at from public.shopper_profiles`, (r) => r.rows[0]?.birthday_locked_at != null);
 await ok('3rd-visit answers saved', 'authenticated', U1,
   `update public.shopper_profiles set household_size_band = '3-4', has_kids_under_12 = 'yes', has_senior_60plus = 'no_answer',
-     payday_pattern = 'kinsenas_katapusan', grocery_budget_band = '6000_9999' where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+     payday_pattern = 'kinsenas_katapusan', grocery_budget_pesos = 6000 where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
 await ok('shopper reads own profile', 'authenticated', U1, `select gender, household_size_band from public.shopper_profiles`,
   (r) => r.rows.length === 1 && r.rows[0].gender === 'woman' && r.rows[0].household_size_band === '3-4');
 await ok('my_consents shows the current switches', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
@@ -408,6 +408,18 @@ await refused('empty nickname', 'authenticated', U3, `update public.shopper_prof
 await ok('another shopper can’t read it', 'authenticated', U1, `select nickname from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows.length === 0);
 await refused('logged-out phone can’t read it', 'anon', null, `select nickname from public.shopper_profiles`);
 await ok('switching off deletes the nickname too', 'authenticated', U3, sw('profile', false));
+
+// 020: monthly grocery budget in pesos. U3 turns the profile back on for these.
+await ok('profile back on for the budget checks', 'authenticated', U3, sw('profile', true));
+await ok('budget ₱1,000 saved', 'authenticated', U3, `insert into public.shopper_profiles (grocery_budget_pesos) values (1000)`);
+await ok('budget ₱15,000 saved', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 15000 where user_id = '${U3}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('...and read back', 'authenticated', U3, `select grocery_budget_pesos b from public.shopper_profiles`, (r) => r.rows[0]?.b === 15000);
+await refused('budget between steps (₱6,500)', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 6500 where user_id = '${U3}'`);
+await refused('budget above the wheel (₱16,000)', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 16000 where user_id = '${U3}'`);
+await refused('budget of zero', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 0 where user_id = '${U3}'`);
+await check('old budget range column is gone', (await db.query(`select 1 from information_schema.columns where table_name = 'shopper_profiles' and column_name = 'grocery_budget_band'`)).rows.length === 0);
+await ok('switching off deletes the budget too', 'authenticated', U3, sw('profile', false));
+await ok('...nothing left', 'authenticated', U3, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
 await ok('...gone', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows[0]?.n === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);

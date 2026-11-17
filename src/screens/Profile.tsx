@@ -10,6 +10,7 @@ import {
   loadProfile,
   saveAnswers,
   setConsent,
+  formatBudget,
   type Answer,
   type ChoiceField,
   type Loaded,
@@ -30,7 +31,7 @@ type Editing = Question | null;
 type Ask = 'turnOff' | 'removeYear' | 'deleteAll' | null;
 
 const PRIVACY = `${import.meta.env.BASE_URL}privacy.html#profile`;
-const CHOICE_FIELDS: ChoiceField[] = ['gender', 'household_size_band', 'has_kids_under_12', 'has_senior_60plus', 'payday_pattern', 'grocery_budget_band'];
+const CHOICE_FIELDS: ChoiceField[] = ['gender', 'household_size_band', 'has_kids_under_12', 'has_senior_60plus', 'payday_pattern'];
 const label = (v: string) => S.profile.labels[v] ?? v;
 
 /** The Profile tab: the shopper's switches and answers, each one changeable or removable on the spot. */
@@ -185,6 +186,26 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
     </div>
   );
 
+  const budgetRow = (
+    <div className="profile-row">
+      <div className="profile-q">
+        <strong>{S.profile.questions.grocery_budget_pesos}</strong>
+        <small>{S.profile.why.grocery_budget_pesos}</small>
+        <span className={profile.grocery_budget_pesos ? 'profile-a' : 'profile-a empty'}>
+          {profile.grocery_budget_pesos ? formatBudget(profile.grocery_budget_pesos) : S.profile.notAnswered}
+        </span>
+      </div>
+      <div className="profile-actions">
+        <button className="link" disabled={busy} onClick={() => setEditing('grocery_budget_pesos')}>
+          {profile.grocery_budget_pesos ? S.profile.edit : S.profile.answer}
+        </button>
+        {profile.grocery_budget_pesos && (
+          <button className="link danger" disabled={busy} onClick={() => void save({ grocery_budget_pesos: null })}>{S.profile.remove}</button>
+        )}
+      </div>
+    </div>
+  );
+
   const hasAnswers = Object.entries(profile).some(([k, v]) => k !== 'birthday_locked_at' && v !== null);
 
   return (
@@ -239,6 +260,7 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
               {locationRow}
               {yearRow}
               {CHOICE_FIELDS.map(row)}
+              {budgetRow}
             </div>
           ) : (
             <p className="hint">{S.profile.offHint}</p>

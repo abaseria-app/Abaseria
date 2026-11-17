@@ -1,33 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, Trip } from './db';
-import { budgetFromBand, nextFromBand, parseBudget, spentThisMonth } from './monthlyBudget';
+import { nextFromProfile, parseBudget, spentThisMonth } from './monthlyBudget';
 
-describe('budgetFromBand', () => {
-  it('uses the bottom of the range, and ₱3,000 for under ₱3,000', () => {
-    expect(budgetFromBand('6000_9999')).toBe(600_000);
-    expect(budgetFromBand('15000_plus')).toBe(1_500_000);
-    expect(budgetFromBand('under_3000')).toBe(300_000);
-    expect(budgetFromBand('no_answer')).toBeNull();
-    expect(budgetFromBand(null)).toBeNull();
-  });
-});
-
-describe('nextFromBand', () => {
+describe('nextFromProfile', () => {
   it('fills an empty budget from the answer', () => {
-    expect(nextFromBand(null, '6000_9999')).toEqual({ centavos: 600_000, source: 'profile' });
+    expect(nextFromProfile(null, 6000)).toEqual({ centavos: 600_000, source: 'profile' });
   });
   it('follows a changed answer', () => {
-    expect(nextFromBand({ centavos: 600_000, source: 'profile' }, '10000_14999')).toEqual({ centavos: 1_000_000, source: 'profile' });
-    expect(nextFromBand({ centavos: 600_000, source: 'profile' }, '6000_9999')).toBeUndefined();
+    expect(nextFromProfile({ centavos: 600_000, source: 'profile' }, 9000)).toEqual({ centavos: 900_000, source: 'profile' });
+    expect(nextFromProfile({ centavos: 600_000, source: 'profile' }, 6000)).toBeUndefined();
   });
   it('drops the amount when the answer is removed or turned off', () => {
-    expect(nextFromBand({ centavos: 600_000, source: 'profile' }, null)).toBeNull();
-    expect(nextFromBand({ centavos: 600_000, source: 'profile' }, 'no_answer')).toBeNull();
-    expect(nextFromBand(null, null)).toBeUndefined();
+    expect(nextFromProfile({ centavos: 600_000, source: 'profile' }, null)).toBeNull();
+    expect(nextFromProfile(null, null)).toBeUndefined();
   });
   it('never overwrites an amount the shopper typed', () => {
-    expect(nextFromBand({ centavos: 720_000, source: 'shopper' }, '15000_plus')).toBeUndefined();
-    expect(nextFromBand({ centavos: 720_000, source: 'shopper' }, null)).toBeUndefined();
+    expect(nextFromProfile({ centavos: 720_000, source: 'shopper' }, 15000)).toBeUndefined();
+    expect(nextFromProfile({ centavos: 720_000, source: 'shopper' }, null)).toBeUndefined();
   });
 });
 
