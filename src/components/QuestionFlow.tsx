@@ -98,7 +98,9 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
 
   const screen = queue[at];
   const last = at >= queue.length - 1;
-  const next = () => (last ? onClose(data) : setAt((i) => i + 1));
+  // `latest` matters on the last screen: the answer just saved isn't in `data` until the next render,
+  // so closing with `data` would hand back the profile from before the tap.
+  const next = (latest: Loaded | null = data) => (last ? onClose(latest) : setAt((i) => i + 1));
 
   async function run(work: () => Promise<Loaded | void>) {
     setBusy(true);
@@ -106,7 +108,7 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
     try {
       const d = await work();
       if (d) setData(d);
-      next();
+      next(d || data);
     } catch (e) {
       setError(e instanceof ProfileFailure ? e.reason : 'failed');
     } finally {
@@ -238,7 +240,7 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
           {busy && <p className="hint">{F().saving}</p>}
         </div>
         {isQuestion && (
-          <button className="flow-skip" disabled={busy} onClick={next}>
+          <button className="flow-skip" disabled={busy} onClick={() => next()}>
             {F().skip}
           </button>
         )}
