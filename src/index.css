@@ -512,3 +512,72 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .monthly-budget .field { width: 100%; }
 .monthly-budget .row-actions { display: flex; gap: 8px; width: 100%; }
 .monthly-budget .row-actions .btn { flex: 1; }
+
+/* ---------------------------------------------------------------------------------------------------------
+   Budget tab (Explore). Built from the Cart tab's cards so the two read as one app. */
+
+.budget { display: flex; flex-direction: column; gap: 12px; }
+.budget h2 { margin: 6px 0 8px; }
+.month-switch { display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.month-switch h2 { margin: 0; text-align: center; font-size: 1.1rem; font-weight: 800; }
+.month-arrow { min-height: 52px; background: none; border: 0; font-size: 1.8rem; font-weight: 700; color: var(--purple); }
+.month-today { align-self: center; margin-top: -8px; }
+.budget-views { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; }
+.budget-views::-webkit-scrollbar { display: none; }
+.budget-views .chip { flex: none; min-height: 44px; }
+.budget-views .chip.on { background: var(--lilac); border-color: var(--purple); color: var(--purple); }
+
+.budget-card { margin: 0; }
+.budget-card .bar { margin: 6px 0 8px; }
+.budget-card .spend-sub { margin: 2px 0; }
+.budget-card .spend-sub.strong { font-weight: 700; }
+.budget-card .link.inline, .pie-card .link.inline { min-height: 36px; padding: 0; text-decoration: underline; }
+.budget-card-actions { margin: 10px 0 6px; }
+.spend-card.over { background: var(--red); color: var(--on-navy); }
+.spend-card.over .label, .spend-card.over .spend-sub, .spend-card.over .link { color: var(--on-navy); }
+.budget-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.budget-actions .btn { padding: 0 10px; font-size: 1rem; }
+.btn.wide-top { width: 100%; }
+.btn.small { min-height: 44px; font-size: .9rem; padding: 0 12px; }
+
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.section-head h2 { margin: 12px 0 6px; }
+.pie-card .section-head h2 { margin: 12px 0 4px; }
+
+.budget-rows li { padding: 0; }
+.budget-row { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: 0; padding: 12px 14px; min-height: 60px; }
+.budget-row > strong { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.budget-row-text { display: flex; flex-direction: column; min-width: 0; }
+.budget-row-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-row-text small { color: var(--muted); }
+.budget-dot { flex: none; width: 12px; height: 12px; border-radius: 4px; }
+
+.bill-list { list-style: none; padding: 0; margin: 0; }
+.bill-list li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.bill-list li:first-child { border-top: 0; }
+.bill-main { display: flex; flex-direction: column; text-align: left; background: none; border: 0; padding: 4px 0; min-height: 44px; min-width: 0; }
+.bill-main small { color: var(--muted); }
+.bill-list li.overdue .bill-main small { color: var(--red); font-weight: 700; }
+.bill-list li.paid .bill-main strong { color: var(--muted); }
+.bill-list li.paid .bill-main small { color: var(--frame); font-weight: 700; }
+.bill-amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
+.goal-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.goal-list .pie-card { margin: 0; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.goal-name { display: flex; flex-direction: column; text-align: left; background: none; border: 0; padding: 0; min-height: 44px; }
+.goal-name small { color: var(--muted); }
+.goal-bar { margin: 0; background: var(--line); }
+.goal-bar > div { background: var(--leaf); }
+.goal-list .btn { align-self: flex-start; }
+
+.budget-tips { background: var(--card); border-radius: var(--radius); padding: 4px 16px; box-shadow: var(--shadow-card); }
+.budget-tips summary { min-height: 48px; display: flex; align-items: center; font-weight: 800; cursor: pointer; }
+.budget-tips ol { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+.budget-overlay { position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: var(--bg); }
+.budget-overlay .sheet { min-height: auto; padding-top: calc(28px + env(safe-area-inset-top)); }
+.budget-overlay .sheet-head { min-height: 56px; }
+.budget-overlay .seg { margin-bottom: 12px; }
+.receipt-pick { width: 100%; margin: 6px 0; }
+.receipt-preview { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 6px 0; }
+.receipt-preview img { max-width: 100%; max-height: 360px; border-radius: 12px; box-shadow: var(--shadow-card); }
