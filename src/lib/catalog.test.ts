@@ -40,7 +40,7 @@ describe('buildPhoneCatalog', () => {
     const canton = cat.find((c) => c.barcode === '4807770270017')!;
     expect(canton.prices).toHaveLength(1);
     expect(canton.prices[0]).toMatchObject({ unitPriceCentavos: 1650, storeKey: 'remote-anabu', seenOn: '2026-11-04', source: 'phone' });
-    expect(canton.category).toBe('dry');
+    expect(canton.category).toBe('pantry staples');
     const kangkong = cat.find((c) => c.name === 'Kangkong')!;
     expect(kangkong.prices.map((p) => p.storeLabel)).toEqual(['Puregold Imus Anabu', 'Sari-sari store']);
   });
@@ -49,7 +49,7 @@ describe('buildPhoneCatalog', () => {
 describe('mergeCatalogs', () => {
   const shared = buildSharedCatalog(
     [
-      { barcode: '4807770270017', name: 'Lucky Me! Pancit Canton Chilimansi', size: '80g', category: 'dry', image_path: '4807770270017.jpg' },
+      { barcode: '4807770270017', name: 'Lucky Me! Pancit Canton Chilimansi', size: '80g', category: 'pantry staples', image_path: '4807770270017.jpg' },
       { barcode: '4801981116072', name: 'Coke Original 1.5L', size: '1.5L', category: null, image_path: null },
     ],
     [
@@ -65,7 +65,7 @@ describe('mergeCatalogs', () => {
 
   it('fills names, sizes, pictures and store names from the shared database', () => {
     const coke = shared.find((s) => s.barcode === '4801981116072')!;
-    expect(coke).toMatchObject({ size: '1.5L', category: 'pantry', image: null });
+    expect(coke).toMatchObject({ size: '1.5L', category: 'beverages', image: null });
     const canton = shared.find((s) => s.barcode === '4807770270017')!;
     expect(canton.image).toBe('https://img.example/4807770270017.jpg');
     expect(canton.prices.map((p) => p.storeLabel)).toEqual(['SM Supermarket Imus', 'Puregold Imus Anabu']);

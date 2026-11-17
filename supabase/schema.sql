@@ -8,10 +8,11 @@
 -- plus a latest_prices view: the newest sighting per barcode per branch.
 --
 -- Who can do what (enforced by row-level security below):
---   anyone with the app's public key can READ branches, Published products, sightings and latest_prices
+--   anyone with the app's public key can READ branches, products (Pending and Published), sightings and latest_prices
 --   a signed-in phone (anonymous sign-in is fine) can ADD rows, stamped with its own user id
 --   nobody can edit or delete rows from the app; fixes are done here by you
---   which phone added a sighting (contributor) is stored but never readable through the app
+--   who added a sighting, product or store (contributor / created_by) is stored but never readable through the app
+--   staff roles (013): Admins manage public.staff; a staff member reads only their own row; shoppers see nothing
 
 
 -- Barcode check: 8, 12, 13 or 14 digits with a valid GTIN check digit.
@@ -19,6 +20,7 @@ create or replace function public.gtin_ok(code text)
 returns boolean
 language sql
 immutable
+set search_path = ''
 as $$
   select code ~ '^([0-9]{8}|[0-9]{12,14})$'
      and (
@@ -44,12 +46,18 @@ create unique index branches_chain_name_key on public.branches (lower(chain), lo
 
 
 create table public.products (
-  barcode     text primary key check (public.gtin_ok(barcode)),
+  id          bigint generated always as identity primary key,
+  -- Unique when present. A bad check digit or no barcode is accepted and flagged in barcode_status (migration 008).
+  barcode     text constraint products_barcode_key unique,
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
-  category    text not null default 'other'
+  -- One of Brad's 16 (011, Nov 11 2026), or null when nobody has sorted the product yet.
+  category    text
               constraint products_category_check
-              check (category in ('meat', 'poultry', 'vegetables', 'dairy', 'pantry', 'dry', 'household', 'other')),
+              check (category in ('pantry staples', 'fruits & vegetables', 'meat, poultry & seafood', 'dairy & eggs',
+                'canned & preserved food', 'cooking essentials & condiments', 'bread & bakery', 'snacks, candies & sweets',
+                'beverages', 'frozen & ready-to-eat food', 'household & cleaning supplies', 'personal care & hygiene',
+                'baby & kids', 'health & wellness', 'pet supplies', 'baking and desserts')),
   -- New products wait as Pending until a Product Manager or Admin publishes them. Phones can't set this.
   status      text not null default 'pending' check (status in ('pending', 'published')),
   -- Reference image: a file name in the public 'product-images' bucket. Set in the dashboard, never by the app.
@@ -62,8 +70,26 @@ create table public.products (
   -- One form per product. UPC-A is stored as 12 digits, the way Chrome's scanner reads it. The same code
   -- written as 13 digits with a leading 0 would become a second copy of the same can (migration 006).
   constraint products_barcode_upca_12
-  check (not (char_length(barcode) = 13 and barcode like '0%'))
+  check (not (char_length(barcode) = 13 and barcode like '0%')),
+  -- For review lists: 'valid', 'invalid' (bad check digit) or 'missing'. Computed, never typed.
+  barcode_status text generated always as (
+    case when barcode is null then 'missing' when public.gtin_ok(barcode) then 'valid' else 'invalid' end
+  ) stored
 );
+create index products_barcode_status_idx on public.products (barcode_status) where barcode_status <> 'valid';
+
+
+-- Holding table for spreadsheet uploads (migration 009). Rows are checked, de-duplicated and moved into
+-- products, then cleared. RLS on with no policies and no grants: only the server key can use it.
+create table public.product_import (
+  barcode     text,
+  name        text,
+  size        text,
+  category    text,
+  uploaded_at timestamptz not null default now()
+);
+comment on table public.product_import is 'Holding table for CSV uploads from the dashboard. No rules here; rows are checked, de-duplicated and moved into products, then cleared.';
+alter table public.product_import enable row level security;
 
 
 create table public.price_sightings (
@@ -106,14 +132,13 @@ alter table public.products        enable row level security;
 alter table public.price_sightings enable row level security;
 
 create policy "read branches"  on public.branches        for select to anon, authenticated using (true);
--- Shoppers see Published products, plus the Pending ones they added themselves. A Pending product's prices
--- still show (sightings and latest_prices aren't filtered), so a scan gets the price and the shopper types the name.
-create policy "read products"  on public.products        for select to anon, authenticated
-  using (status = 'published' or created_by = auth.uid());
+-- Everyone sees every product, Pending or Published (Nov 9 decision).
+create policy "read products"  on public.products        for select to anon, authenticated using (true);
 create policy "read sightings" on public.price_sightings for select to anon, authenticated using (true);
 
 create policy "add branches" on public.branches
   for insert to authenticated with check (created_by = auth.uid());
+-- Phones need a real barcode; staff can add flagged ones from the dashboard (migration 014, after 013).
 create policy "add products" on public.products
   for insert to authenticated with check (created_by = auth.uid());
 create policy "add sightings" on public.price_sightings
@@ -122,8 +147,10 @@ create policy "add sightings" on public.price_sightings
 -- No update or delete policies: the app can only add.
 
 -- Supabase grants every table to the app roles by default. Narrow that to read + add.
-revoke all on public.branches, public.products, public.price_sightings from anon, authenticated;
-grant select on public.branches, public.products to anon, authenticated;
+revoke all on public.branches, public.products, public.price_sightings, public.product_import from anon, authenticated;
+-- Every column except created_by is readable. A column added later stays hidden until a migration grants it.
+grant select (id, chain, name, lat, lng, created_at) on public.branches to anon, authenticated;
+grant select (id, barcode, name, size, category, status, image_path, created_at, barcode_status) on public.products to anon, authenticated;
 grant insert (id, chain, name, lat, lng) on public.branches to authenticated;
 grant insert (barcode, name, size, category) on public.products to authenticated;
 -- Every sighting column except contributor is readable.
@@ -136,12 +163,12 @@ grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_cen
 grant select on public.latest_prices to anon, authenticated;
 
 -- Uploading a price needs to know its barcode is already in the database, Pending or not.
--- This answers only that: which of these barcodes exist (200 at most per call). No names, no status.
+-- This answers only that: which of these barcodes exist (200 at most per call). Runs with the caller's rights.
 create or replace function public.known_barcodes(codes text[])
 returns setof text
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select p.barcode from public.products p where p.barcode = any (codes[1:200]);
@@ -158,3 +185,18 @@ grant execute on function public.known_barcodes(text[]) to authenticated;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('product-images', 'product-images', true, 524288, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do nothing;
+
+
+-- Breach tripwires, shopper notices and staff roles ------------------------------------------------------
+-- On a new project, run these after this file, in order:
+--   supabase/migrations/012_tripwires_and_notices.sql   security schema, alerts, notices
+--   supabase/migrations/013_staff_roles.sql             public.staff, is_staff() / staff_role() / is_admin(),
+--                                                       last-Admin guard and staff tripwires (needs 012's alerts)
+-- Then add the first Admins by hand (the insert at the top of 013).
+--   supabase/migrations/014_phones_need_valid_barcode.sql  phones need a real barcode; staff and imports don't
+--   supabase/migrations/015_shopper_profile.sql         consents, my_consents, has_consent(), shopper_profiles
+--   supabase/migrations/016_profile_real_accounts_only.sql  guest (anonymous) sessions get nothing from those tables
+--   supabase/migrations/017_birth_year_only.sql         birth year alone; the app can't write birth month yet
+--   supabase/migrations/018_profile_photos.sql          private profile-photos bucket, one photo per shopper, own only
+--   supabase/migrations/019_profile_nickname.sql        nickname on the shopper profile
+--   supabase/migrations/020_grocery_budget_pesos.sql    monthly grocery budget in pesos (replaces the range)

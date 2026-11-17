@@ -7,6 +7,7 @@ import { PERIODS, rangeFor, summarize, type Period } from '../lib/periods';
 import { categoryBreakdown, type Breakdown, type SliceId } from '../lib/breakdown';
 import { CATEGORY_BY_ID } from '../lib/categories';
 import type { Item } from '../lib/db';
+import { BottomNav } from '../components/BottomNav';
 
 interface Props {
   activeTripId: number | null;
@@ -15,11 +16,14 @@ interface Props {
   onContinue: () => void;
   onSettings: () => void;
   onSearch: () => void;
+  onExplore: () => void;
+  onCommunity: () => void;
+  onProfile: () => void;
 }
 
 const dateFmt = new Intl.DateTimeFormat('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 
-export function Home({ activeTripId, toast, onStart, onContinue, onSettings, onSearch }: Props) {
+export function Home({ activeTripId, toast, onStart, onContinue, onSettings, onSearch, onExplore, onCommunity, onProfile }: Props) {
   const [period, setPeriod] = useState<Period>('week');
   const trips = useLiveQuery(() => db.trips.toArray(), []) ?? [];
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
@@ -83,7 +87,7 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings, onS
   const activeTotal = active ? items.filter((i) => i.tripId === active.id && !i.removed).reduce((s, i) => s + i.lineTotalCentavos, 0) : 0;
 
   return (
-    <main className="screen home">
+    <main className="screen home with-nav">
       <header className="topbar">
         <h1>{S.appName}</h1>
         <button className="link" onClick={onSettings}>{S.home.settings}</button>
@@ -173,11 +177,12 @@ export function Home({ activeTripId, toast, onStart, onContinue, onSettings, onS
       )}
       <p className="hint small">{S.home.sourceNote}</p>
 
-      <div className="bottom">
+      <div className="bottom above-nav">
         <button className="btn primary huge" onClick={active ? onContinue : onStart}>
           {active ? S.home.continueTrip : S.home.startShopping}
         </button>
       </div>
+      <BottomNav current="cart" onExplore={onExplore} onCart={() => window.scrollTo({ top: 0 })} onScan={active ? onContinue : onStart} onCommunity={onCommunity} onProfile={onProfile} />
     </main>
   );
 }

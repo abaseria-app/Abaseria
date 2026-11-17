@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Abaseria privacy policy</title>
   <meta name="description" content="What Abaseria collects, where it's kept, and how to delete your data.">
-  <!-- DRAFT, Nov 7 2026; contact address added Nov 8. Have someone who knows the Philippine Data Privacy Act
-       read it before the app is public. -->
+  <!-- DRAFT, Nov 7 2026; contact address added Nov 8; profile, switches and photos added Nov 16 (policy version
+       2026-11, the value the app saves with each switch). Have someone who knows the Philippine Data Privacy Act
+       read it before the app is public. Still to do: NPC registration and a named Data Protection Officer. -->
   <style>
     :root { --navy: #1a3555; --purple: #4b1f6f; --lilac: #cfa6ee; --muted: #555a5a; --bg: #f6f5f0; --line: #dedcd4; }
     body { margin: 0; background: var(--bg); color: var(--navy); font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
@@ -14,7 +15,8 @@
     h1 { color: var(--purple); margin: 0 0 4px; }
     h2 { color: var(--purple); margin-top: 32px; padding-top: 8px; border-top: 2px solid var(--line); }
     .updated { color: var(--muted); margin-top: 0; }
-    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .95rem; }
+    ul { padding-left: 20px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .95rem; }
     th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
     th { background: var(--lilac); color: var(--purple); }
     .box { background: #fff; border: 2px solid var(--purple); border-radius: 14px; padding: 4px 18px; }
@@ -24,40 +26,63 @@
 <body>
 <main>
   <h1>Abaseria privacy policy</h1>
-  <p class="updated">Last updated November 7, 2026</p>
+  <p class="updated">Last updated November 16, 2026</p>
 
   <p>Abaseria is a grocery tally app made in Imus, Cavite. You scan items as you shop and see your total before the cashier. This page says what the app collects, where it goes, and how to delete it.</p>
 
   <h2>What stays on your phone</h2>
-  <p>Your trips, budgets, shopping lists, item photos, receipt counts and your location never leave your phone. The app uses your location only to find which store you're in, and doesn't save it. Signing out doesn't delete your trips; uninstalling the app or clearing its data does.</p>
+  <p>Your trips, budgets, shopping lists, item photos, receipt counts and your location never leave your phone. The app uses your location only to find which store you're in, and doesn't save it. Signing out doesn't delete your trips. Uninstalling the app, clearing Chrome's data or changing phones erases them, along with any prices not yet shared, and we can't get them back because we never had them.</p>
 
   <h2>What leaves your phone</h2>
   <table>
     <tr><th>What</th><th>Why</th></tr>
-    <tr><td>Your name, email and account ID from Google or Facebook, plus the profile photo link they send with it</td><td>To sign you in and tie the prices you share to one account. We don't post anything to Google or Facebook, and we don't see your friends, posts or password.</td></tr>
+    <tr><td>Your email address, if you sign in with a code we email you; or your name, email and account ID from Google or Facebook, plus the profile photo link they send with it</td><td>To sign you in and tie the prices you share to one account. We don't post anything to Google or Facebook, and we don't see your friends, posts or password.</td></tr>
     <tr><td>Prices you share: the product barcode, the store, the price, whether it was a promo, how it was captured, and the day (not the time)</td><td>To build a shared list of grocery prices per store, so every shopper sees what things cost. Other shoppers see the price, never who shared it.</td></tr>
     <tr><td>Stores you add: chain, branch name and the store's map position</td><td>So other shoppers can find the same store.</td></tr>
     <tr><td>Names and categories you give to new products</td><td>So the next shopper who scans that barcode sees what it is.</td></tr>
   </table>
   <p>Items without a barcode, and anything from a trip you cancelled, aren't shared.</p>
 
+  <h2 id="profile">Your profile (only if you choose)</h2>
+  <p>The Profile tab can save a few answers about you. Nothing is saved unless you turn on <strong>Save my answers</strong>, every question can be skipped or answered "Prefer not to say", and skipping changes nothing in the app.</p>
+  <table>
+    <tr><th>What</th><th>Why</th></tr>
+    <tr><td>Your birth year (not your birthday)</td><td>To understand shoppers by age group. We only save it if you're 18 or older. Once saved it can be removed but not changed in the app; email us to correct it.</td></tr>
+    <tr><td>Gender: woman, man, another gender, or prefer not to say</td><td>To understand who shops.</td></tr>
+    <tr><td>Your province and city (from a list, never your address or GPS position)</td><td>To show prices from stores near you and to group answers by area.</td></tr>
+    <tr><td>How many people live with you, whether there are kids under 12 or seniors 60+ at home</td><td>To compare your spending with similar households.</td></tr>
+    <tr><td>When you get paid (kinsenas &amp; katapusan, weekly, monthly, or daily or irregular) and your monthly grocery budget (to the nearest ₱1,000, up to ₱15,000 or more)</td><td>For budgeting features that follow your payday.</td></tr>
+  </table>
+  <p>Age is sensitive personal information under the Data Privacy Act, so we ask for it only with your separate consent. We never ask for your full birthday, address, phone number, government ID, income, religion, health or marital status.</p>
+  <p>Two more switches, both off until you turn them on, decide how your answers are used:</p>
+  <ul>
+    <li><strong>Personalized offers:</strong> your answers help pick which offers and coupons you see. The choosing happens on our side; stores and brands never get your answers or your name. Off: you still see offers, just not picked for you.</li>
+    <li><strong>Anonymous reports:</strong> your answers are counted in totals that stores, brands and researchers can see, only for groups of 50 or more shoppers, with no names, accounts, lists or receipts.</li>
+  </ul>
+  <p>Turning off <strong>Save my answers</strong> deletes your answers right away and turns both of these off. <strong>Delete all my answers</strong> on the Profile tab does the same without changing your switches. We keep a record of when you turned each switch on or off, so we can show what you agreed to.</p>
+
+  <h2 id="photo">Your profile photo</h2>
+  <p>The Profile tab shows the photo from your Google account, shown from Google's link; we don't copy it. You can hide it, or replace it with a selfie or a photo from your phone.</p>
+  <p>A photo you choose is cut to a 256 × 256 square on your phone before it's uploaded. That also removes the hidden data phones attach to pictures, such as where and when it was taken and the phone model. It's stored privately: <strong>only you can see it</strong>, not other shoppers, not stores, and it's never used for offers or reports. <strong>Remove photo</strong> deletes it.</p>
+
   <h2>Who handles it</h2>
-  <p>The shared data is stored by Supabase on servers in Singapore. Google and Facebook handle the sign-in step. The app itself is served by GitHub Pages. We don't sell your personal information and the app shows no ads.</p>
-  <p>Price data combined across many shoppers, with no account attached, may be used for reports on grocery prices in the Philippines.</p>
+  <p>Shared prices, your profile answers, your switch choices and your photo are stored by Supabase on servers in Singapore, outside the Philippines. Google and Facebook handle the sign-in step, and sign-in codes are sent through Google's Gmail. The app itself is served by GitHub Pages. We don't sell your personal information, and the app doesn't show ads yet. If it does later, your profile answers won't be shared with any ad network.</p>
+  <p>Price data combined across many shoppers, with no account attached, may be used for reports on grocery prices in the Philippines. Profile answers are only included in reports if you turned on Anonymous reports, and only in totals for groups of 50 or more.</p>
 
   <h2 id="delete">Deleting your data</h2>
   <div class="box">
     <p><strong>To delete your Abaseria account,</strong> email <a href="mailto:abaseria.app@gmail.com?subject=Delete%20my%20Abaseria%20account">abaseria.app@gmail.com</a> with the subject "Delete my Abaseria account", from the email address you signed in with (or tell us which Google or Facebook name you used).</p>
-    <p>Within 30 days we delete your account: your name, email, account ID and profile photo link. Prices you shared stay in the shared list with nothing linking them to you. We'll email you when it's done.</p>
+    <p>Within 30 days we delete your account: your name, email, account ID, profile answers and the photo you uploaded. Prices you shared stay in the shared list with nothing linking them to you, and the record of your switch choices stays with nothing linking it to you. We'll email you when it's done.</p>
+    <p>You don't need to email us to remove your profile answers or photo: turn off <strong>Save my answers</strong>, tap <strong>Delete all my answers</strong>, or tap <strong>Remove photo</strong> on the Profile tab. They're deleted at once.</p>
     <p><strong>If you signed in with Facebook,</strong> you can also remove Abaseria in Facebook: Settings &amp; privacy → Settings → Apps and websites → Abaseria → Remove. That stops Facebook from sending us anything new; email us as above to delete what we already have.</p>
     <p><strong>If you signed in with Google,</strong> you can remove Abaseria's access at <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>, then email us as above.</p>
   </div>
 
   <h2>Your rights</h2>
-  <p>Under the Philippine Data Privacy Act of 2012 you can ask what we hold about you, have it corrected, or have it deleted. Email <a href="mailto:abaseria.app@gmail.com">abaseria.app@gmail.com</a>. We'll reply within 15 days.</p>
+  <p>Under the Philippine Data Privacy Act of 2012 you can ask what we hold about you, have it corrected, have it deleted, take back any consent you gave, or complain to the National Privacy Commission. Email <a href="mailto:abaseria.app@gmail.com">abaseria.app@gmail.com</a>. We'll reply within 15 days.</p>
 
   <h2>Changes</h2>
-  <p>If this policy changes, the date at the top changes and the app will tell you before anything new leaves your phone.</p>
+  <p>If this policy changes, the date at the top changes and the app will tell you before anything new leaves your phone. Profile answers and photos (added November 16, 2026) only leave your phone after you choose to save them.</p>
 </main>
 </body>
 </html>

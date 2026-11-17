@@ -33,7 +33,7 @@ To replace one, upload the new file under the same name, or a new name and chang
 
 ## Sign-in (Google and Facebook)
 
-Every shopper signs in with Google or Facebook on first open. After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
+Every shopper signs in on first open: Google, or a 6-digit code sent to their email (Facebook is hidden until Meta approves the app). After that the app opens offline too: it keeps a "signed in as" record on the phone, and Supabase checks it whenever there's signal. Trips stay on the phone; signing out doesn't delete them.
 
 Phones that were already sharing anonymously keep their user id when they pick a provider (manual linking), so their past prices stay credited to them. If that account already has an Abaseria user, the phone switches to it.
 
@@ -45,7 +45,7 @@ Phones that were already sharing anonymously keep their user id when they pick a
 2. **Google Auth Platform → Branding:** app name `Abaseria`, your support email. Skip the logo for now: uploading one sends the app to Google for review.
 3. **Audience:** User type **External**, leave it in **Testing**. Under Test users, add every Gmail that will sign in (you, Jovie, each tester). Testing mode allows 100. Before the app is public, press **Publish app** (name, email and profile scopes don't need Google's security review).
 4. **Clients → Create client → Web application**, name `Abaseria web`:
-   - Authorized JavaScript origins: `https://bkarkos86-mako.github.io` and `http://localhost:5173`
+   - Authorized JavaScript origins: `https://abaseria-app.github.io` and `http://localhost:5173`
    - Authorized redirect URIs: `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod)
 5. Copy the **Client ID** and **Client secret**. The secret goes into Supabase only, never into this repo or the app.
 
@@ -53,10 +53,10 @@ Phones that were already sharing anonymously keep their user id when they pick a
 
 1. **Authentication → Sign In / Providers → Google:** turn on, paste the Client ID and Client secret, save.
 2. Same page: turn on **Allow manual linking**. With it, old anonymous test phones keep their user id when they add Google. Without it, they sign in to Google as a new user and their past prices stay under the old anonymous id.
-3. **Authentication → URL Configuration:** Site URL `https://bkarkos86-mako.github.io/Abaseria/dev/`. Redirect URLs: add `https://bkarkos86-mako.github.io/**` and `http://localhost:5173/**`.
+3. **Authentication → URL Configuration:** Site URL `https://abaseria-app.github.io/Abaseria/dev/`. Redirect URLs: add `https://abaseria-app.github.io/**` and `http://localhost:5173/**`.
 4. Once your test phones have signed in with Google, turn **off** Allow anonymous sign-ins. The app no longer uses it, and leaving it on lets scripts create users.
 
-**abaseria-prod:** the same 4 steps with Site URL `https://bkarkos86-mako.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
+**abaseria-prod:** the same 4 steps with Site URL `https://abaseria-app.github.io/Abaseria/`, **before** the login branch reaches `main`. Otherwise the live app asks for a sign-in that can't finish.
 
 To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Google, pick your account, and you land on Home. Settings → Account shows your name. In SQL Editor, `select email, is_anonymous from auth.users` shows your Gmail with `is_anonymous = false`.
 
@@ -69,7 +69,7 @@ Facebook needs a public privacy page with data-deletion instructions before anyo
 1. **My Apps → Create app.** Name `Abaseria`, your contact email. Use case: **Authenticate and request data from users with Facebook Login**. Skip connecting a business portfolio.
 2. **Use cases → Authentication and account creation → Customize:** next to `email`, press **Add**. `public_profile` is already on. Ask for nothing else: any other permission sends the app to Meta's App Review.
 3. **Facebook Login → Settings:** Valid OAuth Redirect URIs `https://psffjwaezfspmbebqbgg.supabase.co/auth/v1/callback` (dev) and `https://xjztzqwyzkfzvgizlucc.supabase.co/auth/v1/callback` (prod). Leave Client OAuth login, Web OAuth login and Enforce HTTPS on. Save.
-4. **App settings → Basic:** Privacy Policy URL `https://bkarkos86-mako.github.io/Abaseria/dev/privacy.html`. User data deletion → **Data deletion instructions URL**, same address with `#delete` on the end. Category **Shopping**. Save, then copy the **App ID** and **App secret** (press Show). The secret goes into Supabase only, never into this repo or the app.
+4. **App settings → Basic:** Privacy Policy URL `https://abaseria-app.github.io/Abaseria/dev/privacy.html`. User data deletion → **Data deletion instructions URL**, same address with `#delete` on the end. Category **Shopping**. Save, then copy the **App ID** and **App secret** (press Show). The secret goes into Supabase only, never into this repo or the app.
 5. While the app is in **Development** mode, only people with a role on it can sign in. To let Jovie test first: **App roles → Roles → Add people → Testers**, and she accepts at developers.facebook.com/requests.
 6. When the dev app works: **Publish** (top of the dashboard). With only `email` and `public_profile`, Meta usually lets it go live without a review. Once it's on `main`, change both URLs in step 4 to the `/Abaseria/` addresses.
 
@@ -83,11 +83,27 @@ To confirm: open `/Abaseria/dev/` on your phone, tap Continue with Facebook, and
 
 - **No email, no sign-in.** Supabase needs an email from Facebook. Accounts made with a mobile number and no email are refused; the app tells the shopper to use Google or add an email in Facebook. Watch how often testers hit this.
 - **Same email, same account.** A shopper who signs in with Google on one phone and Facebook on another, both with the same email, lands on one Abaseria account. Different emails make two accounts, and their shared prices are split between them.
-- **Links opened inside Messenger or Facebook** open in Facebook's own browser. Facebook sign-in works there; Google sign-in may be refused in that browser. Testers should open the link in Chrome and add it to the home screen, as the tester sheet already says.
+- **Links opened inside Messenger, Facebook or Instagram** open in that app's own browser, where Google refuses sign-in. Since Nov 12 the sign-in screen spots those browsers, hides the Google button and offers Open in Chrome (Android) and Copy link (`src/lib/inAppBrowser.ts`; preview with `?inapp`). Testers should still add the app to the home screen from Chrome.
+
+### Email code: one-time setup, about 15 minutes per project
+
+Shoppers can sign in with an email address instead of Google: the app emails a 6-digit code and they type it in (Nov 13, 2026). No link to tap, because a link opens in whatever browser the mail app picks and the sign-in can't finish there. Codes also work inside Messenger's and Facebook's browsers, where Google doesn't. The same address on Google and on a code is one account.
+
+Until Abaseria has a domain, the codes go out through a Gmail account over SMTP (about 500 emails a day). Use a Gmail that **only** sends codes, not the one that owns GitHub, Supabase and Google Cloud: if Gmail ever flags it for automated sending, only the codes stop.
+
+1. **The sending Gmail:** turn on 2-Step Verification, then Google Account → Security → **App passwords** → create one named `Abaseria Supabase dev`. Copy the 16 characters. They go into Supabase only, never into chat or this repo.
+2. **Supabase → Authentication → Emails → SMTP Settings:** Enable custom SMTP. Sender email: the sending Gmail. Sender name: `Abaseria`. Host `smtp.gmail.com`, port `587`, username: the sending Gmail, password: the app password. Minimum interval between emails to the same user: `60` seconds (the app counts down from 60). Save.
+3. **Authentication → Sign In / Providers → Email:** Email provider on, Confirm email on, Email OTP Expiration `600` seconds (the app and the email both say 10 minutes), Email OTP Length `6`.
+4. **Authentication → Emails → Templates:** in both **Magic Link** and **Confirm signup**, set the subject to `Your Abaseria code: {{ .Token }}` and paste the body of `supabase/email-templates/sign-in-code.html`.
+5. **Authentication → Rate Limits:** check "emails sent per hour". It caps how much a bot could send through the Gmail; the default is fine for dev.
+
+To confirm: on the dev app, Continue with email → your address → Send me a code. The email arrives from Abaseria with a 6-digit code; type it and you land on Explore. Settings → Account shows your address. In SQL Editor, `select email, raw_app_meta_data->'providers' from auth.users` shows `"email"` in your providers (next to `"google"` if it's the same address).
+
+Before this reaches the live app: the same steps on abaseria-prod with its own app password, and Cloudflare Turnstile on the email form (see CAPTCHA below), since every code request sends a real email.
 
 ### CAPTCHA
 
-With Google and Facebook as the only ways in, their own sign-in pages do the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in (the admin dashboard's staff login, or email-link sign-in for shoppers).
+With Google and Facebook as the only ways in, their own sign-in pages do the bot checking, and turning off anonymous sign-ins closes the one door scripts could use without it. Cloudflare Turnstile goes in with the first email or password sign-in. Email code sign-in (Nov 13) is that sign-in: Turnstile on the email form before it reaches the live app.
 
 ## Two databases
 
@@ -124,9 +140,24 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `002_shared_capture.sql` | Allows capture method `shared` (another shopper's price, checked against the tag) | Needed for module 2 | Before price sharing turns on in the live app |
 | `003_product_images.sql` | `products.image_path` and the public `product-images` bucket; images set in the dashboard only | Before adding images | Before images show in the live app |
 | `004_poultry_dairy_product_status.sql` | Poultry and Dairy categories; `products.status` (pending / published), new products Pending | Done Nov 5 | Before the next `dev` → `main` merge |
-| `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Same time as 004 |
+| `005_hide_pending_products.sql` | Pending products readable only by the shopper who added them; `known_barcodes()` for uploads | Done Nov 7 | Done Nov 8 (replaced by 007) |
+| `006_one_barcode_form.sql` | UPC-A stored as 12 digits only; merges 13-digit twins | Done Nov 8 | Done Nov 8 |
+| `007_all_products_visible.sql` | Everyone sees every product, Pending or Published (Nov 9) | Done Nov 9 | Done by hand Nov 9 |
+| `008_flag_invalid_and_missing_barcodes.sql` | Products get a numeric `id`; a bad check digit or no barcode is accepted and flagged in `barcode_status` | Done Nov 9 | Done Nov 16 |
+| `009_product_import_holding_table.sql` | `product_import` holding table for spreadsheet uploads, server key only | Done Nov 9 | Done Nov 16 |
+| `010_security_review.sql` | Hides `created_by` on products and branches; `latest_prices` read-only; function fixes | Done Nov 11 | Done Nov 11; run again Nov 16 after 008 |
+| `011_categories_v2.sql` | The 16 categories (Nov 11) | Done Nov 11 | Done Nov 11 |
+| `012_tripwires_and_notices.sql` | `security` schema: price-flood limits, paused accounts, delete alerts; `public.notices` | Done Nov 11 | Done Nov 16 (alert emails need pg_net and the vault secrets) |
+| `013_staff_roles.sql` | `public.staff` (Admin / Product Manager / Data Entry, trusted), `is_staff()` / `staff_role()` / `is_admin()`, last-Admin guard, staff tripwires. Needs 012. Then add the first Admins (insert at the top of the file) | Pending Brad's OK | Done Nov 16 (first Admins still to add by hand) |
+| `014_phones_need_valid_barcode.sql` | Phones can add a product only with a valid barcode; staff (dashboard) and imports keep the Nov 9 flag-for-review rule (security review G12) | Done Nov 16 | Done Nov 16 |
+| `015_shopper_profile.sql` | `consents` (4 switches, insert-only history), `my_consents`, `has_consent()`, `shopper_profiles` (own row only, needs the profile switch, birthday lock, under-18 refused) | Done Nov 16 (SQL Editor) | Done Nov 16 (with the privacy page update) |
+| `016_profile_real_accounts_only.sql` | Guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | Done Nov 16 |
+| `017_birth_year_only.sql` | Birth year can be saved alone (under 18 checked against Dec 31); the app can't write birth month until birthday offers launch; year and month lock separately | Nov 16 | Done Nov 16 |
+| `018_profile_photos.sql` | Private `profile-photos` bucket (200 KB, WebP/JPEG); a real account reads, adds, replaces and deletes only `<user id>/photo` | Nov 16 | Done Nov 16 |
+| `019_profile_nickname.sql` | `shopper_profiles.nickname` (1–30 characters, trimmed, no markup) | Nov 17 | Not yet |
+| `020_grocery_budget_pesos.sql` | `shopper_profiles.grocery_budget_pesos` (₱1,000–15,000 in ₱1,000 steps) replaces `grocery_budget_band` | Nov 18 | Not yet |
 
-Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs 42 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
+Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
 ## Before real testers use it
 

@@ -32,7 +32,7 @@ const item = (name: string, extra: Partial<CatalogItem> = {}): CatalogItem => ({
   barcode: null,
   name,
   size: null,
-  category: 'pantry',
+  category: 'canned & preserved food',
   image: null,
   prices: [],
   ...extra,
@@ -41,11 +41,11 @@ const item = (name: string, extra: Partial<CatalogItem> = {}): CatalogItem => ({
 const CATALOG: CatalogItem[] = [
   item('Coca-Cola Original', { barcode: '4801981116072', size: '1.5L', prices: [price(7500), price(7200, { storeKey: 'sm-imus', storeLabel: 'SM Supermarket Imus' })] }),
   item('Coca-Cola Zero', { barcode: '4801981118120', size: '330ml', prices: [price(3000, { isPromo: true })] }),
-  item('Lucky Me Pancit Canton Chilimansi', { barcode: '4807770270017', size: '80g', category: 'dry', prices: [price(1650)] }),
+  item('Lucky Me Pancit Canton Chilimansi', { barcode: '4807770270017', size: '80g', category: 'pantry staples', prices: [price(1650)] }),
   item('555 Sardines in Tomato Sauce', { barcode: '4800249000016', size: '155g', prices: [price(2475, { seenOn: '2026-10-01' })] }),
-  item('Liempo', { category: 'meat', prices: [price(32000, { priceType: 'perkg' })] }),
+  item('Liempo', { category: 'meat, poultry & seafood', prices: [price(32000, { priceType: 'perkg' })] }),
   item('Piattos Cheese', { barcode: '4800016644115', size: '85g', prices: [price(10000, { priceType: 'bundle', bundleQty: 3, bundlePriceCentavos: 10000 })] }),
-  item('Jasmine Rice', { barcode: '4806511010019', size: '5kg', category: 'dry' }),
+  item('Jasmine Rice', { barcode: '4806511010019', size: '5kg', category: 'pantry staples' }),
   item('Señorita Bread', { prices: [price(5000)] }),
 ];
 
@@ -125,7 +125,7 @@ describe('searchCatalog', () => {
     expect(hit.prices.map(comparable)).toEqual([7200, 7500]);
   });
   it('filters by category, store, price range, promo, date and having a price', () => {
-    expect(find('', { ...NO_FILTERS, categories: ['dry'] }, 'name')).toEqual(['Jasmine Rice', 'Lucky Me Pancit Canton Chilimansi']);
+    expect(find('', { ...NO_FILTERS, categories: ['pantry staples'] }, 'name')).toEqual(['Jasmine Rice', 'Lucky Me Pancit Canton Chilimansi']);
     expect(find('', { ...NO_FILTERS, store: 'sm-imus' })).toEqual(['Coca-Cola Original']);
     expect(find('', { ...NO_FILTERS, minCentavos: 5000, maxCentavos: 8000 }, 'priceLow')).toEqual(['Señorita Bread', 'Coca-Cola Original']);
     expect(find('', { ...NO_FILTERS, promoOnly: true })).toEqual(['Coca-Cola Zero']);
@@ -150,7 +150,7 @@ describe('searchCatalog', () => {
 describe('helpers', () => {
   it('counts active filters', () => {
     expect(activeFilterCount(NO_FILTERS)).toBe(0);
-    expect(activeFilterCount({ ...NO_FILTERS, categories: ['dry', 'meat'], minCentavos: 100, maxCentavos: 200, promoOnly: true })).toBe(3);
+    expect(activeFilterCount({ ...NO_FILTERS, categories: ['pantry staples', 'meat, poultry & seafood'], minCentavos: 100, maxCentavos: 200, promoOnly: true })).toBe(3);
   });
   it('lists stores A to Z', () => {
     expect(storesIn(CATALOG)).toEqual([

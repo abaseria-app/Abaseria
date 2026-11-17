@@ -3,7 +3,7 @@ import { S } from '../strings';
 import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type PriceType } from '../lib/money';
 import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
-import { CATEGORIES, guessCategory, type CategoryId } from '../lib/categories';
+import { CATEGORIES, categoryOf, guessCategory, type CategoryId } from '../lib/categories';
 import { formatBarcode } from '../lib/barcode';
 
 export interface ItemSubmit {
@@ -79,7 +79,11 @@ export function ItemEditor(p: Props) {
   );
   const [qty, setQty] = useState(init?.quantity ?? 1);
   // The guess follows the name until the shopper taps a category themselves.
-  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(init?.category ?? p.knownCategory ?? null);
+  // Items saved before Nov 11 2026 carry an old category id; categoryOf() turns it into one of today's 16.
+  const initCategory = init?.category ? categoryOf(init) : null;
+  const [pickedCategory, setPickedCategory] = useState<CategoryId | null>(
+    initCategory && initCategory !== 'other' ? initCategory : (p.knownCategory ?? null),
+  );
   const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
