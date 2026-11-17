@@ -3,20 +3,23 @@ import { useEffect, useRef, useState } from 'react';
 const ROW = 56;
 
 interface Props {
-  years: number[];
-  /** Where the wheel starts. Nothing is chosen until the shopper moves it or taps a year. */
+  values: number[];
+  /** Where the wheel starts. Nothing is chosen until the shopper moves it or taps a row. */
   start: number;
   value: number | null;
-  onChange: (year: number) => void;
+  onChange: (value: number) => void;
   label: string;
+  /** How each row reads, e.g. ₱6,000. Plain number if left out. */
+  format?: (value: number) => string;
 }
 
 /**
- * A scrolling wheel of years, like the phone's own date picker. The centre row is the pick. It starts with no
- * pick, so a shopper who taps Next straight away saves nothing instead of the starting year (otherwise birth
- * years pile up on one default and skew the reports).
+ * A scrolling wheel, like the phone's own date picker (birth year, monthly budget). The centre row is the pick.
+ * It starts with no pick, so a shopper who taps Next straight away saves nothing instead of the starting row
+ * (otherwise answers pile up on one default and skew the reports).
  */
-export function YearWheel({ years, start, value, onChange, label }: Props) {
+export function Wheel({ values, start, value, onChange, label, format = String }: Props) {
+  const years = values;
   const box = useRef<HTMLDivElement>(null);
   const [centre, setCentre] = useState(() => Math.max(0, years.indexOf(start)));
   const settle = useRef<number | undefined>(undefined);
@@ -62,7 +65,7 @@ export function YearWheel({ years, start, value, onChange, label }: Props) {
         className="year-wheel-list"
         role="listbox"
         aria-label={label}
-        aria-activedescendant={value != null ? `year-${value}` : undefined}
+        aria-activedescendant={value != null ? `wheel-${value}` : undefined}
         tabIndex={0}
         onScroll={onScroll}
         onPointerDown={() => (touched.current = true)}
@@ -73,13 +76,13 @@ export function YearWheel({ years, start, value, onChange, label }: Props) {
         {years.map((y, i) => (
           <div
             key={y}
-            id={`year-${y}`}
+            id={`wheel-${y}`}
             role="option"
             aria-selected={value === y}
             className={`year-wheel-row ${i === centre ? 'centre' : ''} ${value === y ? 'picked' : ''}`}
             onClick={() => pick(i)}
           >
-            {y}
+            {format(y)}
           </div>
         ))}
         <div style={{ height: ROW * 2 }} aria-hidden="true" />

@@ -199,3 +199,4 @@ on conflict (id) do nothing;
 --   supabase/migrations/017_birth_year_only.sql         birth year alone; the app can't write birth month yet
 --   supabase/migrations/018_profile_photos.sql          private profile-photos bucket, one photo per shopper, own only
 --   supabase/migrations/019_profile_nickname.sql        nickname on the shopper profile
+--   supabase/migrations/020_grocery_budget_pesos.sql    monthly grocery budget in pesos (replaces the range)

@@ -1,7 +1,7 @@
 // The shopper's monthly grocery budget, kept on the phone like trips (privacy page: budgets never leave the phone).
 //
-// It starts from the profile's budget range (bottom of the range; "Under ₱3,000" uses ₱3,000), and the shopper
-// can type their own amount when starting a trip. Their own amount wins from then on. A new trip suggests what's
+// It starts from the profile's budget answer (₱1,000 to ₱15,000+, migration 020), and the shopper can type
+// their own amount when starting a trip. Their own amount wins from then on. A new trip suggests what's
 // left this month: the monthly budget minus this month's finished trips.
 import type { Item, Trip } from './db';
 import { getSetting, setSetting } from './db';
@@ -15,19 +15,6 @@ export interface MonthlyBudget {
 
 const KEY = 'monthlyBudget';
 
-const FROM_BAND: Record<string, number> = {
-  under_3000: 300_000,
-  '3000_5999': 300_000,
-  '6000_9999': 600_000,
-  '10000_14999': 1_000_000,
-  '15000_plus': 1_500_000,
-};
-
-/** The starting amount for a budget range answer, or null for no answer / prefer not to say. */
-export function budgetFromBand(band: string | null | undefined): number | null {
-  return (band && FROM_BAND[band]) || null;
-}
-
 export function parseBudget(raw: string | null): MonthlyBudget | null {
   try {
     const v = JSON.parse(raw ?? '') as Partial<MonthlyBudget>;
@@ -40,10 +27,10 @@ export function parseBudget(raw: string | null): MonthlyBudget | null {
   return null;
 }
 
-/** What to store after the profile's budget answer is read or changed. Undefined: leave it alone. */
-export function nextFromBand(current: MonthlyBudget | null, band: string | null | undefined): MonthlyBudget | null | undefined {
+/** What to store after the profile's budget answer (in pesos) is read or changed. Undefined: leave it alone. */
+export function nextFromProfile(current: MonthlyBudget | null, pesos: number | null | undefined): MonthlyBudget | null | undefined {
   if (current?.source === 'shopper') return undefined;
-  const centavos = budgetFromBand(band);
+  const centavos = pesos && pesos > 0 ? Math.round(pesos) * 100 : null;
   if (centavos) return current?.centavos === centavos ? undefined : { centavos, source: 'profile' };
   // The answer was removed (or the profile switched off): drop the amount that came from it.
   return current ? null : undefined;
@@ -59,9 +46,9 @@ export async function setMonthlyBudget(centavos: number | null): Promise<void> {
 }
 
 /** Called whenever the profile is loaded or saved. Never throws: budgeting is a convenience, not part of the save. */
-export async function followProfileBand(band: string | null | undefined): Promise<void> {
+export async function followProfileBudget(pesos: number | null | undefined): Promise<void> {
   try {
-    const next = nextFromBand(await loadMonthlyBudget(), band);
+    const next = nextFromProfile(await loadMonthlyBudget(), pesos);
     if (next !== undefined) await setSetting(KEY, next ? JSON.stringify(next) : '');
   } catch {
     /* storage unavailable: the trip screen simply shows no suggestion */

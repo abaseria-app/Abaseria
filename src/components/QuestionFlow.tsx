@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { S } from '../strings';
-import { YearWheel } from './YearWheel';
+import { Wheel } from './Wheel';
 import {
+  BUDGET_PESOS,
   CHOICES,
   ProfileFailure,
   birthYears,
   cleanNickname,
+  formatBudget,
   loadProfile,
   saveAnswers,
   setConsent,
@@ -17,10 +19,10 @@ import {
 import type { QuestionSet } from '../lib/visits';
 
 /** One question per screen. Location joins the basics once the city list exists (task P3). */
-export type Question = 'nickname' | 'birth_year' | ChoiceField;
+export type Question = 'nickname' | 'birth_year' | 'grocery_budget_pesos' | ChoiceField;
 const SETS: Record<QuestionSet, Question[]> = {
   basics: ['nickname', 'birth_year', 'gender'],
-  household: ['household_size_band', 'has_kids_under_12', 'has_senior_60plus', 'payday_pattern', 'grocery_budget_band'],
+  household: ['household_size_band', 'has_kids_under_12', 'has_senior_60plus', 'payday_pattern', 'grocery_budget_pesos'],
 };
 
 /** Male first, as in the design. */
@@ -67,6 +69,7 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
   const [name, setName] = useState('');
   const [year, setYear] = useState<number | null>(null);
   const years = useMemo(() => birthYears(), []);
+  const [budget, setBudget] = useState<number | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -85,6 +88,7 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
           return onClose(d);
         }
         setName(p.nickname ?? '');
+        setBudget(p.grocery_budget_pesos);
         const screens: Screen[] = [...(d.consents.profile ? [] : (['welcome'] as Screen[])), ...asked];
         setQueue(only ? screens : [...screens, 'done']);
         onShown?.();
@@ -168,12 +172,23 @@ export function QuestionFlow({ set, only, suggestedName, onShown, onClose }: Pro
           <>
             <h2>{F().birthYear}</h2>
             <p className="flow-sub">{F().birthYearText}</p>
-            <YearWheel years={years} start={years[0] - 16} value={year} onChange={setYear} label={F().birthYear} />
+            <Wheel values={years} start={years[0] - 16} value={year} onChange={setYear} label={F().birthYear} />
             <button className="btn primary wide" disabled={busy || year == null} onClick={() => year && void answer({ birth_year: year })}>
               {F().next}
             </button>
             <button className="link flow-under18" disabled={busy} onClick={() => setQueue((q) => [...q.slice(0, at + 1), 'under18'])}>
               {F().under18}
+            </button>
+          </>
+        );
+      case 'grocery_budget_pesos':
+        return (
+          <>
+            <h2>{F().grocery_budget_pesos}</h2>
+            <p className="flow-sub">{F().grocery_budget_pesosText}</p>
+            <Wheel values={BUDGET_PESOS} start={5000} value={budget} onChange={setBudget} label={F().grocery_budget_pesos} format={formatBudget} />
+            <button className="btn primary wide" disabled={busy || budget == null} onClick={() => budget && void answer({ grocery_budget_pesos: budget })}>
+              {F().next}
             </button>
           </>
         );
