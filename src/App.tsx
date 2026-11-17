@@ -46,6 +46,8 @@ export default function App() {
   // Profile questions due on this visit (2nd: about you, 3rd: household). Counted when the app comes to the front.
   const [due, setDue] = useState<{ id: string; set: QuestionSet | null } | null>(null);
   const accountId = account?.id;
+  // Bumped when the visit popups close, so the Profile tab underneath shows the new answers.
+  const [profileVersion, setProfileVersion] = useState(0);
 
   useEffect(() => {
     if (!accountId) return;
@@ -161,7 +163,10 @@ export default function App() {
       set={askNow}
       suggestedName={account.name}
       onShown={() => void markShown(account.id, askNow)}
-      onClose={() => setDue(null)}
+      onClose={() => {
+        setDue(null);
+        setProfileVersion((v) => v + 1);
+      }}
     />
   );
   return (
@@ -204,6 +209,7 @@ export default function App() {
       case 'profile':
         return (
           <Profile
+            key={profileVersion}
             account={account}
             onExplore={() => setRoute('explore')}
             onCart={() => setRoute('home')}
