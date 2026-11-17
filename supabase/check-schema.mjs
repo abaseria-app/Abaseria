@@ -19,6 +19,9 @@ await db.exec(`
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  create function auth.jwt() returns jsonb language sql stable as
+    $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+  grant execute on function auth.jwt() to anon, authenticated;
   -- Like Supabase: new functions in public are granted to anon and authenticated directly.
   alter default privileges in schema public grant execute on functions to anon, authenticated;
   -- Stand-in for Supabase Storage: just what the checks use. Supabase turns on RLS for objects itself.
@@ -38,7 +41,8 @@ for (const f of readdirSync(new URL('./migrations/', import.meta.url)).filter((n
 let pass = 0, fail = 0;
 async function as(role, uid, sql) {
   await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid ?? ''}', false); set role ${role};`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
+  // Back to the owner with no signed-in account, as in the SQL Editor.
+  try { return await db.query(sql); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
 }
 async function ok(name, role, uid, sql, check = () => true) {
   try { const r = await as(role, uid, sql); if (check(r)) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name, JSON.stringify(r.rows)); } }
@@ -55,7 +59,18 @@ await refused('duplicate branch (same chain + name, any case)', 'authenticated',
 await refused('swapped lat/lng', 'authenticated', U1, `insert into public.branches (id, chain, name, lat, lng) values (gen_random_uuid(), 'SM', 'Bacoor', 120.9, 14.4)`);
 await refused('logged-out phone adds a branch', 'anon', null, `insert into public.branches (id, chain, name) values (gen_random_uuid(), 'SM', 'Molino')`);
 await ok('signed-in phone adds a product', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4800016644818', 'Test product', '250 ml')`);
-await refused('bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad')`);
+// 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
+// 014: phones need a real barcode; imports (server key, here postgres) and staff keep the Nov 9 rule.
+await refused('phone adds a bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
+await refused('phone adds a product with no barcode', 'authenticated', U1, `insert into public.products (barcode, name) values (null, 'No code')`);
+await refused('phone adds text as a barcode', 'authenticated', U1, `insert into public.products (barcode, name) values ('hello', 'Junk')`);
+await ok('import adds a bad check digit', 'postgres', null, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
+await ok('...and flagged invalid', 'postgres', null, `select barcode_status from public.products where barcode = '4800016644819'`, (r) => r.rows[0]?.barcode_status === 'invalid');
+await ok('missing barcode flagged missing', 'postgres', null, `insert into public.products (barcode, name) values (null, 'Loose galunggong') returning barcode_status`, (r) => r.rows[0]?.barcode_status === 'missing');
+await refused('same barcode twice', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Again')`);
+await refused('phone sets barcode_status', 'authenticated', U1, `insert into public.products (barcode, name, barcode_status) values ('4800016644115', 'X', 'valid')`);
+await refused('app reads the import table', 'authenticated', U1, `select * from public.product_import`);
+await refused('app writes the import table', 'anon', null, `insert into public.product_import (barcode, name) values ('1', 'x')`);
 await refused('in-store scale code', 'authenticated', U1, `insert into public.products (barcode, name) values ('2000000000008', 'Scale')`);
 const sighting = (cid, day = today, extra = '') => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method${extra ? ', bundle_qty' : ''}) values ('${cid}', '4800016644818', '${B1}', '${day}', ${extra ? "'bundle'" : "'each'"}, 11500, 'tag'${extra ? ', 3' : ''})`;
 await ok('signed-in phone adds a sighting', 'authenticated', U1, sighting('c0000000-0000-4000-8000-000000000001'));
@@ -69,25 +84,39 @@ await ok('re-upload of a known product is ignored, not an error', 'authenticated
 await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
+// Security review (010): who added a product or store is hidden too; the view is read-only.
+await refused('product created_by hidden from logged-out phones', 'anon', null, `select created_by from public.products`);
+await refused('product created_by hidden from signed-in phones', 'authenticated', U2, `select created_by from public.products`);
+await refused('branch created_by hidden from logged-out phones', 'anon', null, `select created_by from public.branches`);
+await refused('branch created_by hidden from signed-in phones', 'authenticated', U2, `select created_by from public.branches`);
+await refused('select * on products (hidden column)', 'anon', null, `select * from public.products`);
+await ok('logged-out phone reads every other product column', 'anon', null, `select barcode, name, size, category, status, image_path, created_at from public.products`, (r) => r.rows.length >= 1);
+await ok('logged-out phone reads every other branch column', 'anon', null, `select id, chain, name, lat, lng, created_at from public.branches`, (r) => r.rows.length >= 1);
+await ok('connection-check counts still work', 'anon', null, `select (select count(barcode) from public.products) + (select count(id) from public.branches) + (select count(barcode) from public.latest_prices) as n`, (r) => r.rows[0]?.n >= 3);
+await refused('write through latest_prices', 'authenticated', U1, `insert into public.latest_prices (barcode, branch_id, seen_on, price_type, unit_price_centavos) values ('4800016644818', '${B1}', '${today}', 'each', 1)`);
+await ok('known_barcodes runs with the caller\'s rights', 'postgres', null, `select prosecdef from pg_proc where proname = 'known_barcodes'`, (r) => r.rows[0]?.prosecdef === false);
+await ok('gtin_ok has a fixed search path', 'postgres', null, `select proconfig from pg_proc where proname = 'gtin_ok'`, (r) => String(r.rows[0]?.proconfig).includes('search_path'));
 await refused('edit a sighting', 'authenticated', U1, `update public.price_sightings set unit_price_centavos = 1`);
 await refused('delete a sighting', 'authenticated', U1, `delete from public.price_sightings`);
 await refused('edit a product', 'authenticated', U1, `update public.products set name = 'x'`);
 
-// Pending / Published (004, 005): shoppers see Published products and their own Pending ones; prices always show.
+// Pending / Published (004, 005, 010): Pending products wait for a Product Manager, but everyone sees them (Nov 9).
 const P = '4800888123459';
-await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'poultry')`);
+await ok('new product starts Pending', 'authenticated', U1, `insert into public.products (barcode, name, category) values ('${P}', 'Magnolia Chicken Nuggets', 'meat, poultry & seafood')`);
 await ok('...and is Pending in the database', 'postgres', null, `select status from public.products where barcode = '${P}'`, (r) => r.rows[0]?.status === 'pending');
 await refused('phone publishes its own product', 'authenticated', U1, `insert into public.products (barcode, name, status) values ('4800777123454', 'X', 'published')`);
 await refused('phone publishes a product later', 'authenticated', U1, `update public.products set status = 'published'`);
 await ok('the shopper who added it still sees it', 'authenticated', U1, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
-await ok('other shoppers don\'t see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
-await ok('logged-out phones don\'t see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 0);
+await ok('other shoppers see a Pending product', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
+await ok('logged-out phones see a Pending product', 'anon', null, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
 await ok('price for a Pending product can be added', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000020', '${P}', '${B1}', '${today}', 'each', 18900, 'tag')`);
 await ok('other shoppers see a Pending product\'s price', 'authenticated', U2, `select unit_price_centavos from public.latest_prices where barcode = '${P}'`, (r) => r.rows[0]?.unit_price_centavos === 18900);
 await ok('known_barcodes finds a Pending barcode', 'authenticated', U2, `select * from public.known_barcodes(array['${P}', '4800016644818', '4800777123454'])`, (r) => r.rows.length === 2);
 await refused('logged-out phone calls known_barcodes', 'anon', null, `select * from public.known_barcodes(array['${P}'])`);
-await ok('Dairy is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy')`);
+await ok('Dairy & eggs is a category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800777123454', 'Eden Cheese 165g', 'dairy & eggs')`);
 await refused('unknown category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'snacks')`);
+await refused('old category id (before Nov 11)', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644115', 'X', 'dairy')`);
+await ok('unsorted product has no category', 'authenticated', U2, `insert into public.products (barcode, name, category) values ('4800016644122', 'Mystery', null)`);
 await db.exec(`update public.products set status = 'published' where barcode = '${P}'`);
 await ok('Published, other shoppers see it', 'authenticated', U2, `select name from public.products where barcode = '${P}'`, (r) => r.rows.length === 1);
 
@@ -119,6 +148,253 @@ await ok('006: lone 13-digit row moved to 12 digits with its price', 'postgres',
   `select count(*)::int n from public.price_sightings where barcode = '024000163022'`, (r) => r.rows[0]?.n === 1);
 await ok('006: no 13-digit 0 rows left', 'postgres', null, `select count(*)::int n from public.products where char_length(barcode) = 13 and barcode like '0%'`, (r) => r.rows[0]?.n === 0);
 await refused('006: check is back on', 'postgres', null, `insert into public.products (barcode, name) values ('0024000010920', 'X')`);
+
+// Tripwires and notices (011) -------------------------------------------------------------------------------
+const one = async (sql) => (await db.query(sql)).rows[0];
+const events = async (kind) => Number((await one(`select count(*)::int n from security.events where kind = '${kind}'`)).n);
+for (const t of ['events', 'settings', 'paused_accounts', 'daily_counts']) {
+  await refused(`logged-out phone reads security.${t}`, 'anon', null, `select * from security.${t}`);
+  await refused(`signed-in phone reads security.${t}`, 'authenticated', U1, `select * from security.${t}`);
+}
+await refused('signed-in phone writes an alert', 'authenticated', U1, `select security.alert('fake', '{}')`);
+await refused('signed-in phone pauses someone', 'authenticated', U1, `insert into security.paused_accounts (user_id, reason) values ('${U2}', 'x')`);
+await ok('prices are counted per account per day', 'postgres', null,
+  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => r.rows[0]?.n >= 2); // U1's two uploads above
+const before = Number((await one(`select n from security.daily_counts where user_id = '${U1}' and day = security.today()`)).n);
+await as('authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
+await ok('a re-upload is not counted', 'postgres', null,
+  `select n from security.daily_counts where user_id = '${U1}' and day = security.today()`, (r) => Number(r.rows[0]?.n) === before);
+
+// Flood: a third account crosses lowered limits; everyone else's counts are cleared so only it is affected.
+const U3 = '33333333-3333-4333-8333-333333333333';
+await db.exec(`insert into auth.users values ('${U3}'); delete from security.daily_counts where user_id <> '00000000-0000-0000-0000-000000000000';
+               update security.settings set value = 1 where key = 'price_alert_per_day'; update security.settings set value = 2 where key = 'price_block_per_day'`);
+const price = (n, cents) => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}', '4800777123454', '${B1}', '${today}', 'each', ${cents}, 'tag')`;
+const recorded = async (name, kind, n) => { if ((await events(kind)) === n) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
+await ok('first price goes in', 'authenticated', U3, price(1, 9900));
+await recorded('crossing the alert line records a price_flood alert', 'price_flood', 1);
+await ok('price at the limit goes in', 'authenticated', U3, price(2, 9900));
+await recorded('reaching the limit records price_limit_reached', 'price_limit_reached', 1);
+await refused('price past the daily limit is refused', 'authenticated', U3, price(3, 9900));
+await refused('...also when it is part of a batch', 'authenticated', U3,
+  `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000199', '4800777123454', '${B1}', '${today}', 'each', 1, 'tag'), ('c0000000-0000-4000-8000-000000000198', '4800777123454', '${B1}', '${today}', 'each', 1, 'tag')`);
+await ok('other accounts can still add prices', 'authenticated', U1, price(50, 9800));
+await recorded('a second account crossing the line gets its own alert', 'price_flood', 2);
+await db.exec(`update security.settings set value = 300 where key = 'price_alert_per_day'; update security.settings set value = 1000 where key = 'price_block_per_day'; delete from security.daily_counts where user_id = '${U3}'`);
+await ok('limit reset: the account can add again', 'authenticated', U3, price(4, 9850));
+await db.exec(`delete from security.daily_counts where user_id <> '00000000-0000-0000-0000-000000000000'`);
+await ok('U2 adds the newest price', 'authenticated', U2, price(5, 9700));
+
+// Pause: U2's prices vanish from the app and new ones are refused.
+await ok('before pausing, U2\'s price is the latest', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9700);
+await db.exec(`insert into security.paused_accounts (user_id, reason) values ('${U2}', 'test: fake prices')`);
+await ok('after pausing, the latest price is someone else\'s', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9850);
+await ok('a paused account\'s prices are hidden from signed-in phones too', 'authenticated', U1, `select count(*)::int n from public.price_sightings where unit_price_centavos = 9700`, (r) => r.rows[0]?.n === 0);
+await refused('a paused account can\'t add prices', 'authenticated', U2, price(6, 9600));
+await db.exec(`delete from security.paused_accounts where user_id = '${U2}'`);
+await ok('unpaused: prices are back', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800777123454'`, (r) => r.rows[0]?.unit_price_centavos === 9700);
+
+// Deletes alert, unless marked as maintenance.
+const delBefore = await events('rows_deleted');
+await db.exec(`delete from public.price_sightings where client_id = 'c0000000-0000-4000-8000-000000000150'`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS deleting a price records an alert'); } else { fail++; console.log('FAIL deleting a price records an alert'); }
+await db.exec(`begin; set local abaseria.maintenance = 'on'; delete from public.price_sightings where client_id = 'c0000000-0000-4000-8000-000000000104'; commit;`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS maintenance delete records no alert'); } else { fail++; console.log('FAIL maintenance delete records no alert'); }
+await db.exec(`delete from public.price_sightings where id = -1`);
+if ((await events('rows_deleted')) === delBefore + 1) { pass++; console.log('PASS a delete that removes nothing records no alert'); } else { fail++; console.log('FAIL a delete that removes nothing records no alert'); }
+await db.exec(`create table public.staff_test (id int); create trigger w after insert or update or delete on public.staff_test for each statement execute function security.watch_changes(); insert into public.staff_test values (1); drop table public.staff_test;`);
+if ((await events('watched_table_changed')) === 1) { pass++; console.log('PASS watched table change records an alert'); } else { fail++; console.log('FAIL watched table change records an alert'); }
+await ok('alerts wait unsent when email isn\'t set up', 'postgres', null, `select count(*)::int n from security.events where sent`, (r) => r.rows[0]?.n === 0);
+
+// Notices.
+await db.exec(`insert into public.notices (kind, title_en, body_en, title_tl, body_tl) values ('incident', 'We''re sorry', 'Body', 'Paumanhin po', 'Katawan');
+               insert into public.notices (title_en, body_en, ends_at) values ('Old', 'Expired', now() - interval '1 day');
+               insert into public.notices (title_en, body_en, starts_at) values ('Later', 'Not yet', now() + interval '1 day');`);
+await ok('logged-out phone sees only the current notice', 'anon', null, `select id, kind, title_en, body_en, title_tl, body_tl, starts_at, ends_at from public.notices`, (r) => r.rows.length === 1 && r.rows[0].title_tl === 'Paumanhin po');
+await refused('phone adds a notice', 'authenticated', U1, `insert into public.notices (title_en, body_en) values ('x', 'y')`);
+await refused('phone edits a notice', 'authenticated', U1, `update public.notices set title_en = 'x'`);
+await refused('phone deletes a notice', 'authenticated', U1, `delete from public.notices`);
+
+// Staff roles (013) ------------------------------------------------------------------------------------------
+// Two Admins (like Brad and Jovie), a Data Entry volunteer added through the API, and U1 as a plain shopper.
+const UA = 'aaaaaaaa-0000-4000-8000-00000000000a', UJ = 'aaaaaaaa-0000-4000-8000-00000000000b', UD = 'aaaaaaaa-0000-4000-8000-00000000000d';
+await db.exec(`insert into auth.users values ('${UA}'), ('${UJ}'), ('${UD}');
+               insert into public.staff (user_id, role) values ('${UA}', 'admin'), ('${UJ}', 'admin');`);
+const staffCount = async () => Number((await one(`select count(*)::int n from public.staff`)).n);
+const check = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
+await ok('first Admins seeded by hand', 'postgres', null, `select role, trusted, added_by from public.staff where user_id = '${UA}'`,
+  (r) => r.rows[0]?.role === 'admin' && r.rows[0]?.trusted === true && r.rows[0]?.added_by === null);
+await ok('seeding records staff_changed alerts', 'postgres', null, `select count(*)::int n from security.events where kind = 'staff_changed'`, (r) => r.rows[0]?.n === 2);
+for (const f of ['is_staff', 'staff_role', 'is_admin']) {
+  await refused(`logged-out phone calls ${f}()`, 'anon', null, `select public.${f}()`);
+  await ok(`${f}() is security definer with a fixed search path`, 'postgres', null,
+    `select prosecdef, proconfig from pg_proc where proname = '${f}' and pronamespace = 'public'::regnamespace`,
+    (r) => r.rows[0]?.prosecdef === true && String(r.rows[0]?.proconfig).includes('search_path'));
+}
+await refused('logged-out phone reads staff', 'anon', null, `select user_id from public.staff`);
+await refused('logged-out phone adds staff', 'anon', null, `insert into public.staff (user_id, role) values ('${U2}', 'admin')`);
+await ok('shopper reads staff: empty list', 'authenticated', U1, `select * from public.staff`, (r) => r.rows.length === 0);
+await ok('shopper is not staff', 'authenticated', U1, `select public.is_staff() s, public.staff_role() r, public.is_admin() a`,
+  (r) => r.rows[0]?.s === false && r.rows[0]?.r === null && r.rows[0]?.a === false);
+const attempts = await events('staff_write_attempt');
+await ok('shopper makes itself Admin: nothing added', 'authenticated', U1, `insert into public.staff (user_id, role) values ('${U1}', 'admin')`);
+check('...staff table unchanged', (await staffCount()) === 2);
+check('...and a staff_write_attempt alert is recorded', (await events('staff_write_attempt')) === attempts + 1);
+await refused('shopper demotes an Admin', 'authenticated', U1, `update public.staff set role = 'data_entry' where user_id = '${UA}'`);
+await refused('shopper removes an Admin', 'authenticated', U1, `delete from public.staff where user_id = '${UA}'`);
+check('...both attempts recorded', (await events('staff_write_attempt')) === attempts + 3);
+
+await ok('Admin adds a Data Entry volunteer through the API', 'authenticated', UA, `insert into public.staff (user_id, role) values ('${UD}', 'data_entry')`);
+await ok('...stamped with who added it, trusted by default', 'postgres', null, `select added_by, trusted, trust_changed_by from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.added_by === UA && r.rows[0]?.trusted === true && r.rows[0]?.trust_changed_by === null);
+check('...and an Admin\'s change is not an attempt', (await events('staff_write_attempt')) === attempts + 3);
+await refused('Admin fakes added_by', 'authenticated', UA, `insert into public.staff (user_id, role, added_by) values ('${U2}', 'data_entry', '${UJ}')`);
+await refused('unknown role', 'authenticated', UA, `insert into public.staff (user_id, role) values ('${U2}', 'owner')`);
+await refused('account that doesn\'t exist', 'authenticated', UA, `insert into public.staff (user_id, role) values ('99999999-9999-4999-8999-999999999999', 'data_entry')`);
+await ok('volunteer reads only their own row', 'authenticated', UD, `select user_id, role from public.staff`,
+  (r) => r.rows.length === 1 && r.rows[0].user_id === UD && r.rows[0].role === 'data_entry');
+await ok('volunteer\'s helpers', 'authenticated', UD, `select public.is_staff() s, public.staff_role() r, public.is_admin() a`,
+  (r) => r.rows[0]?.s === true && r.rows[0]?.r === 'data_entry' && r.rows[0]?.a === false);
+await refused('volunteer promotes themselves', 'authenticated', UD, `update public.staff set role = 'admin' where user_id = '${UD}'`);
+await refused('volunteer turns their own trust back on', 'authenticated', UD, `update public.staff set trusted = true`);
+await refused('volunteer removes their own row', 'authenticated', UD, `delete from public.staff where user_id = '${UD}'`);
+await ok('...volunteer row unchanged', 'postgres', null, `select role from public.staff where user_id = '${UD}'`, (r) => r.rows[0]?.role === 'data_entry');
+await ok('Admin reads every row', 'authenticated', UJ, `select user_id from public.staff`, (r) => r.rows.length === 3);
+await ok('Admin switches trust off', 'authenticated', UJ, `update public.staff set trusted = false where user_id = '${UD}'`);
+await ok('...stamped with who and when', 'postgres', null, `select trusted, trust_changed_by, trust_changed_at from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.trusted === false && r.rows[0]?.trust_changed_by === UJ && r.rows[0]?.trust_changed_at !== null);
+await ok('changing role keeps the trust stamp', 'authenticated', UJ, `update public.staff set role = 'product_manager' where user_id = '${UD}'`);
+await ok('...still stamped', 'postgres', null, `select trust_changed_by, added_by from public.staff where user_id = '${UD}'`,
+  (r) => r.rows[0]?.trust_changed_by === UJ && r.rows[0]?.added_by === UA);
+await refused('Admin moves a row to another account', 'authenticated', UA, `update public.staff set user_id = '${U2}' where user_id = '${UD}'`);
+
+// The last Admin.
+await refused('removing both Admins at once', 'authenticated', UA, `delete from public.staff where role = 'admin'`);
+await ok('Admin demotes the other Admin', 'authenticated', UA, `update public.staff set role = 'product_manager' where user_id = '${UJ}'`);
+await refused('the last Admin demotes themselves', 'authenticated', UA, `update public.staff set role = 'data_entry' where user_id = '${UA}'`);
+await refused('the last Admin removes themselves', 'authenticated', UA, `delete from public.staff where user_id = '${UA}'`);
+await refused('the last Admin\'s account is deleted', 'postgres', null, `delete from auth.users where id = '${UA}'`);
+await ok('...still an Admin', 'postgres', null, `select count(*)::int n from public.staff where role = 'admin'`, (r) => r.rows[0]?.n === 1);
+await db.exec(`update public.staff set role = 'admin' where user_id = '${UJ}'`);
+await ok('with a second Admin, the first can step down', 'postgres', null,
+  `update public.staff set role = 'product_manager' where user_id = '${UA}' returning role`, (r) => r.rows[0]?.role === 'product_manager');
+await db.exec(`update public.staff set role = 'admin' where user_id = '${UA}'`);
+await ok('Admin removes a volunteer', 'authenticated', UA, `delete from public.staff where user_id = '${UD}'`, (r) => (r.affectedRows ?? 0) === 1);
+await db.exec(`insert into public.staff (user_id, role) values ('${UD}', 'data_entry')`);
+await ok('a deleted account leaves the staff table', 'postgres', null, `delete from auth.users where id = '${UD}'`);
+check('...row gone', (await staffCount()) === 2);
+await ok('staff changes are recorded', 'postgres', null, `select count(*)::int n from security.events where kind = 'staff_changed' and detail ->> 'operation' = 'DELETE'`, (r) => r.rows[0]?.n >= 2);
+await refused('signed-in phone reads the alerts', 'authenticated', UA, `select * from security.events`);
+
+// Shopper profile and consents (015). U1 and U2 are shoppers, UA is an Admin.
+const YEAR = new Date().getFullYear();
+const sw = (p, g) => `insert into public.consents (purpose, granted, policy_version) values ('${p}', ${g}, '2026-11')`;
+const basics = `insert into public.shopper_profiles (birth_year, gender, province_code, city_code)
+                values (1988, 'woman', '0402100000', '0402109000')`;
+await refused('logged-out phone reads profiles', 'anon', null, `select user_id from public.shopper_profiles`);
+await refused('logged-out phone reads consents', 'anon', null, `select purpose from public.consents`);
+await refused('logged-out phone adds a consent', 'anon', null, sw('profile', true));
+await refused('logged-out phone calls has_consent', 'anon', null, `select public.has_consent('profile')`);
+await ok('no row means off', 'authenticated', U1, `select public.has_consent('profile') p`, (r) => r.rows[0]?.p === false);
+await refused('answers saved before the profile switch is on', 'authenticated', U1, basics);
+await refused('research on before profile', 'authenticated', U1, sw('research', true));
+await refused('offers on before profile', 'authenticated', U1, sw('offers', true));
+await ok('profile switch on', 'authenticated', U1, sw('profile', true));
+await ok('...has_consent says on', 'authenticated', U1, `select public.has_consent('profile') p`, (r) => r.rows[0]?.p === true);
+await ok('offers on', 'authenticated', U1, sw('offers', true));
+await ok('research on', 'authenticated', U1, sw('research', true));
+await ok('2nd-visit answers saved', 'authenticated', U1, basics);
+await ok('...birthday locked by the database', 'authenticated', U1, `select birthday_locked_at from public.shopper_profiles`, (r) => r.rows[0]?.birthday_locked_at != null);
+await ok('3rd-visit answers saved', 'authenticated', U1,
+  `update public.shopper_profiles set household_size_band = '3-4', has_kids_under_12 = 'yes', has_senior_60plus = 'no_answer',
+     payday_pattern = 'kinsenas_katapusan', grocery_budget_band = '6000_9999' where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('shopper reads own profile', 'authenticated', U1, `select gender, household_size_band from public.shopper_profiles`,
+  (r) => r.rows.length === 1 && r.rows[0].gender === 'woman' && r.rows[0].household_size_band === '3-4');
+await ok('my_consents shows the current switches', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
+  (r) => r.rows.map((x) => `${x.purpose}:${x.granted}`).join(',') === 'offers:true,profile:true,research:true');
+await ok('another shopper sees no profiles', 'authenticated', U2, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
+await ok('another shopper sees no consents', 'authenticated', U2, `select * from public.consents`, (r) => r.rows.length === 0);
+await ok('staff see no profiles', 'authenticated', UA, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
+await refused('another shopper changes the profile', 'authenticated', U2, `update public.shopper_profiles set gender = 'man' where user_id = '${U1}'`);
+await refused('another shopper deletes the profile', 'authenticated', U2, `delete from public.shopper_profiles where user_id = '${U1}'`);
+await ok('second shopper turns profile on', 'authenticated', U2, sw('profile', true));
+await refused('shopper adds a profile for someone else', 'authenticated', U2, `insert into public.shopper_profiles (user_id, gender) values ('${U1}', 'man')`);
+await refused('shopper adds a consent for someone else', 'authenticated', U2, `insert into public.consents (user_id, purpose, granted, policy_version) values ('${U1}', 'research', false, 'x')`);
+await refused('shopper edits a consent row', 'authenticated', U1, `update public.consents set granted = false`);
+await refused('shopper deletes a consent row', 'authenticated', U1, `delete from public.consents`);
+await refused('shopper sets the birthday lock', 'authenticated', U1, `update public.shopper_profiles set birthday_locked_at = null`);
+await refused('birth year changed after saving', 'authenticated', U1, `update public.shopper_profiles set birth_year = 1989 where user_id = '${U1}'`);
+await ok('...birth year unchanged', 'authenticated', U1, `select birth_year from public.shopper_profiles`, (r) => r.rows[0]?.birth_year === 1988);
+// 017: no birth month from the app until birthday offers launch.
+await refused('app saves a birth month', 'authenticated', U1, `update public.shopper_profiles set birth_month = 3 where user_id = '${U1}'`);
+await refused('app adds a profile with a birth month', 'authenticated', U2, `insert into public.shopper_profiles (birth_month, birth_year) values (5, 1990)`);
+await refused('birth month without a year (support)', 'postgres', null, `insert into public.shopper_profiles (user_id, birth_month) values ('${U2}', 5)`);
+await refused('under 18 is refused', 'authenticated', U2, `insert into public.shopper_profiles (birth_year) values (${YEAR - 17})`);
+await refused('turning 18 sometime this year is refused (Dec 31 rule)', 'authenticated', U2, `insert into public.shopper_profiles (birth_year) values (${YEAR - 18})`);
+await ok('an adult who skips the birthday is fine', 'authenticated', U2, `insert into public.shopper_profiles (gender) values ('no_answer')`);
+await refused('a made-up answer', 'authenticated', U2, `update public.shopper_profiles set payday_pattern = 'whenever' where user_id = '${U2}'`);
+await refused('a bad PSGC code', 'authenticated', U2, `update public.shopper_profiles set city_code = 'Imus' where user_id = '${U2}'`);
+await ok('a month can be added later to a saved year (future birthday offers)', 'postgres', null,
+  `update public.shopper_profiles set birth_month = 3 where user_id = '${U1}' returning birth_month, birth_year`, (r) => r.rows[0]?.birth_month === 3 && r.rows[0]?.birth_year === 1988);
+await refused('clearing the year while a month is saved', 'authenticated', U1, `update public.shopper_profiles set birth_year = null where user_id = '${U1}'`);
+await db.exec(`update public.shopper_profiles set birth_month = null where user_id = '${U1}'`);
+await ok('shopper clears the birth year', 'authenticated', U1, `update public.shopper_profiles set birth_year = null where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('...then a new year from the app needs support', 'authenticated', U1, `update public.shopper_profiles set birth_year = 1990 where user_id = '${U1}'`);
+await ok('support corrects a birthday', 'postgres', null, `update public.shopper_profiles set birth_year = 1987 where user_id = '${U1}' returning birth_year, birthday_locked_at`,
+  (r) => r.rows[0]?.birth_year === 1987 && r.rows[0]?.birthday_locked_at != null);
+await ok('profile switch off', 'authenticated', U1, sw('profile', false));
+await ok('...deletes the answers', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U1}'`, (r) => r.rows[0]?.n === 0);
+await ok('...and turns offers and research off', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
+  (r) => r.rows.map((x) => `${x.purpose}:${x.granted}`).join(',') === 'offers:false,profile:false,research:false');
+await ok('...with the history kept', 'authenticated', U1, `select count(*)::int n from public.consents`, (r) => r.rows[0]?.n === 6);
+await refused('answers after switching off', 'authenticated', U1, basics);
+await ok('shopper deletes own profile', 'authenticated', U2, `delete from public.shopper_profiles where user_id = '${U2}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('shopper answers again', 'authenticated', U2, `insert into public.shopper_profiles (gender) values ('man')`);
+await ok('deleting an account', 'postgres', null, `delete from auth.users where id = '${U2}'`);
+await ok('...removes the profile', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U2}'`, (r) => r.rows[0]?.n === 0);
+await ok('...keeps consent rows without the id', 'postgres', null, `select count(*)::int n from public.consents where user_id is null and purpose = 'profile'`, (r) => r.rows[0]?.n === 1);
+
+// 016: guest (anonymous) sessions get nothing from the profile tables.
+const UG = '44444444-4444-4444-8444-444444444444';
+await db.exec(`insert into auth.users values ('${UG}')`);
+async function asGuest(sql) {
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${UG}', false);
+                 select set_config('request.jwt.claims', '{"sub":"${UG}","is_anonymous":true}', false); set role authenticated;`);
+  try { return await db.query(sql); }
+  finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);`); }
+}
+try { await asGuest(sw('profile', true)); fail++; console.log('FAIL guest turns the profile switch on was allowed'); }
+catch (e) { pass++; console.log('PASS guest turns the profile switch on ::', e.message); }
+try { await asGuest(`insert into public.shopper_profiles (gender) values ('man')`); fail++; console.log('FAIL guest saves answers was allowed'); }
+catch (e) { pass++; console.log('PASS guest saves answers ::', e.message); }
+await db.exec(`insert into public.consents (user_id, purpose, granted, policy_version) values ('${UG}', 'profile', true, 'x');
+               insert into public.shopper_profiles (user_id, gender) values ('${UG}', 'man')`);
+check('guest reads no consents', (await asGuest(`select * from public.consents`)).rows.length === 0);
+check('guest reads no profile', (await asGuest(`select * from public.shopper_profiles`)).rows.length === 0);
+check('guest deletes nothing', ((await asGuest(`delete from public.shopper_profiles`)).affectedRows ?? 0) === 0);
+check('a real account still reads its own switches after 016', (await as('authenticated', U1, `select count(*)::int n from public.consents`)).rows[0]?.n === 6);
+
+// 018: profile photos. U1 owns one; U3 is another shopper; UG is a guest session.
+const PHOTO = (u) => `insert into storage.objects (bucket_id, name) values ('profile-photos', '${u}/photo')`;
+await ok('photo bucket is private with limits', 'postgres', null, `select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'profile-photos'`,
+  (r) => r.rows[0]?.public === false && Number(r.rows[0]?.file_size_limit) === 204800 && r.rows[0]?.allowed_mime_types?.length === 2);
+await ok('shopper uploads own photo', 'authenticated', U1, PHOTO(U1));
+await ok('shopper reads own photo', 'authenticated', U1, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 1 && r.rows[0].name === `${U1}/photo`);
+await ok('shopper replaces own photo', 'authenticated', U1, `update storage.objects set name = name where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('another shopper sees no photos', 'authenticated', U3, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 0);
+await refused('another shopper uploads into someone else’s spot', 'authenticated', U3, PHOTO(U1));
+await refused('another shopper replaces someone else’s photo', 'authenticated', U3, `update storage.objects set name = name where bucket_id = 'profile-photos'`);
+await refused('another shopper deletes someone else’s photo', 'authenticated', U3, `delete from storage.objects where bucket_id = 'profile-photos'`);
+await refused('shopper saves a second file', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('profile-photos', '${U1}/other')`);
+await refused('shopper saves under another name', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('profile-photos', '${U1}/photo.jpg')`);
+await refused('shopper moves the photo to another account', 'authenticated', U1, `update storage.objects set name = '${U3}/photo' where bucket_id = 'profile-photos' and name = '${U1}/photo'`);
+await ok('logged-out phone sees no photos', 'anon', null, `select name from storage.objects where bucket_id = 'profile-photos'`, (r) => r.rows.length === 0);
+await refused('logged-out phone uploads a photo', 'anon', null, PHOTO(U1));
+try { await asGuest(PHOTO(UG)); fail++; console.log('FAIL guest uploads a photo was allowed'); }
+catch (e) { pass++; console.log('PASS guest uploads a photo ::', e.message); }
+check('guest sees no photos', (await asGuest(`select name from storage.objects where bucket_id = 'profile-photos'`)).rows.length === 0);
+await refused('product images still need the server key', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', '${U1}/photo')`);
+await ok('shopper deletes own photo', 'authenticated', U1, `delete from storage.objects where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

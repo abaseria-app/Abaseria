@@ -10,6 +10,7 @@ export const S = {
     title: 'Welcome to Abaseria',
     pitch: 'Know your total before you reach the cashier. Scan as you shop and watch it add up against your budget.',
     google: 'Continue with Google',
+    email: 'Continue with email',
     facebook: 'Continue with Facebook',
     going: (provider: 'google' | 'facebook') => (provider === 'google' ? 'Opening Google…' : 'Opening Facebook…'),
     finishing: 'Signing you in…',
@@ -21,6 +22,47 @@ export const S = {
     returned: (message: string) => `Sign-in didn’t finish: ${message}.`,
     noEmail:
       'Your Facebook account doesn’t have an email on it, so Abaseria can’t sign you in with it. Use Google, or add an email in Facebook (Settings → Accounts Center → Personal details) and try again.',
+  },
+
+  // Email code sign-in (Nov 13). The shopper types a 6-digit code from the email; there's no link to tap.
+  emailCode: {
+    title: 'Sign in with email',
+    label: 'Your email address',
+    placeholder: 'juan@gmail.com',
+    send: 'Send me a code',
+    sending: 'Sending…',
+    sentTo: (email: string) =>
+      `We sent a 6-digit code to ${email}. It can take a minute. If it isn’t in your inbox, check Spam or Promotions.`,
+    codeLabel: '6-digit code',
+    verify: 'Sign in',
+    verifying: 'Checking…',
+    resend: 'Send a new code',
+    resendIn: (seconds: number) => `Send a new code in ${seconds}s`,
+    resent: 'New code sent. Use the newest one.',
+    otherEmail: 'Use a different email',
+    back: 'Back',
+    problems: {
+      offline: 'You’re offline. Connect to the internet to sign in.',
+      off: 'Sign-in isn’t set up in this build.',
+      wait: 'Wait a minute before asking for another code.',
+      tooMany: 'Too many tries. Wait a few minutes, then try again.',
+      badCode: 'That code is wrong or has expired. Use the newest email, or send a new code.',
+      badEmail: 'That doesn’t look like an email address. Check it and try again.',
+      failed: 'Something went wrong. Try again in a minute.',
+    },
+  },
+
+  // Shown on the sign-in screen inside Facebook's, Messenger's or Instagram's built-in browser.
+  inApp: {
+    apps: { facebook: 'Facebook', messenger: 'Messenger', instagram: 'Instagram' },
+    why: (app: string) =>
+      `Google doesn’t allow sign-in inside ${app}’s browser. Open Abaseria in Chrome, or sign in with your email here.`,
+    openChrome: 'Open in Chrome',
+    copyLink: 'Copy link',
+    copied: 'Link copied. Open Chrome and paste it in the address bar.',
+    copyFailed: 'Press and hold the link below to copy it, then paste it in Chrome.',
+    // iPhone (no Android intent): the app's own menu opens the page in Safari.
+    otherPhone: 'Tap ⋯ at the top of the screen, then Open in browser.',
   },
 
   home: {
@@ -262,6 +304,11 @@ export const S = {
     noPriceAnywhere: 'No price here yet. Type the price from the shelf tag.',
   },
 
+  staff: {
+    // Shown in Settings → Account for staff accounts. data_entry is called Collector in the app.
+    roles: { admin: 'Admin', product_manager: 'Product Manager', data_entry: 'Collector' },
+  },
+
   settings: {
     title: 'Settings',
     testMode: 'Test mode',
@@ -275,6 +322,7 @@ export const S = {
     account: 'Account',
     signedInAs: (name: string | null, email: string | null) =>
       name && email ? `Signed in as ${name} (${email})` : `Signed in as ${name ?? email ?? 'your account'}`,
+    staffRole: (label: string) => `Staff role: ${label}`,
     signOut: 'Sign out',
     signOutAsk: 'Sign out on this phone? Your trips stay here, and you’ll need to sign in again before the next trip.',
     signOutYes: 'Yes, sign out',
@@ -326,5 +374,185 @@ export const S = {
     repeat: (n: number, total: number) => `${n} of ${total} testers came back for an unprompted trip.`,
     medianSec: (s: number) => `Median time per tag item: ${s.toFixed(1)} s`,
     cols: ['Tester', 'Basket', 'Coverage', 'Trips', 'Came back'],
+  },
+
+  nav: {
+    label: 'Main',
+    explore: 'Explore',
+    cart: 'Cart',
+    scan: 'Scan',
+    scanLabel: 'Scan an item',
+    community: 'Community',
+    profile: 'Profile',
+    soon: 'Soon',
+  },
+
+  explore: {
+    sections: 'Explore sections',
+    tabs: { products: 'Products', recipes: 'Recipes', budget: 'Budget', pantry: 'Pantry', articles: 'Articles' },
+    soonAria: (label: string) => `${label}, coming soon`,
+    tipsLabel: 'Tips',
+    tipOf: (i: number, n: number) => `Tip ${i} of ${n}`,
+    tips: [
+      { title: 'Snap the shelf tag, watch your total', body: 'Know your bill before the counter.' },
+      { title: 'Set a budget before you go', body: 'Abaseria tells you the moment your cart goes over it.' },
+      { title: 'Check your total at the counter', body: 'Count the receipt lines and match the register in seconds.' },
+    ],
+    startShopping: 'Start shopping',
+    continueTrip: 'Continue your trip',
+    sampleTotal: 'Total',
+    sampleBudget: 'of ₱1,200 budget',
+    categories: 'Shop by category',
+    usual: 'Your usual items',
+    usualSoon: 'The things you buy most, one tap away.',
+    chat: 'Ask Abaseria, coming soon',
+    chatSoon: 'Ask Abaseria is coming soon.',
+  },
+
+  soon: {
+    badge: 'Coming soon',
+    titles: {
+      recipes: 'Recipes are on the way',
+      budget: 'Budget tools are on the way',
+      pantry: 'Your pantry is on the way',
+      articles: 'Articles are on the way',
+      community: 'Community is on the way',
+    } as Record<string, string>,
+    body: 'We’re still building this. Scanning and your cart work today.',
+    bodies: {
+      budget: 'Your spending by week, month and year is on the Cart tab for now.',
+      community: 'Price tips and deals from shoppers near you. Scanning and your cart work today.',
+    } as Record<string, string>,
+    backToProducts: 'Back to products',
+    openCart: 'Open Cart',
+  },
+
+  ads: {
+    ad: 'Ad',
+    sponsored: 'Sponsored',
+    space: 'Ad space',
+    banner: '320×50 banner',
+    mrec: '300×250 medium rectangle',
+  },
+
+  sponsor: {
+    label: 'Sponsored message',
+    close: 'Close',
+    notToday: 'Don’t show again today',
+    placeholder: 'Sponsor creative',
+    placeholderSize: '3:5 portrait, 600×1000 image',
+  },
+  notices: {
+    close: 'Close notice',
+  },
+
+  // Profile tab (task P2, Nov 16). Every answer is optional; the database enforces the rules.
+  profile: {
+    title: 'Profile',
+    settings: 'Settings',
+    loading: 'Loading your profile…',
+    retry: 'Try again',
+    errors: {
+      offline: 'You’re offline. Your profile is kept online, so connect to see or change it.',
+      not_signed_in: 'Sign in to see your profile.',
+      locked: 'Your birth year is locked once saved. To correct it, email abaseria.app@gmail.com.',
+      under_18: 'Abaseria doesn’t save answers for anyone under 18.',
+      needs_profile: 'Turn on “Save my answers” first.',
+      failed: 'That didn’t save. Please try again.',
+    } as Record<string, string>,
+
+    aboutYou: 'About you',
+    aboutYouHint: 'We’d like to get to know who shops with Abaseria. Every question is optional.',
+    privacyLink: 'How we use your answers and photo',
+    saveSwitch: 'Save my answers',
+    saveSwitchHint: 'Lets Abaseria keep the answers below for your budgeting and comparisons. Off: nothing is saved.',
+    turnOffAsk: 'Turning this off deletes all your answers and also turns off personalized offers and anonymous reports. Turn it off?',
+    turnOffYes: 'Yes, delete my answers',
+    turnOffNo: 'Keep my answers',
+    offHint: 'Nothing about you is saved while this is off.',
+
+    notAnswered: 'Not answered',
+    answer: 'Answer',
+    edit: 'Change',
+    remove: 'Remove',
+    cancel: 'Cancel',
+    saving: 'Saving…',
+
+    questions: {
+      birth_year: 'Birth year',
+      gender: 'Gender',
+      location: 'Where you live',
+      household_size_band: 'People in your household',
+      has_kids_under_12: 'Kids under 12 at home',
+      has_senior_60plus: 'Seniors 60+ at home',
+      payday_pattern: 'When you get paid',
+      grocery_budget_band: 'Monthly grocery budget',
+    } as Record<string, string>,
+    why: {
+      birth_year: 'Helps us understand shoppers by age group.',
+      gender: 'Helps us understand who shops. Never shown to stores with your name.',
+      location: 'Shows prices from stores near you.',
+      household_size_band: 'Lets us compare your spend with similar households.',
+      has_kids_under_12: 'Helps us show baby and kids’ items that matter to you.',
+      has_senior_60plus: 'Helps with senior discounts later.',
+      payday_pattern: 'So budgets can follow your payday.',
+      grocery_budget_band: 'So we can compare your spend with similar households.',
+    } as Record<string, string>,
+    labels: {
+      woman: 'Woman',
+      man: 'Man',
+      another: 'Another gender',
+      no_answer: 'Prefer not to say',
+      yes: 'Yes',
+      no: 'No',
+      '1': 'Just me',
+      '2': '2',
+      '3-4': '3–4',
+      '5-6': '5–6',
+      '7+': '7 or more',
+      kinsenas_katapusan: 'Kinsenas & katapusan',
+      weekly: 'Weekly',
+      monthly: 'Monthly',
+      daily_irregular: 'Daily or irregular',
+      under_3000: 'Under ₱3,000',
+      '3000_5999': '₱3,000–5,999',
+      '6000_9999': '₱6,000–9,999',
+      '10000_14999': '₱10,000–14,999',
+      '15000_plus': '₱15,000 or more',
+    } as Record<string, string>,
+    yearPick: 'Pick your birth year',
+    under18: 'I’m under 18',
+    yearLocked: 'Locked once saved. To correct it, email abaseria.app@gmail.com.',
+    yearRemoveAsk: 'Once removed, adding a birth year again needs our help by email. Remove it?',
+    locationSaved: 'Saved',
+    locationLater: 'Choosing your city is coming soon.',
+
+    usesTitle: 'How your answers are used',
+    offers: 'Personalized offers',
+    offersHint: 'Use my answers to pick which offers and coupons I see. Off: you still see offers, just not picked for you.',
+    research: 'Anonymous reports',
+    researchHint: 'Include me in totals for groups of 50+ shoppers that stores and brands see. They never get your name, lists or receipts.',
+    needsSave: 'Turn on “Save my answers” to use this.',
+
+    pricesTitle: 'Prices you scan',
+    pricesText: 'Prices you scan are shared with other shoppers so everyone sees what things cost. Your name and account are never shown with them.',
+
+    photo: {
+      alt: 'Your profile photo',
+      onlyYou: 'Only you can see your photo.',
+      selfie: 'Take a selfie',
+      choose: 'Choose a photo',
+      remove: 'Remove photo',
+      hideGoogle: 'Hide my Google photo',
+      showGoogle: 'Show my Google photo',
+      saving: 'Saving photo…',
+      failed: 'That photo didn’t save. Please try again.',
+      offline: 'You’re offline. Connect to change your photo.',
+    },
+
+    deleteAll: 'Delete all my answers',
+    deleteAllAsk: 'Delete every answer above? Your switches stay as they are.',
+    deleteAllYes: 'Yes, delete them',
+    deleted: 'Your answers are deleted.',
   },
 };

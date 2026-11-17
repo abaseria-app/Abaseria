@@ -13,6 +13,7 @@ import { dbConfig, getSupabase } from './supabase';
 import { logEvent } from './events';
 import { shrinkImage } from './thumb';
 import { hasAccountSession } from './auth';
+import { categoryOf, sharedCategory, toCategory, type CategoryId } from './categories';
 
 export const SHARING_ON = dbConfig?.target === 'dev';
 
@@ -90,7 +91,7 @@ export function sightingRow(item: Item & { shareId: string }, branchId: string):
 }
 
 export function productRow(item: Item) {
-  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), category: item.category ?? 'other' };
+  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), category: sharedCategory(categoryOf(item)) };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -231,7 +232,8 @@ async function run(): Promise<ShareResult> {
 
 export interface SharedProduct {
   label: string;
-  category: Item['category'];
+  /** Null when the shared database has no category for it. */
+  category: CategoryId | null;
   imagePath: string | null;
 }
 
@@ -256,7 +258,7 @@ export async function sharedProduct(barcode: string): Promise<SharedProduct | nu
       .abortSignal(ctrl.signal);
     const row = data?.[0];
     if (error || !row?.name) return null;
-    return { label: row.name as string, category: (row.category as Item['category']) ?? null, imagePath: (row.image_path as string | null) ?? null };
+    return { label: row.name as string, category: row.category ? toCategory(row.category as string, row.name as string) : null, imagePath: (row.image_path as string | null) ?? null };
   } catch {
     return null;
   } finally {

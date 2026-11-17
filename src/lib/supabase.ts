@@ -87,13 +87,14 @@ export async function checkConnection(): Promise<DbStatus> {
   if (!client) return { state: 'off' };
   const db = client;
   // No retries: offline, the client would wait 1 + 2 + 4 seconds before giving up, and this is a quick check.
-  const count = async (table: string) => {
-    const { count: n, error } = await db.from(table).select('*', { count: 'exact', head: true }).retry(false);
+  // Count one named column: select('*') fails on tables where a column (created_by) is hidden from the app.
+  const count = async (table: string, column: string) => {
+    const { count: n, error } = await db.from(table).select(column, { count: 'exact', head: true }).retry(false);
     if (error) throw new Error(error.message || error.code || 'unknown error');
     return n ?? 0;
   };
   try {
-    const [branches, products, prices] = await Promise.all([count('branches'), count('products'), count('latest_prices')]);
+    const [branches, products, prices] = await Promise.all([count('branches', 'id'), count('products', 'barcode'), count('latest_prices', 'barcode')]);
     return { state: 'ok', target, branches, products, prices };
   } catch (e) {
     return { state: 'error', target, message: e instanceof Error ? e.message : String(e) };

@@ -23,14 +23,14 @@ describe('accountFromUser', () => {
 
 describe('redirectUrl', () => {
   it('sends each app back to itself', () => {
-    expect(redirectUrl('https://bkarkos86-mako.github.io', '/Abaseria/')).toBe('https://bkarkos86-mako.github.io/Abaseria/');
-    expect(redirectUrl('https://bkarkos86-mako.github.io', '/Abaseria/dev/')).toBe('https://bkarkos86-mako.github.io/Abaseria/dev/');
+    expect(redirectUrl('https://abaseria-app.github.io', '/Abaseria/')).toBe('https://abaseria-app.github.io/Abaseria/');
+    expect(redirectUrl('https://abaseria-app.github.io', '/Abaseria/dev/')).toBe('https://abaseria-app.github.io/Abaseria/dev/');
     expect(redirectUrl('http://localhost:5173', '/')).toBe('http://localhost:5173/');
   });
 });
 
 describe('readReturn and cleanUrl', () => {
-  const base = 'https://bkarkos86-mako.github.io/Abaseria/dev/';
+  const base = 'https://abaseria-app.github.io/Abaseria/dev/';
   it('spots a sign-in code coming back from Google', () => {
     expect(readReturn(`${base}?code=abc123`)).toEqual({ finishing: true, error: null, code: null });
     expect(cleanUrl(`${base}?code=abc123`)).toBe(base);
@@ -66,7 +66,7 @@ describe('shouldStartFresh', () => {
 describe('isMissingEmail', () => {
   it('spots a Facebook account with no email (Supabase refuses it)', () => {
     const back = readReturn(
-      'https://bkarkos86-mako.github.io/Abaseria/dev/?error=server_error&error_code=unexpected_failure&error_description=Error+getting+user+email+from+external+provider#_=_',
+      'https://abaseria-app.github.io/Abaseria/dev/?error=server_error&error_code=unexpected_failure&error_description=Error+getting+user+email+from+external+provider#_=_',
     );
     expect(isMissingEmail(back.error)).toBe(true);
   });

@@ -4,6 +4,7 @@ import { exportCsvFiles } from '../lib/export';
 import { checkConnection, dbConfig, type DbStatus } from '../lib/supabase';
 import { SHARING_ON, sharePending, waitingToShare, type ShareResult } from '../lib/sync';
 import { signOut, type Account } from '../lib/auth';
+import { refreshStaffRole, roleLabel, savedStaffRole, type StaffRole } from '../lib/staff';
 
 interface Props {
   account: Account | null;
@@ -22,6 +23,15 @@ export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults,
   const [share, setShare] = useState<ShareResult | null>(null);
   const [sharing, setSharing] = useState(false);
   const [askSignOut, setAskSignOut] = useState(false);
+  const [role, setRole] = useState<StaffRole | null>(null);
+  useEffect(() => {
+    if (!account) return;
+    let live = true;
+    // The phone's copy first (works offline), then the database's answer.
+    savedStaffRole(account.id).then((r) => live && setRole(r));
+    refreshStaffRole(account.id).then((r) => live && setRole(r)).catch(() => undefined);
+    return () => { live = false; };
+  }, [account]);
   useEffect(() => {
     waitingToShare().then(setWaiting);
   }, [share]);
@@ -37,6 +47,7 @@ export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults,
         <section className="card">
           <h2>{S.settings.account}</h2>
           <p className="hint">{S.settings.signedInAs(account.name, account.email)}</p>
+          {role && <p className="staff-role"><strong>{S.settings.staffRole(roleLabel(role))}</strong></p>}
           {askSignOut ? (
             <div className="account-actions">
               <p>{S.settings.signOutAsk}</p>
