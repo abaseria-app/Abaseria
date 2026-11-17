@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { birthYears, consentsFromRows, explainError } from './profile';
+import { birthYears, cleanNickname, consentsFromRows, explainError } from './profile';
 
 describe('birthYears', () => {
   it('starts at the newest year that is certainly 18+', () => {
@@ -41,5 +41,19 @@ describe('explainError', () => {
     expect(explainError({ message: 'TypeError: Failed to fetch' })).toBe('offline');
     expect(explainError({ message: 'something else' })).toBe('failed');
     expect(explainError(null)).toBe('failed');
+  });
+});
+
+describe('cleanNickname', () => {
+  it('trims, squeezes spaces and drops markup characters', () => {
+    expect(cleanNickname('  Ate   Jo  ')).toBe('Ate Jo');
+    expect(cleanNickname('<b>Jovie</b>')).toBe('bJovie/b');
+    expect(cleanNickname('   ')).toBeNull();
+  });
+  it('keeps at most 30 characters', () => {
+    expect(cleanNickname('x'.repeat(40))).toHaveLength(30);
+  });
+  it('keeps Filipino names intact', () => {
+    expect(cleanNickname('Ma. Señora Ñiña')).toBe('Ma. Señora Ñiña');
   });
 });

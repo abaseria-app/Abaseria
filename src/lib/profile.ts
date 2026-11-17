@@ -21,6 +21,7 @@ export const PAYDAYS = ['kinsenas_katapusan', 'weekly', 'monthly', 'daily_irregu
 export const BUDGETS = ['under_3000', '3000_5999', '6000_9999', '10000_14999', '15000_plus', 'no_answer'] as const;
 
 export interface Profile {
+  nickname: string | null;
   birth_year: number | null;
   birthday_locked_at: string | null;
   gender: (typeof GENDERS)[number] | null;
@@ -45,6 +46,7 @@ export const CHOICES: Record<ChoiceField, readonly string[]> = {
 };
 
 export const EMPTY_PROFILE: Profile = {
+  nickname: null,
   birth_year: null,
   birthday_locked_at: null,
   gender: null,
@@ -58,7 +60,7 @@ export const EMPTY_PROFILE: Profile = {
 };
 
 const PROFILE_COLUMNS =
-  'birth_year, birthday_locked_at, gender, province_code, city_code, household_size_band, has_kids_under_12, has_senior_60plus, payday_pattern, grocery_budget_band';
+  'nickname, birth_year, birthday_locked_at, gender, province_code, city_code, household_size_band, has_kids_under_12, has_senior_60plus, payday_pattern, grocery_budget_band';
 
 /**
  * Birth years the app offers: from the year that is certainly 18+ (this year minus 19) back 100 years.
@@ -136,7 +138,14 @@ export async function setConsent(purpose: Purpose, granted: boolean): Promise<Lo
   return loadProfile();
 }
 
-export type Answer = Partial<Pick<Profile, 'birth_year' | 'gender' | 'province_code' | 'city_code' | ChoiceField>>;
+export type Answer = Partial<Pick<Profile, 'nickname' | 'birth_year' | 'gender' | 'province_code' | 'city_code' | ChoiceField>>;
+
+/** A nickname the database will accept (migration 019), or null if there's nothing usable. */
+export function cleanNickname(raw: string): string | null {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+  const s = raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
+  return s || null;
+}
 
 /** Saves (or clears, with null) answers: changes the shopper's row, or adds it the first time. */
 export async function saveAnswers(answer: Answer): Promise<Profile> {

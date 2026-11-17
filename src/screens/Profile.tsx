@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { S } from '../strings';
 import { BottomNav } from '../components/BottomNav';
 import { ProfilePhoto } from '../components/ProfilePhoto';
+import { QuestionFlow, type Question } from '../components/QuestionFlow';
 import type { Account } from '../lib/auth';
 import {
-  CHOICES,
   ProfileFailure,
-  birthYears,
   deleteAnswers,
   loadProfile,
   saveAnswers,
@@ -27,7 +26,7 @@ interface Props {
   onSettings: () => void;
 }
 
-type Editing = ChoiceField | 'birth_year' | null;
+type Editing = Question | null;
 type Ask = 'turnOff' | 'removeYear' | 'deleteAll' | null;
 
 const PRIVACY = `${import.meta.env.BASE_URL}privacy.html#profile`;
@@ -112,68 +111,31 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
 
   function row(field: ChoiceField) {
     const value = profile[field];
-    const open = editing === field;
     return (
       <div className="profile-row" key={field}>
         <div className="profile-q">
           <strong>{S.profile.questions[field]}</strong>
           <small>{S.profile.why[field]}</small>
-          {!open && <span className={value ? 'profile-a' : 'profile-a empty'}>{value ? label(value) : S.profile.notAnswered}</span>}
+          <span className={value ? 'profile-a' : 'profile-a empty'}>{value ? label(value) : S.profile.notAnswered}</span>
         </div>
-        {open ? (
-          <div className="chips">
-            {CHOICES[field].map((v) => (
-              <button key={v} className={`chip ${value === v ? 'on' : ''}`} disabled={busy} onClick={() => void save({ [field]: v })}>
-                {label(v)}
-              </button>
-            ))}
-            <button className="chip ghost" disabled={busy} onClick={() => setEditing(null)}>{S.profile.cancel}</button>
-          </div>
-        ) : (
-          <div className="profile-actions">
-            <button className="link" disabled={busy} onClick={() => setEditing(field)}>{value ? S.profile.edit : S.profile.answer}</button>
-            {value && <button className="link danger" disabled={busy} onClick={() => void save({ [field]: null })}>{S.profile.remove}</button>}
-          </div>
-        )}
+        <div className="profile-actions">
+          <button className="link" disabled={busy} onClick={() => setEditing(field)}>{value ? S.profile.edit : S.profile.answer}</button>
+          {value && <button className="link danger" disabled={busy} onClick={() => void save({ [field]: null })}>{S.profile.remove}</button>}
+        </div>
       </div>
     );
   }
 
-  const years = birthYears();
   const yearLocked = !!profile.birthday_locked_at;
   const yearRow = (
     <div className="profile-row">
       <div className="profile-q">
         <strong>{S.profile.questions.birth_year}</strong>
         <small>{S.profile.why.birth_year}</small>
-        {editing !== 'birth_year' && (
-          <span className={profile.birth_year ? 'profile-a' : 'profile-a empty'}>{profile.birth_year ?? S.profile.notAnswered}</span>
-        )}
+        <span className={profile.birth_year ? 'profile-a' : 'profile-a empty'}>{profile.birth_year ?? S.profile.notAnswered}</span>
         {profile.birth_year && <small>{S.profile.yearLocked}</small>}
       </div>
-      {editing === 'birth_year' ? (
-        <div className="profile-year">
-          <select
-            aria-label={S.profile.yearPick}
-            defaultValue=""
-            disabled={busy}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === 'under18') {
-                setEditing(null);
-                setNote(S.profile.errors.under_18);
-              } else if (v) void save({ birth_year: Number(v) });
-            }}
-          >
-            <option value="" disabled>{S.profile.yearPick}</option>
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-            <option value="under18">{S.profile.under18}</option>
-          </select>
-          <button className="chip ghost" disabled={busy} onClick={() => setEditing(null)}>{S.profile.cancel}</button>
-        </div>
-      ) : ask === 'removeYear' ? (
+      {ask === 'removeYear' ? (
         <div className="account-actions">
           <p>{S.profile.yearRemoveAsk}</p>
           <button className="btn danger-link" disabled={busy} onClick={() => void save({ birth_year: null })}>{S.profile.remove}</button>
@@ -189,6 +151,20 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
           {profile.birth_year && <button className="link danger" disabled={busy} onClick={() => setAsk('removeYear')}>{S.profile.remove}</button>}
         </div>
       )}
+    </div>
+  );
+
+  const nicknameRow = (
+    <div className="profile-row">
+      <div className="profile-q">
+        <strong>{S.profile.questions.nickname}</strong>
+        <small>{S.profile.why.nickname}</small>
+        <span className={profile.nickname ? 'profile-a' : 'profile-a empty'}>{profile.nickname ?? S.profile.notAnswered}</span>
+      </div>
+      <div className="profile-actions">
+        <button className="link" disabled={busy} onClick={() => setEditing('nickname')}>{profile.nickname ? S.profile.edit : S.profile.answer}</button>
+        {profile.nickname && <button className="link danger" disabled={busy} onClick={() => void save({ nickname: null })}>{S.profile.remove}</button>}
+      </div>
     </div>
   );
 
@@ -219,6 +195,17 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
       </header>
       <div className="explore-body">
         {account && <ProfilePhoto account={account} />}
+        {profile.nickname && <p className="profile-hello">{S.profile.hello(profile.nickname)}</p>}
+        {editing && (
+          <QuestionFlow
+            only={editing}
+            suggestedName={account?.name}
+            onClose={(latest) => {
+              setEditing(null);
+              if (latest) setData(latest);
+            }}
+          />
+        )}
         {errorLine}
         {note && <p className="hint" role="status">{note}</p>}
 
@@ -248,6 +235,7 @@ export function Profile({ account, onExplore, onCart, onScan, onCommunity, onSet
           )}
           {consents.profile ? (
             <div className="profile-rows">
+              {nicknameRow}
               {locationRow}
               {yearRow}
               {CHOICE_FIELDS.map(row)}

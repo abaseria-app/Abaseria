@@ -198,3 +198,4 @@ on conflict (id) do nothing;
 --   supabase/migrations/016_profile_real_accounts_only.sql  guest (anonymous) sessions get nothing from those tables
 --   supabase/migrations/017_birth_year_only.sql         birth year alone; the app can't write birth month yet
 --   supabase/migrations/018_profile_photos.sql          private profile-photos bucket, one photo per shopper, own only
+--   supabase/migrations/019_profile_nickname.sql        nickname on the shopper profile

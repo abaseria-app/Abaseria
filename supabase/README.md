@@ -154,6 +154,7 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `016_profile_real_accounts_only.sql` | Guest (anonymous) sessions can't read or write profiles or consents | Nov 16 | Done Nov 16 |
 | `017_birth_year_only.sql` | Birth year can be saved alone (under 18 checked against Dec 31); the app can't write birth month until birthday offers launch; year and month lock separately | Nov 16 | Done Nov 16 |
 | `018_profile_photos.sql` | Private `profile-photos` bucket (200 KB, WebP/JPEG); a real account reads, adds, replaces and deletes only `<user id>/photo` | Nov 16 | Done Nov 16 |
+| `019_profile_nickname.sql` | `shopper_profiles.nickname` (1–30 characters, trimmed, no markup) | Nov 17 | Not yet |
 
 Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 

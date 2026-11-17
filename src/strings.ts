@@ -462,6 +462,7 @@ export const S = {
     } as Record<string, string>,
 
     aboutYou: 'About you',
+    hello: (name: string) => `Hi, ${name}!`,
     aboutYouHint: 'We’d like to get to know who shops with Abaseria. Every question is optional.',
     privacyLink: 'How we use your answers and photo',
     saveSwitch: 'Save my answers',
@@ -479,6 +480,7 @@ export const S = {
     saving: 'Saving…',
 
     questions: {
+      nickname: 'What we call you',
       birth_year: 'Birth year',
       gender: 'Gender',
       location: 'Where you live',
@@ -489,6 +491,7 @@ export const S = {
       grocery_budget_band: 'Monthly grocery budget',
     } as Record<string, string>,
     why: {
+      nickname: 'Used to greet you in the app.',
       birth_year: 'Helps us understand shoppers by age group.',
       gender: 'Helps us understand who shops. Never shown to stores with your name.',
       location: 'Shows prices from stores near you.',
@@ -499,9 +502,9 @@ export const S = {
       grocery_budget_band: 'So we can compare your spend with similar households.',
     } as Record<string, string>,
     labels: {
-      woman: 'Woman',
-      man: 'Man',
-      another: 'Another gender',
+      woman: 'Female',
+      man: 'Male',
+      another: 'Non-binary',
       no_answer: 'Prefer not to say',
       yes: 'Yes',
       no: 'No',
@@ -536,6 +539,44 @@ export const S = {
 
     pricesTitle: 'Prices you scan',
     pricesText: 'Prices you scan are shared with other shoppers so everyone sees what things cost. Your name and account are never shown with them.',
+
+    // One-question popups (Nov 17): 2nd visit "get to know you", 3rd visit household, and Change on this tab.
+    flow: {
+      next: 'Next',
+      skip: 'Skip',
+      back: 'Back',
+      close: 'Close',
+      saving: 'Saving…',
+      welcomeBasics: 'Let’s get to know you',
+      welcomeBasicsText: 'A few quick questions so Abaseria fits you better. Every one is optional.',
+      welcomeHousehold: 'A bit about your household',
+      welcomeHouseholdText: 'So we can compare your spending with households like yours. Every question is optional.',
+      allowSave: 'Yes, save my answers',
+      allowSaveHint: 'Yes lets Abaseria keep your answers. You can turn this off any time in Profile, and that deletes them.',
+      notNow: 'Not now',
+      nickname: 'What is your name?',
+      nicknameText: 'We’re glad to meet you. What should we call you?',
+      nicknamePlaceholder: 'Your name or palayaw',
+      birthYear: 'What year were you born?',
+      birthYearText: 'Helps us understand shoppers by age group. Saved once; email us to correct it.',
+      under18: 'I’m under 18',
+      under18Done: 'Thanks for telling us. Abaseria doesn’t save answers for anyone under 18, so we’ll stop here.',
+      gender: 'What is your gender?',
+      genderText: 'Helps us understand who shops. Never shown to stores with your name.',
+      household_size_band: 'How many people live with you?',
+      household_size_bandText: 'Counting you.',
+      has_kids_under_12: 'Any kids under 12 at home?',
+      has_kids_under_12Text: 'Helps us show baby and kids’ items that matter to you.',
+      has_senior_60plus: 'Any seniors 60 or older at home?',
+      has_senior_60plusText: 'Helps with senior discounts later.',
+      payday_pattern: 'When do you get paid?',
+      payday_patternText: 'So budgets can follow your payday.',
+      grocery_budget_band: 'What’s your monthly grocery budget?',
+      grocery_budget_bandText: 'A rough range is fine.',
+      doneTitle: 'Salamat!',
+      doneText: 'You can see or change your answers any time in Profile.',
+      done: 'Done',
+    },
 
     photo: {
       alt: 'Your profile photo',

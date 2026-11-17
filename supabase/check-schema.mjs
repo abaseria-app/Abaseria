@@ -396,5 +396,19 @@ check('guest sees no photos', (await asGuest(`select name from storage.objects w
 await refused('product images still need the server key', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', '${U1}/photo')`);
 await ok('shopper deletes own photo', 'authenticated', U1, `delete from storage.objects where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
 
+// 019: nickname. U1's profile switch is off by now (turned off above), U3 is a fresh shopper.
+await ok('U3 turns the profile switch on', 'authenticated', U3, sw('profile', true));
+await ok('nickname saved', 'authenticated', U3, `insert into public.shopper_profiles (nickname) values ('Jovie')`);
+await ok('...and read back', 'authenticated', U3, `select nickname from public.shopper_profiles`, (r) => r.rows[0]?.nickname === 'Jovie');
+await ok('nickname changed', 'authenticated', U3, `update public.shopper_profiles set nickname = 'Ate Jo' where user_id = '${U3}'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('nickname over 30 characters', 'authenticated', U3, `update public.shopper_profiles set nickname = '${'x'.repeat(31)}' where user_id = '${U3}'`);
+await refused('nickname with spaces around it', 'authenticated', U3, `update public.shopper_profiles set nickname = ' Jo ' where user_id = '${U3}'`);
+await refused('nickname with markup', 'authenticated', U3, `update public.shopper_profiles set nickname = '<b>Jo</b>' where user_id = '${U3}'`);
+await refused('empty nickname', 'authenticated', U3, `update public.shopper_profiles set nickname = '' where user_id = '${U3}'`);
+await ok('another shopper can’t read it', 'authenticated', U1, `select nickname from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows.length === 0);
+await refused('logged-out phone can’t read it', 'anon', null, `select nickname from public.shopper_profiles`);
+await ok('switching off deletes the nickname too', 'authenticated', U3, sw('profile', false));
+await ok('...gone', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows[0]?.n === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
