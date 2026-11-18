@@ -7,9 +7,12 @@ import { Icon, SoonBadge, type IconName } from '../components/Icon';
 import { BottomNav } from '../components/BottomNav';
 import { MrecSlot, TopBannerSlot, ADS_PREVIEW } from '../components/AdSlot';
 import { SponsorPopup } from '../components/SponsorPopup';
+import { Budget } from './Budget';
 
 type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
 const TABS: Tab[] = ['products', 'recipes', 'budget', 'pantry', 'articles'];
+/** Tabs that are built. The rest carry a coming-soon cover. */
+const LIVE: Tab[] = ['products', 'budget'];
 
 const CATEGORY_ICON: Record<CategoryId, IconName> = {
   'pantry staples': 'dry',
@@ -88,7 +91,7 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
         <img className="explore-logo" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt={S.appName} />
         {TABS.map((t) => {
           const label = S.explore.tabs[t];
-          const soon = t !== 'products';
+          const soon = !LIVE.includes(t);
           return (
             <button key={t} className={`explore-tab ${tab === t ? 'on' : ''}`} aria-pressed={tab === t} aria-label={soon ? S.explore.soonAria(label) : label} onClick={() => setTab(t)}>
               <Icon name={t} size={28} stroke={1.9} />
@@ -100,10 +103,12 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
       </nav>
 
       <div className="explore-body">
-        <button className="search-open" onClick={() => onSearch()} aria-label={S.search.open}>
-          <Icon name="search" size={22} stroke={2.5} />
-          <span>{S.search.openHint}</span>
-        </button>
+        {tab !== 'budget' && (
+          <button className="search-open" onClick={() => onSearch()} aria-label={S.search.open}>
+            <Icon name="search" size={22} stroke={2.5} />
+            <span>{S.search.openHint}</span>
+          </button>
+        )}
 
         {notice && <p className="toast">{notice}</p>}
 
@@ -168,15 +173,20 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
               </div>
             </section>
           </>
+        ) : tab === 'budget' ? (
+          <Budget />
         ) : (
-          <SoonPanel tab={tab} onBack={() => setTab('products')} onCart={onCart} />
+          <SoonPanel tab={tab} onBack={() => setTab('products')} />
         )}
       </div>
 
-      <button className="chat-fab" aria-label={S.explore.chat} onClick={() => setNotice(S.explore.chatSoon)}>
-        <Icon name="chat" size={28} />
-        <SoonBadge />
-      </button>
+      {/* Not on Budget: it would sit over the Mark paid buttons. */}
+      {tab !== 'budget' && (
+        <button className="chat-fab" aria-label={S.explore.chat} onClick={() => setNotice(S.explore.chatSoon)}>
+          <Icon name="chat" size={28} />
+          <SoonBadge />
+        </button>
+      )}
 
       <BottomNav current="explore" onExplore={() => setTab('products')} onCart={onCart} onScan={onScan} onCommunity={onCommunity} onProfile={onProfile} />
 
@@ -185,7 +195,7 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
   );
 }
 
-function SoonPanel({ tab, onBack, onCart }: { tab: Tab; onBack: () => void; onCart: () => void }) {
+function SoonPanel({ tab, onBack }: { tab: Tab; onBack: () => void }) {
   return (
     <section className="soon-panel">
       <div className="soon-skeleton" aria-hidden="true">
@@ -199,15 +209,9 @@ function SoonPanel({ tab, onBack, onCart }: { tab: Tab; onBack: () => void; onCa
         <span className="soon-pill">{S.soon.badge}</span>
         <h2>{S.soon.titles[tab]}</h2>
         <p>{S.soon.bodies[tab] ?? S.soon.body}</p>
-        {tab === 'budget' ? (
-          <button className="btn secondary" onClick={onCart}>
-            {S.soon.openCart}
-          </button>
-        ) : (
-          <button className="btn secondary" onClick={onBack}>
-            {S.soon.backToProducts}
-          </button>
-        )}
+        <button className="btn secondary" onClick={onBack}>
+          {S.soon.backToProducts}
+        </button>
       </div>
     </section>
   );

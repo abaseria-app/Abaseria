@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { PriceType } from './money';
 import type { CategoryId, LegacyCategoryId } from './categories';
+import type { BudgetBill, BudgetExpense, BudgetGoal, BudgetIncome, BudgetMonth, BudgetPhoto } from './budget';
 
 export const STORE_CHAINS = [
   '7-Eleven',
@@ -137,6 +138,12 @@ class AbaseriaDB extends Dexie {
   events!: Table<AppEvent, number>;
   settings!: Table<Setting, string>;
   branches!: Table<Branch, number>;
+  budgetExpenses!: Table<BudgetExpense, number>;
+  budgetIncome!: Table<BudgetIncome, number>;
+  budgetBills!: Table<BudgetBill, number>;
+  budgetGoals!: Table<BudgetGoal, number>;
+  budgetMonths!: Table<BudgetMonth, string>;
+  budgetPhotos!: Table<BudgetPhoto, number>;
 
   constructor() {
     super(DB_NAME);
@@ -161,6 +168,20 @@ class AbaseriaDB extends Dexie {
       events: '++id, tripId, type, createdAt',
       settings: 'key',
       branches: '++id, &uuid, chain',
+    });
+    // v4 (Nov 18, 2026): the household budget on the Budget tab. New tables only; trips and items are untouched.
+    this.version(4).stores({
+      trips: '++id, testerId, startedAt, endedAt, branchUuid',
+      items: '++id, tripId, label, createdAt, barcode',
+      events: '++id, tripId, type, createdAt',
+      settings: 'key',
+      branches: '++id, &uuid, chain',
+      budgetExpenses: '++id, date, billId',
+      budgetIncome: '++id, date',
+      budgetBills: '++id',
+      budgetGoals: '++id',
+      budgetMonths: 'month',
+      budgetPhotos: '++id',
     });
   }
 }

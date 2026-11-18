@@ -75,7 +75,9 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/ocr.ts` | Tesseract setup, guide-box crop, contrast stretch |
 | `src/lib/money.ts` | Centavo formatting and line totals |
 | `src/lib/export.ts` | trips/events/items CSV, coverage, pass-line math |
-| `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches) |
+| `src/lib/db.ts` | IndexedDB tables (trips, items, events, settings, branches, and the budget tables) |
+| `src/lib/budget.ts`, `budgetStore.ts` | Budget tab: months, bills, groceries from trips, saving on the phone. Never uploaded. Tests in `budget.test.ts` |
+| `src/screens/Budget.tsx` | The Budget tab on Explore (overview, records, bills, income, goals) |
 | `src/lib/thumb.ts` | Shrinks the product's reference image (from the shared database) to the list thumbnail kept on the phone |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
 | `.env.development` | Dev database address and publishable key (abaseria-dev) |

@@ -3,6 +3,7 @@ import { S } from '../strings';
 import { db } from '../lib/db';
 import { formatPeso, parsePesoInput } from '../lib/money';
 import { loadMonthlyBudget, setMonthlyBudget, spentThisMonth, type MonthlyBudget } from '../lib/monthlyBudget';
+import { manualGroceries, thisMonth } from '../lib/budget';
 
 /** ₱3,450 rather than ₱3,450.00 when there are no centavos. */
 const peso = (c: number) => formatPeso(c).replace(/\.00$/, '');
@@ -22,9 +23,10 @@ export function MonthlyBudgetHint({ onUse }: Props) {
 
   useEffect(() => {
     (async () => {
-      const [m, trips, items] = await Promise.all([loadMonthlyBudget(), db.trips.toArray(), db.items.toArray()]);
+      const [m, trips, items, expenses] = await Promise.all([loadMonthlyBudget(), db.trips.toArray(), db.items.toArray(), db.budgetExpenses.toArray()]);
       setMonthly(m);
-      setSpent(spentThisMonth(trips, items));
+      // Trips plus groceries typed in on the Budget tab, so both screens agree on what's left.
+      setSpent(spentThisMonth(trips, items) + manualGroceries(expenses, thisMonth()));
       setReady(true);
     })().catch(() => setReady(true));
   }, []);
