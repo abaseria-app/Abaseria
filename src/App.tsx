@@ -11,7 +11,8 @@ import { Settings } from './screens/Settings';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
 import { Search } from './screens/Search';
-import { Explore } from './screens/Explore';
+import { Explore, type Tab as ExploreTab } from './screens/Explore';
+import { RecipeDetail } from './screens/Recipes';
 import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
 import { Profile } from './screens/Profile';
 import { QuestionFlow } from './components/QuestionFlow';
@@ -22,7 +23,7 @@ import { NoticeBanner } from './components/NoticeBanner';
 import { dismissNotice, loadNotices, type Notice } from './lib/notices';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
-type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile';
+type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile' | 'recipe';
 /** Screens a back button can return to. */
 type Base = 'explore' | 'home';
 
@@ -43,6 +44,9 @@ export default function App() {
   const [searchCategory, setSearchCategory] = useState<CategoryId | null>(null);
   const [soon, setSoon] = useState<SoonFeature>('community');
   const [notices, setNotices] = useState<Notice[]>([]);
+  // The recipe open on the recipe screen, and which Explore tab to come back to.
+  const [recipeSlug, setRecipeSlug] = useState<string | null>(null);
+  const [exploreTab, setExploreTab] = useState<ExploreTab>('products');
   // Profile questions due on this visit (2nd: about you, 3rd: household). Counted when the app comes to the front.
   const [due, setDue] = useState<{ id: string; set: QuestionSet | null } | null>(null);
   const accountId = account?.id;
@@ -186,6 +190,13 @@ export default function App() {
       case 'explore':
         return (
           <Explore
+            key={exploreTab}
+            initialTab={exploreTab}
+            onRecipe={(slug) => {
+              setRecipeSlug(slug);
+              setExploreTab('recipes');
+              setRoute('recipe');
+            }}
             activeTripId={tripId}
             onScan={() => scan('explore')}
             onSearch={(category) => search('explore', category)}
@@ -199,7 +210,10 @@ export default function App() {
           <ComingSoon
             key={soon}
             feature={soon}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCart={() => setRoute('home')}
             onScan={() => scan('explore')}
             onCommunity={() => openSoon('community')}
@@ -211,7 +225,10 @@ export default function App() {
           <Profile
             key={profileVersion}
             account={account}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCart={() => setRoute('home')}
             onScan={() => scan('explore')}
             onCommunity={() => openSoon('community')}
@@ -227,7 +244,10 @@ export default function App() {
             onContinue={() => setRoute('shop')}
             onSettings={() => setRoute('settings')}
             onSearch={() => search('home')}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCommunity={() => openSoon('community')}
             onProfile={() => setRoute('profile')}
           />
@@ -289,6 +309,8 @@ export default function App() {
         return <OcrCheck onBack={() => setRoute('settings')} />;
       case 'results':
         return <Results onBack={() => setRoute('settings')} />;
+      case 'recipe':
+        return <RecipeDetail key={recipeSlug ?? ''} slug={recipeSlug ?? ''} onBack={() => setRoute('explore')} />;
       case 'search':
         return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
     }

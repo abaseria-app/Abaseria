@@ -31,6 +31,9 @@ const PATHS = {
   health: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
   pet: 'M12 13c-3 0-6 3-6 6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2c0-3-3-6-6-6z M5 10a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M8.5 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M12.5 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M16 10a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0',
   cupcake: 'M5 11h14l-2 10H7z M5 11a7 5 0 0 1 14 0 M12 4v2',
+  heart: 'M12 20s-7-4.5-9-9a4.5 4.5 0 0 1 9-2a4.5 4.5 0 0 1 9 2c-2 4.5-9 9-9 9z',
+  play: 'M8 5v14l11-7z',
+  clock: 'M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18z M12 7v5l3 2',
 } as const;
 
 export type IconName = keyof typeof PATHS;
