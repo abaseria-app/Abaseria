@@ -302,10 +302,14 @@ describe('productImage', () => {
   });
 
   it('never sends an image when the app adds a product', () => {
-    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'size', 'category']);
+    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'size', 'brand', 'kind', 'contents', 'category']);
     expect(sync.productRow(item({})).size).toBeNull();
     expect(sync.productRow(item({ size: '4x113g' })).size).toBe('4x113g');
     expect(sync.productRow(item({ size: '  ' })).size).toBeNull();
+    expect(sync.productRow(item({})).kind).toBe('single');
+    expect(sync.productRow(item({ brand: ' Del Monte ', kind: 'multipack', contents: 'ignored' }))).toMatchObject({ brand: 'Del Monte', kind: 'multipack', contents: null });
+    expect(sync.productRow(item({ kind: 'bundle', contents: ' Whey 1kg + shaker ' }))).toMatchObject({ kind: 'bundle', contents: 'Whey 1kg + shaker' });
+    expect(sync.productRow(item({ brand: '   ' })).brand).toBeNull();
   });
 
   it('uploads one of the 16 categories, or none when the item is unsorted', () => {

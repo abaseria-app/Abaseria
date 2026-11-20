@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { S } from '../strings';
 import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type PriceType } from '../lib/money';
 import type { PriceCandidate } from '../lib/priceParser';
-import type { Item } from '../lib/db';
+import type { Item, ProductKind } from '../lib/db';
 import { CATEGORIES, categoryOf, guessCategory, type CategoryId } from '../lib/categories';
 import { formatBarcode } from '../lib/barcode';
 import { StorePrices } from '../components/StorePrices';
@@ -35,6 +35,10 @@ export interface ItemSubmit {
   regularPriceCentavos: number | null;
   /** Promo only: what the deal is. */
   promoNote: string | null;
+  /** New products only: brand, kind and a bundle's contents. Null when the product was already known. */
+  brand: string | null;
+  kind: ProductKind | null;
+  contents: string | null;
 }
 
 interface Props {
@@ -78,6 +82,17 @@ interface Props {
 
 const plain = (c: number) => (c / 100).toFixed(2);
 
+/**
+ * Tag text is often all capitals: "DEL MONTE" → "Del Monte". A single short word ("CDO", "NAN", "C2") stays as it
+ * is, since many local brands really are written that way; the one-word chip keeps that version on offer.
+ */
+const unshout = (s: string) => {
+  const words = s.split(' ');
+  const shouting = s === s.toUpperCase() && /[A-Z]{2}/.test(s);
+  if (!shouting || (words.length === 1 && s.length <= 3)) return s;
+  return words.map((w) => (w.length >= 3 && /^[A-Z]/.test(w) ? w.charAt(0) + w.slice(1).toLowerCase() : w)).join(' ');
+};
+
 /** A tag price read as per kilo or per 100 g, as a per-kilo price. Null for ordinary prices. */
 const perKgCentavos = (c: PriceCandidate | undefined) =>
   c?.unit === 'kg' ? c.centavos : c?.unit === '100g' ? c.centavos * 10 : null;
@@ -113,16 +128,29 @@ export function ItemEditor(p: Props) {
   const [dealText, setDealText] = useState(init?.promoNote ?? '');
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
 
+  // New-product details (brand, size, kind) show for a barcode nobody has named, and stay editable on that item.
+  const askSize = !!p.askSize || !!init?.size || !!init?.brand || (!!init?.kind && init.kind !== 'single');
+  const [brandText, setBrandText] = useState(init?.brand ?? '');
+  const [kindPicked, setKindPicked] = useState<ProductKind | null>(init?.kind && init.kind !== 'single' ? init.kind : null);
+  const [contentsText, setContentsText] = useState(init?.contents ?? '');
   // Size: the guess (from the name, else the tag) follows along until the shopper touches the size field.
-  const askSize = !!p.askSize || !!init?.size;
   const [sizeTyped, setSizeTyped] = useState<SizeParts | null>(init?.size ? (guessSize(init.size) ?? null) : null);
-  const [showPack, setShowPack] = useState((sizeTyped?.pack ?? 1) > 1);
+  const [packOpen, setShowPack] = useState((sizeTyped?.pack ?? 1) > 1);
   const sizeGuess = askSize && !sizeTyped ? (guessSize(label) ?? guessSize(p.sizeSource)) : null;
   const sizeParts: SizeParts = sizeTyped ?? sizeGuess ?? { amount: '', unit: 'g', pack: 1 };
   const sizeText = askSize ? formatSize(sizeParts) : null;
   // Something typed that can't be saved holds the Add button, the same as a missing price.
   const sizeBad = askSize && sizeParts.amount.trim() !== '' && sizeText == null;
   const setSize = (change: Partial<SizeParts>) => setSizeTyped({ ...sizeParts, ...change });
+  // A guessed multipack ("6 x 240ML" on the tag) shows its count too, so it can be checked.
+  const showPack = packOpen || sizeParts.pack > 1;
+  // Kind follows the size ("6 × 330 ml" is a multipack) until the shopper picks one.
+  const kind: ProductKind = kindPicked ?? (sizeParts.pack > 1 ? 'multipack' : 'single');
+  // One-tap brand suggestions from the name: its first word and first two words ("Del", "Del Monte").
+  const nameWords = (label.trim() || '').split(/\s+/).filter(Boolean);
+  const brandChips = askSize && !brandText.trim() && nameWords.length >= 2
+    ? [...new Set([nameWords[0], nameWords.slice(0, 2).join(' ')].map(unshout))].filter((b) => b.length <= 60)
+    : [];
 
   const unitPrice = parsePesoInput(priceText);
   const bPrice = parsePesoInput(bundlePriceText);
@@ -199,6 +227,9 @@ export function ItemEditor(p: Props) {
       editedAfterChoice: chosen != null && edited,
       priceTouched: edited,
       size: sizeText,
+      brand: askSize ? brandText.trim().slice(0, 60) || null : null,
+      kind: askSize ? kind : null,
+      contents: askSize && kind === 'bundle' ? contentsText.trim().slice(0, 200) || null : null,
       regularPriceCentavos: promo && !regularBad ? regular : null,
       promoNote: promo ? dealText.trim().slice(0, 60) || null : null,
     });
@@ -267,6 +298,20 @@ export function ItemEditor(p: Props) {
       )}
 
       {askSize && (
+        <label className="field brand-field">
+          <span className="label">{S.item.brandLabel}</span>
+          <input value={brandText} maxLength={60} placeholder={S.item.brandPlaceholder} autoComplete="off" onChange={(e) => setBrandText(e.target.value)} />
+        </label>
+      )}
+      {brandChips.length > 0 && (
+        <div className="chips brand-chips">
+          {brandChips.map((b) => (
+            <button key={b} className="chip" onClick={() => setBrandText(b)}>{b}</button>
+          ))}
+        </div>
+      )}
+
+      {askSize && (
         <section className="field size-field">
           <span className="label">{S.item.sizeLabel}</span>
           <div className="row size-row">
@@ -312,6 +357,36 @@ export function ItemEditor(p: Props) {
                 ? S.item.sizeHintPcs
                 : S.item.sizeHint}
           </span>
+        </section>
+      )}
+
+      {askSize && (
+        <section className="field kind-field">
+          <span className="label">{S.item.kindLabel}</span>
+          <div className="seg" role="radiogroup" aria-label={S.item.kindLabel}>
+            {(['single', 'multipack', 'bundle'] as ProductKind[]).map((k) => (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={kind === k}
+                className={kind === k ? 'on' : ''}
+                onClick={() => {
+                  setKindPicked(k);
+                  if (k === 'multipack') { setShowPack(true); if (sizeParts.pack < 2) setSize({ pack: 2 }); }
+                  if (k !== 'multipack' && sizeParts.pack > 1) { setShowPack(false); setSize({ pack: 1 }); }
+                }}
+              >
+                {S.item.kinds[k]}
+              </button>
+            ))}
+          </div>
+          <span className="hint">{S.item.kindHint[kind]}</span>
+          {kind === 'bundle' && (
+            <label className="field">
+              <span className="label">{S.item.contentsLabel}</span>
+              <input value={contentsText} maxLength={200} placeholder={S.item.contentsPlaceholder} onChange={(e) => setContentsText(e.target.value)} />
+            </label>
+          )}
         </section>
       )}
 

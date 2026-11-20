@@ -51,6 +51,10 @@ create table public.products (
   barcode     text constraint products_barcode_key unique,
   name        text not null check (char_length(name) between 1 and 120),
   size        text check (char_length(size) <= 40),
+  -- 023: brand as printed; kind single / multipack (same item, one barcode) / bundle (different items); bundle contents.
+  brand       text constraint products_brand_check check (brand is null or char_length(btrim(brand)) between 1 and 60),
+  kind        text not null default 'single' constraint products_kind_check check (kind in ('single', 'multipack', 'bundle')),
+  contents    text,
   -- One of Brad's 16 (011, Nov 11 2026), or null when nobody has sorted the product yet.
   category    text
               constraint products_category_check
@@ -66,6 +70,8 @@ create table public.products (
   created_at  timestamptz not null default now(),
   -- 13-digit codes starting with 2 are printed in-store (deli, meat, produce scales) and often contain
   -- the weight or price, so the same "product" would get a new barcode every day. Keep them out.
+  constraint products_contents_check
+  check (contents is null or (kind = 'bundle' and char_length(btrim(contents)) between 1 and 200)),
   check (not (char_length(barcode) = 13 and barcode like '2%')),
   -- One form per product. UPC-A is stored as 12 digits, the way Chrome's scanner reads it. The same code
   -- written as 13 digits with a leading 0 would become a second copy of the same can (migration 006).
@@ -159,9 +165,9 @@ create policy "add sightings" on public.price_sightings
 revoke all on public.branches, public.products, public.price_sightings, public.product_import from anon, authenticated;
 -- Every column except created_by is readable. A column added later stays hidden until a migration grants it.
 grant select (id, chain, name, lat, lng, created_at) on public.branches to anon, authenticated;
-grant select (id, barcode, name, size, category, status, image_path, created_at, barcode_status) on public.products to anon, authenticated;
+grant select (id, barcode, name, size, brand, kind, contents, category, status, image_path, created_at, barcode_status) on public.products to anon, authenticated;
 grant insert (id, chain, name, lat, lng) on public.branches to authenticated;
-grant insert (barcode, name, size, category) on public.products to authenticated;
+grant insert (barcode, name, size, brand, kind, contents, category) on public.products to authenticated;
 -- Every sighting column except contributor is readable.
 grant select (id, client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty,
               bundle_price_centavos, is_promo, capture_method, regular_price_centavos, promo_note)

@@ -112,7 +112,14 @@ export interface Item {
   regularPriceCentavos?: number | null;
   /** Promo only: what the deal is, e.g. "free shaker". */
   promoNote?: string | null;
+  /** New products only (go into the product row when shared): brand as printed, kind, and a bundle's contents. */
+  brand?: string | null;
+  kind?: ProductKind | null;
+  contents?: string | null;
 }
+
+/** 'single' one item; 'multipack' several of the same under one barcode; 'bundle' different items under one barcode. */
+export type ProductKind = 'single' | 'multipack' | 'bundle';
 
 export interface AppEvent {
   id?: number;

@@ -21,14 +21,17 @@ interface Props {
 }
 
 /**
- * Every store's latest price for one product, cheapest first. The cheapest current price is marked Lowest;
- * prices older than 30 days are greyed and never marked, since the store may have changed them.
+ * Every store's latest price for one product: current prices cheapest first, then prices older than 30 days
+ * (greyed, never marked Lowest, since the store may have changed them). The store being shopped always shows,
+ * even past the row limit.
  */
 export function StorePrices({ prices, hereKey, today, limit, className }: Props) {
   const [all, setAll] = useState(false);
-  const sorted = sortByPrice(prices);
+  const sorted = [...sortByPrice(prices.filter((p) => !isStale(p, today))), ...sortByPrice(prices.filter((p) => isStale(p, today)))];
   const lowest = lowestCurrent(sorted, today);
-  const shown = limit && !all ? sorted.slice(0, limit) : sorted;
+  let shown = limit && !all ? sorted.slice(0, limit) : sorted;
+  const here = hereKey ? sorted.find((p) => p.storeKey === hereKey) : undefined;
+  if (here && !shown.includes(here)) shown = [...shown, here];
   return (
     <>
       <ul className={`store-prices ${className ?? ''}`}>
@@ -60,7 +63,7 @@ export function StorePrices({ prices, hereKey, today, limit, className }: Props)
           );
         })}
       </ul>
-      {limit && !all && sorted.length > limit && (
+      {limit && !all && sorted.length > shown.length && (
         <button className="link small show-all-prices" onClick={() => setAll(true)}>{S.prices.showAll(sorted.length)}</button>
       )}
     </>

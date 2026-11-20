@@ -62,6 +62,13 @@ await ok('signed-in phone adds a product', 'authenticated', U1, `insert into pub
 // 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
 // 014: phones need a real barcode; imports (server key, here postgres) and staff keep the Nov 9 rule.
 await refused('phone adds a size over 40 characters', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4806502162316', 'Long size', repeat('9', 41))`);
+await ok('phone adds a multipack with its brand', 'authenticated', U1, `insert into public.products (barcode, name, size, brand, kind) values ('4800361002998', 'Del Monte Pineapple Juice 6-pack', '6x240ml', 'Del Monte', 'multipack')`);
+await ok('phone adds a bundle with its contents', 'authenticated', U1, `insert into public.products (barcode, name, brand, kind, contents) values ('4800024555014', 'Protein starter kit', 'Optimum', 'bundle', 'Whey 1kg + shaker')`);
+await refused('contents on a product that isn’t a bundle', 'authenticated', U1, `insert into public.products (barcode, name, kind, contents) values ('4800888180018', 'Odd', 'single', 'stuff')`);
+await refused('an unknown product kind', 'authenticated', U1, `insert into public.products (barcode, name, kind) values ('4800888180018', 'Odd', 'crate')`);
+await refused('a blank brand', 'authenticated', U1, `insert into public.products (barcode, name, brand) values ('4800888180018', 'Odd', '   ')`);
+await ok('the same product with a valid kind and brand goes in (so the three above failed on their rule)', 'authenticated', U1, `insert into public.products (barcode, name, brand, kind) values ('4800888180018', 'Odd', 'Odd Co', 'single')`);
+await ok('a new product is single unless said otherwise', 'anon', null, `select kind from public.products where barcode = '4800016644818'`, (r) => r.rows[0]?.kind === 'single');
 await refused('phone adds a bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
 await refused('phone adds a product with no barcode', 'authenticated', U1, `insert into public.products (barcode, name) values (null, 'No code')`);
 await refused('phone adds text as a barcode', 'authenticated', U1, `insert into public.products (barcode, name) values ('hello', 'Junk')`);
