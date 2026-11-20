@@ -5,6 +5,7 @@ import { checkConnection, dbConfig, type DbStatus } from '../lib/supabase';
 import { SHARING_ON, sharePending, waitingToShare, type ShareResult } from '../lib/sync';
 import { signOut, type Account } from '../lib/auth';
 import { refreshStaffRole, roleLabel, savedStaffRole, type StaffRole } from '../lib/staff';
+import { APP_BUILD } from '../lib/feedback';
 
 interface Props {
   account: Account | null;
@@ -12,10 +13,11 @@ interface Props {
   onTestMode: (on: boolean) => void;
   onOcrCheck: () => void;
   onResults: () => void;
+  onFeedback: () => void;
   onBack: () => void;
 }
 
-export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults, onBack }: Props) {
+export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults, onFeedback, onBack }: Props) {
   const [msg, setMsg] = useState<string | null>(null);
   const [db, setDb] = useState<DbStatus | null>(null);
   const [checking, setChecking] = useState(false);
@@ -57,6 +59,14 @@ export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults,
           ) : (
             <button className="btn secondary wide" onClick={() => setAskSignOut(true)}>{S.settings.signOut}</button>
           )}
+        </section>
+      )}
+
+      {dbConfig && (
+        <section className="card feedback-entry">
+          <h2>{S.settings.feedback}</h2>
+          <p className="hint">{account ? S.settings.feedbackHint : S.settings.feedbackSignIn}</p>
+          {account && <button className="btn primary wide" onClick={onFeedback}>{S.settings.feedbackOpen}</button>}
         </section>
       )}
 
@@ -119,7 +129,7 @@ export function Settings({ account, testMode, onTestMode, onOcrCheck, onResults,
       <section className="about">
         <h2>{S.settings.about}</h2>
         <p>{SHARING_ON ? S.settings.aboutTextSharing : S.settings.aboutText}</p>
-        <p className="hint">{S.settings.version}</p>
+        <p className="hint">{S.settings.version} · {S.settings.build(APP_BUILD)}</p>
       </section>
     </main>
   );

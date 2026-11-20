@@ -159,6 +159,7 @@ Changes after the first setup go in `supabase/migrations/`, numbered in order. `
 | `021_recipes.sql` | Recipes, ingredients and their product links | Nov 18 | Not yet |
 | `022_regular_price_and_promo_note.sql` | `price_sightings.regular_price_centavos` (price before the promo, above the price paid) and `promo_note` (60 characters); both in `latest_prices`. Promo prices only | Nov 20 | Before price sharing is on in prod |
 | `023_brand_and_product_kind.sql` | `products.brand` (60 characters), `kind` (single / multipack / bundle, default single) and `contents` (bundles only, 200 characters); phones may add all three on a new product. Then run `scripts/023_backfill_brand_kind.sql` to fill brand and kind on existing products (blanks only) | Nov 20 (backfill run: 2,728 of 2,773 branded, 81 multipacks, 3 bundles) | Before price sharing is on in prod |
+| `024_tester_feedback.sql` | `public.feedback` (problem / comment / suggestion / concern, optional area and screenshot; staff set status and note; Admins delete; 20 a day per account) and the private `feedback-screenshots` bucket (1 MB, WebP/JPEG, `<user id>/<random id>`). Each message emails Brad: redeploy `security-alert` after running it | Not yet | Not yet |
 
 Run `npm run test:schema` first. It loads `schema.sql` into an in-memory Postgres with stand-ins for Supabase's sign-in and roles and runs about 150 checks. The deploy workflow runs it on every push. Apply a change to dev, test, then apply the same change to prod.
 
