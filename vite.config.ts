@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // On GitHub Pages the app lives at /<repo-name>/. Set BASE_PATH in the deploy workflow.
 const base = process.env.BASE_PATH ?? '/';
+// Which build a phone is running, sent with tester feedback and shown in Settings → About.
+// GITHUB_SHA is set by GitHub Actions; local builds say "local".
+const build = `${(process.env.GITHUB_SHA ?? 'local').slice(0, 7)} ${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10)}`; // Manila date
 
 export default defineConfig(({ mode }) => {
   // The dev build is served at /<repo>/dev/ next to the live app, on the same web address.
@@ -14,6 +17,7 @@ export default defineConfig(({ mode }) => {
   const icon = (name: string) => `icons/${live ? '' : 'dev-'}${name}`;
   return {
     base,
+    define: { __APP_BUILD__: JSON.stringify(build) },
     plugins: [
       react(),
       {

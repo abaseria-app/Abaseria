@@ -72,6 +72,50 @@ function explain(a: Alert): { subject: string; lines: string[] } {
   }
 }
 
+// Tester feedback (migration 024). The alert carries only the feedback id; the message, sender and a 7-day
+// screenshot link are read here with the server key, which Supabase gives every Edge Function.
+async function feedbackEmail(a: Alert): Promise<{ subject: string; lines: string[] }> {
+  const id = Number(a.detail?.feedback_id);
+  const base = Deno.env.get('SUPABASE_URL') ?? '';
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const fallback = { subject: `New tester feedback #${id}`, lines: ['Open it in Table Editor → feedback.'] };
+  if (!id || !base || !key) return fallback;
+  const h = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+  try {
+    const rows = await (await fetch(`${base}/rest/v1/feedback?id=eq.${id}&select=*`, { headers: h })).json();
+    const f = rows?.[0];
+    if (!f) return fallback;
+    const user = await (await fetch(`${base}/auth/v1/admin/users/${f.user_id}`, { headers: h })).json().catch(() => null);
+    const meta = user?.user_metadata ?? {};
+    const who = [meta.full_name ?? meta.name, user?.email].filter(Boolean).join(' · ') || f.user_id;
+    let shot = 'none';
+    if (f.screenshot_path) {
+      const path = String(f.screenshot_path).split('/').map(encodeURIComponent).join('/');
+      const signed = await (await fetch(`${base}/storage/v1/object/sign/feedback-screenshots/${path}`, {
+        method: 'POST', headers: h, body: JSON.stringify({ expiresIn: 7 * 24 * 3600 }),
+      })).json().catch(() => null);
+      shot = signed?.signedURL ? `${base}/storage/v1${signed.signedURL} (link works for 7 days)` : `Storage → feedback-screenshots → ${f.screenshot_path}`;
+    }
+    const kind = String(f.kind).charAt(0).toUpperCase() + String(f.kind).slice(1);
+    return {
+      subject: `${kind} from ${meta.full_name ?? meta.name ?? user?.email ?? 'a tester'}${f.area ? ` (${f.area})` : ''}`,
+      lines: [
+        String(f.message),
+        '',
+        `From: ${who}`,
+        `Where: ${f.area ?? 'not said'} · ${f.app_env === 'prod' ? 'live app' : 'test (dev) app'} · build ${f.app_build ?? '?'}`,
+        `Phone: ${f.device ?? '?'} · screen ${f.screen ?? '?'}`,
+        `Screenshot: ${shot}`,
+        '',
+        `Mark it handled: update public.feedback set status = 'seen', staff_note = '...' where id = ${id};`,
+      ],
+    };
+  } catch (e) {
+    console.error('feedback lookup failed', e);
+    return fallback;
+  }
+}
+
 function sameSecret(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -96,7 +140,7 @@ Deno.serve(async (req) => {
 
   const ref = (Deno.env.get('SUPABASE_URL') ?? '').match(/https:\/\/([a-z0-9]+)\./)?.[1] ?? 'unknown';
   const project = ref === 'xjztzqwyzkfzvgizlucc' ? 'PROD' : ref === 'psffjwaezfspmbebqbgg' ? 'dev' : ref;
-  const { subject, lines } = explain(alert);
+  const { subject, lines } = alert.kind === 'tester_feedback' ? await feedbackEmail(alert) : explain(alert);
   const text = [
     ...lines,
     '',
