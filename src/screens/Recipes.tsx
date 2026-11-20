@@ -35,6 +35,7 @@ import {
 } from '../lib/recipes';
 import { Icon } from '../components/Icon';
 import { MrecSlot } from '../components/AdSlot';
+import { addLines, ensureCurrentList, recipeLines } from '../lib/lists';
 
 // ---------------------------------------------------------------------------------------------------------
 // Data shared by the list and the recipe screen. Loaded once per app session; the list's retry reloads it.
@@ -270,13 +271,15 @@ function SaveButton({ saved, onClick }: { saved: boolean; onClick: () => void })
 
 type DetailTab = 'ingredients' | 'steps' | 'nutrition';
 
-export function RecipeDetail({ slug, onBack }: { slug: string; onBack: () => void }) {
+export function RecipeDetail({ slug, onBack, onOpenList }: { slug: string; onBack: () => void; onOpenList: () => void }) {
   const [data, { setSaved, setStore }] = useRecipeData();
   const recipe = data.book.recipes.find((r) => r.slug === slug) ?? null;
   const [servings, setServings] = useState<number | null>(null);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
   const [tab, setTab] = useState<DetailTab>('ingredients');
   const [toast, setToast] = useState<string | null>(null);
+  const [listNote, setListNote] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const stores = useMemo(() => storesIn(data.catalog), [data.catalog]);
 
   useEffect(() => {
@@ -405,6 +408,37 @@ export function RecipeDetail({ slug, onBack }: { slug: string; onBack: () => voi
           </div>
         )}
         <p className="hint">{S.recipes.coverage(pricedCount, counted.length)}</p>
+      </section>
+
+      <section className="recipe-to-list">
+        <button
+          className="btn primary wide"
+          disabled={adding}
+          onClick={async () => {
+            const lines = recipeLines(recipe, cost.lines, serves);
+            if (!lines.length) return setListNote(S.lists.fromRecipeNone);
+            setAdding(true);
+            try {
+              const list = await ensureCurrentList();
+              const r = await addLines(list.id!, lines);
+              setListNote(S.lists.fromRecipeDone(r.added, r.merged, list.name));
+            } finally {
+              setAdding(false);
+            }
+          }}
+        >
+          {S.lists.fromRecipe}
+        </button>
+        {listNote ? (
+          <p className="hint">
+            {listNote}{' '}
+            <button className="link" onClick={onOpenList}>
+              {S.lists.openList}
+            </button>
+          </p>
+        ) : (
+          <p className="hint">{S.lists.fromRecipeHint}</p>
+        )}
       </section>
 
       <nav className="recipe-tabs" role="tablist">
