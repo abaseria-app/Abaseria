@@ -91,7 +91,9 @@ export function sightingRow(item: Item & { shareId: string }, branchId: string):
 }
 
 export function productRow(item: Item) {
-  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), category: sharedCategory(categoryOf(item)) };
+  // Size only counts for a brand-new product: products that already exist are skipped on upload, never changed.
+  const size = item.size?.trim().slice(0, 40) || null;
+  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), size, category: sharedCategory(categoryOf(item)) };
 }
 
 // ---------------------------------------------------------------------------------------------------------

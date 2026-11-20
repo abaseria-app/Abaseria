@@ -289,7 +289,10 @@ describe('productImage', () => {
   });
 
   it('never sends an image when the app adds a product', () => {
-    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'category']);
+    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'size', 'category']);
+    expect(sync.productRow(item({})).size).toBeNull();
+    expect(sync.productRow(item({ size: '4x113g' })).size).toBe('4x113g');
+    expect(sync.productRow(item({ size: '  ' })).size).toBeNull();
   });
 
   it('uploads one of the 16 categories, or none when the item is unsorted', () => {

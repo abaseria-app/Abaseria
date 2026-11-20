@@ -293,6 +293,8 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
         nameGuess={isTag ? result?.nameGuess : null}
         knownName={known?.label ?? (!isTag && startName?.trim() ? startName.trim() : null)}
         knownCategory={known?.category ?? null}
+        askSize={!!barcode && !known}
+        sizeSource={isTag ? (result?.lines.map((l) => l.text).join('\n') ?? null) : null}
         recallNote={elsewhereNote}
         barcode={barcode}
         promoHint={isTag ? result?.promoHint : false}

@@ -47,7 +47,7 @@ export function buildPhoneCatalog(items: Item[], trips: Trip[], branches: Branch
     let g = groups.get(key);
     if (!g) {
       g = {
-        item: { key, barcode: it.barcode ?? null, name: placeholder ? '' : it.label.trim(), size: null, category: categoryOf(it), image: it.thumb ?? null, prices: [] },
+        item: { key, barcode: it.barcode ?? null, name: placeholder ? '' : it.label.trim(), size: it.size ?? null, category: categoryOf(it), image: it.thumb ?? null, prices: [] },
         seen: new Map(),
       };
       groups.set(key, g);
@@ -58,6 +58,7 @@ export function buildPhoneCatalog(items: Item[], trips: Trip[], branches: Branch
       g.item.category = categoryOf(it);
     }
     if (!g.item.image && it.thumb) g.item.image = it.thumb;
+    if (!g.item.size && it.size) g.item.size = it.size;
 
     const trip = tripById.get(it.tripId)!;
     const branch = trip.branchUuid ? branchByUuid.get(trip.branchUuid) : undefined;

@@ -5,6 +5,7 @@ import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
 import { CATEGORIES, categoryOf, guessCategory, type CategoryId } from '../lib/categories';
 import { formatBarcode } from '../lib/barcode';
+import { SIZE_UNITS, formatSize, guessSize, parseAmount, type SizeParts, type SizeUnit } from '../lib/size';
 
 export interface ItemSubmit {
   label: string;
@@ -26,6 +27,8 @@ export interface ItemSubmit {
   barcode?: string | null;
   /** Filled in by the capture screen, not the editor. */
   thumb?: string | null;
+  /** Pack size, e.g. "250ml" or "4x113g". Null when not asked or left empty. */
+  size: string | null;
 }
 
 interface Props {
@@ -42,6 +45,13 @@ interface Props {
   /** Shown above the form, e.g. where a recalled price came from. */
   recallNote?: string | null;
   barcode?: string | null;
+  /**
+   * Show the size field. The capture screen sets this when a barcode was scanned and neither this phone nor the
+   * shared database recognized it, so the size can go into the new product row.
+   */
+  askSize?: boolean;
+  /** Text to read a starting size from, e.g. the shelf tag's lines. The typed name is read too. */
+  sizeSource?: string | null;
   /** How the price is sold when there's no starting price, e.g. per kilo for meat found by search. */
   startPriceType?: PriceType;
   recent: string[];
@@ -88,17 +98,29 @@ export function ItemEditor(p: Props) {
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
 
+  // Size: the guess (from the name, else the tag) follows along until the shopper touches the size field.
+  const askSize = !!p.askSize || !!init?.size;
+  const [sizeTyped, setSizeTyped] = useState<SizeParts | null>(init?.size ? (guessSize(init.size) ?? null) : null);
+  const [showPack, setShowPack] = useState((sizeTyped?.pack ?? 1) > 1);
+  const sizeGuess = askSize && !sizeTyped ? (guessSize(label) ?? guessSize(p.sizeSource)) : null;
+  const sizeParts: SizeParts = sizeTyped ?? sizeGuess ?? { amount: '', unit: 'g', pack: 1 };
+  const sizeText = askSize ? formatSize(sizeParts) : null;
+  // Something typed that can't be saved holds the Add button, the same as a missing price.
+  const sizeBad = askSize && sizeParts.amount.trim() !== '' && sizeText == null;
+  const setSize = (change: Partial<SizeParts>) => setSizeTyped({ ...sizeParts, ...change });
+
   const unitPrice = parsePesoInput(priceText);
   const bPrice = parsePesoInput(bundlePriceText);
   const bQty = Number(bundleQty) || 0;
   const grams = parseKgInput(weightText);
   const priceOk = unitPrice != null && unitPrice > 0;
   const valid =
-    priceType === 'each'
+    !sizeBad &&
+    (priceType === 'each'
       ? priceOk
       : priceType === 'perkg'
         ? priceOk && grams != null
-        : bPrice != null && bPrice > 0 && bQty >= 2;
+        : bPrice != null && bPrice > 0 && bQty >= 2);
   const total = useMemo(
     () =>
       valid
@@ -144,6 +166,7 @@ export function ItemEditor(p: Props) {
       chosenRank: chosen != null ? chosen + 1 : 'typed',
       editedAfterChoice: chosen != null && edited,
       priceTouched: edited,
+      size: sizeText,
     });
   }
 
@@ -199,6 +222,55 @@ export function ItemEditor(p: Props) {
             <button key={r} className="chip" onClick={() => setLabel(r)}>{r}</button>
           ))}
         </div>
+      )}
+
+      {askSize && (
+        <section className="field size-field">
+          <span className="label">{S.item.sizeLabel}</span>
+          <div className="row size-row">
+            {showPack && (
+              <>
+                <input
+                  className="size-pack"
+                  aria-label={S.item.sizePackOf}
+                  inputMode="numeric"
+                  value={sizeParts.pack > 1 ? String(sizeParts.pack) : ''}
+                  placeholder="4"
+                  onChange={(e) => setSize({ pack: Math.max(1, Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 1) })}
+                />
+                <span aria-hidden="true">×</span>
+              </>
+            )}
+            <input
+              className="size-amount"
+              aria-label={S.item.sizeAmount}
+              inputMode="decimal"
+              value={sizeParts.amount}
+              placeholder="250"
+              onChange={(e) => setSize({ amount: e.target.value.replace(/[^\d.,]/g, '').slice(0, 10) })}
+            />
+            {showPack && <span className="hint">{S.item.sizePackEach}</span>}
+          </div>
+          <div className="chips size-units" role="radiogroup" aria-label={S.item.sizeLabel}>
+            {SIZE_UNITS.map((u: SizeUnit) => (
+              <button key={u} role="radio" aria-checked={sizeParts.unit === u} className={`chip ${sizeParts.unit === u ? 'on' : ''}`} onClick={() => setSize({ unit: u })}>
+                {S.item.sizeUnits[u]}
+              </button>
+            ))}
+            {!showPack && (
+              <button className="chip ghost" onClick={() => { setShowPack(true); setSize({ pack: Math.max(2, sizeParts.pack) }); }}>
+                {S.item.sizeMultipack}
+              </button>
+            )}
+          </div>
+          <span className="hint">
+            {sizeText
+              ? S.item.sizeSaved(sizeText)
+              : sizeParts.unit === 'pcs' && parseAmount(sizeParts.amount) != null
+                ? S.item.sizeHintPcs
+                : S.item.sizeHint}
+          </span>
+        </section>
       )}
 
       <div className="chips cat-chips" role="radiogroup" aria-label={S.item.category}>
@@ -302,7 +374,7 @@ export function ItemEditor(p: Props) {
           <strong>{total != null ? formatPeso(total) : '—'}</strong>
         </div>
         <button className="btn primary" disabled={!valid} onClick={submit}>
-          {valid ? p.submitLabel : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
+          {valid ? p.submitLabel : sizeBad ? S.item.needSize : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
         </button>
         {p.onRemove && (
           <button className="btn danger-link" onClick={p.onRemove}>{S.item.remove}</button>

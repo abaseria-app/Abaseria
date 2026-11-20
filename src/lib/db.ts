@@ -103,6 +103,11 @@ export interface Item {
   createdAt: string;
   /** Made just before this item's price is first uploaded; the shared database ignores a second upload with the same id. */
   shareId?: string | null;
+  /**
+   * Pack size the shopper entered for a product nobody had named, e.g. "250ml" or "4x113g" (see size.ts).
+   * Goes into the new product row when the trip is shared. Not indexed, so no database version change.
+   */
+  size?: string | null;
 }
 
 export interface AppEvent {

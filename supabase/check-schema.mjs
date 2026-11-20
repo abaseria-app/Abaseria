@@ -61,6 +61,7 @@ await refused('logged-out phone adds a branch', 'anon', null, `insert into publi
 await ok('signed-in phone adds a product', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4800016644818', 'Test product', '250 ml')`);
 // 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
 // 014: phones need a real barcode; imports (server key, here postgres) and staff keep the Nov 9 rule.
+await refused('phone adds a size over 40 characters', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4806502162316', 'Long size', repeat('9', 41))`);
 await refused('phone adds a bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
 await refused('phone adds a product with no barcode', 'authenticated', U1, `insert into public.products (barcode, name) values (null, 'No code')`);
 await refused('phone adds text as a barcode', 'authenticated', U1, `insert into public.products (barcode, name) values ('hello', 'Junk')`);
