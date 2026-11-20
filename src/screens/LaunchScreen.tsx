@@ -7,8 +7,8 @@ import { S } from '../strings';
 const SEEN_KEY = 'launchSeen';
 const VIDEO_URL = `${import.meta.env.BASE_URL}launch.mp4`;
 const VIDEO_SECONDS = 5;
-// The video's first 1.2 s are blank white; start where the logo begins drawing in.
-const START_SECONDS = 1.2;
+// The video's first 1.1 s are blank white; start just before the tagline begins writing in.
+const START_SECONDS = 1.1;
 const FADE_MS = 250;
 
 function alreadySeen(): boolean {
