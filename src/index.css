@@ -673,3 +673,7 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .store-prices.in-sheet li:first-child { border-top: 0; }
 .compare-prices { margin: 8px 0 4px; }
 .show-all-prices { margin: 0 0 8px; }
+
+/* Item screen: promo details under the Promo toggle. */
+.promo-details { margin: -4px 0 4px 34px; }
+.promo-details .field { margin: 10px 0; }

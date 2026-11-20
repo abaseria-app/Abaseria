@@ -108,6 +108,10 @@ export interface Item {
    * Goes into the new product row when the trip is shared. Not indexed, so no database version change.
    */
   size?: string | null;
+  /** Promo only: the price before the promo, same terms as unitPriceCentavos (per piece or per kilo). */
+  regularPriceCentavos?: number | null;
+  /** Promo only: what the deal is, e.g. "free shaker". */
+  promoNote?: string | null;
 }
 
 export interface AppEvent {

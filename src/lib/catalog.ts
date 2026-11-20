@@ -74,6 +74,8 @@ export function buildPhoneCatalog(items: Item[], trips: Trip[], branches: Branch
       bundleQty: it.bundleQty,
       bundlePriceCentavos: it.bundlePriceCentavos,
       isPromo: it.isPromo,
+      regularPriceCentavos: it.isPromo ? (it.regularPriceCentavos ?? null) : null,
+      promoNote: it.isPromo ? (it.promoNote ?? null) : null,
       source: 'phone',
     });
   }
@@ -96,9 +98,13 @@ export interface LatestPriceRow {
   bundle_qty: number | null;
   bundle_price_centavos: number | null;
   is_promo: boolean;
+  /** Present once migration 022 is in the project. */
+  regular_price_centavos?: number | null;
+  promo_note?: string | null;
 }
 /** Columns read from latest_prices. */
-export const LATEST_PRICE_COLS = 'barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo';
+export const LATEST_PRICE_COLS =
+  'barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo, regular_price_centavos, promo_note';
 
 export interface BranchRow {
   id: string;
@@ -140,6 +146,8 @@ export function buildSharedCatalog(
       bundleQty: r.bundle_qty,
       bundlePriceCentavos: r.bundle_price_centavos,
       isPromo: r.is_promo,
+      regularPriceCentavos: r.regular_price_centavos ?? null,
+      promoNote: r.promo_note ?? null,
       source: 'shared',
     });
   }

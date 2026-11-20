@@ -67,6 +67,8 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
       barcode: v.barcode ?? null,
       thumb: v.thumb ?? null,
       size: v.size ?? null,
+      regularPriceCentavos: v.regularPriceCentavos,
+      promoNote: v.promoNote,
       label: v.label,
       priceType: v.priceType,
       unitPriceCentavos: v.unitPriceCentavos,
@@ -101,6 +103,8 @@ export function Shopping({ tripId, onFinish, onHome, onCancelled }: Props) {
       lineTotalCentavos: v.lineTotalCentavos,
       category: v.category,
       size: v.size ?? null,
+      regularPriceCentavos: v.regularPriceCentavos,
+      promoNote: v.promoNote,
     });
     await logEvent('item_edited', tripId, { item_id: editing.id, before, after: { label: v.label, price: v.unitPriceCentavos, qty: v.quantity, total: v.lineTotalCentavos } });
     setEditing(null);

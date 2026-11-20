@@ -111,6 +111,14 @@ create table public.price_sightings (
   -- 'shared' = another shopper's latest price at this branch, accepted after checking the tag.
   capture_method         text not null check (capture_method in ('tag', 'tag+typed', 'typed', 'recall', 'shared')),
   contributor            uuid default auth.uid() references auth.users (id) on delete set null,
+  -- Promo prices only (022): the price before the promo, same terms as unit_price_centavos, and what the deal is.
+  regular_price_centavos integer
+                         constraint price_sightings_regular_price_check
+                         check (regular_price_centavos is null
+                                or (is_promo and regular_price_centavos between 1 and 10000000 and regular_price_centavos > unit_price_centavos)),
+  promo_note             text
+                         constraint price_sightings_promo_note_check
+                         check (promo_note is null or (is_promo and char_length(btrim(promo_note)) between 1 and 60)),
   check ((price_type = 'bundle') = (bundle_qty is not null and bundle_price_centavos is not null))
 );
 create index price_sightings_lookup on public.price_sightings (barcode, branch_id, seen_on desc, id desc);
@@ -120,7 +128,8 @@ create index price_sightings_branch_day on public.price_sightings (branch_id, se
 -- Newest price per barcode per branch. security_invoker makes it obey the same rules as the table.
 create view public.latest_prices with (security_invoker = true) as
 select distinct on (barcode, branch_id)
-  barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo, capture_method
+  barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo, capture_method,
+  regular_price_centavos, promo_note
 from public.price_sightings
 order by barcode, branch_id, seen_on desc, id desc;
 
@@ -155,10 +164,10 @@ grant insert (id, chain, name, lat, lng) on public.branches to authenticated;
 grant insert (barcode, name, size, category) on public.products to authenticated;
 -- Every sighting column except contributor is readable.
 grant select (id, client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty,
-              bundle_price_centavos, is_promo, capture_method)
+              bundle_price_centavos, is_promo, capture_method, regular_price_centavos, promo_note)
   on public.price_sightings to anon, authenticated;
 grant insert (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty,
-              bundle_price_centavos, is_promo, capture_method)
+              bundle_price_centavos, is_promo, capture_method, regular_price_centavos, promo_note)
   on public.price_sightings to authenticated;
 grant select on public.latest_prices to anon, authenticated;
 

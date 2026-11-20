@@ -31,6 +31,10 @@ export interface ItemSubmit {
   thumb?: string | null;
   /** Pack size, e.g. "250ml" or "4x113g". Null when not asked or left empty. */
   size: string | null;
+  /** Promo only: the price before the promo, per piece (bundles too) or per kilo. */
+  regularPriceCentavos: number | null;
+  /** Promo only: what the deal is. */
+  promoNote: string | null;
 }
 
 interface Props {
@@ -104,6 +108,9 @@ export function ItemEditor(p: Props) {
   );
   const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
+  // Regular price: the tag's higher price is the guess until the shopper types one. Null = follow the guess.
+  const [regularTyped, setRegularTyped] = useState<string | null>(init?.regularPriceCentavos != null ? plain(init.regularPriceCentavos) : null);
+  const [dealText, setDealText] = useState(init?.promoNote ?? '');
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
 
   // Size: the guess (from the name, else the tag) follows along until the shopper touches the size field.
@@ -122,8 +129,24 @@ export function ItemEditor(p: Props) {
   const bQty = Number(bundleQty) || 0;
   const grams = parseKgInput(weightText);
   const priceOk = unitPrice != null && unitPrice > 0;
+  // The price paid in the same terms as the regular price: per piece (a bundle split evenly) or per kilo.
+  const paidEach = priceType === 'bundle' ? (bPrice != null && bQty >= 2 ? Math.round(bPrice / bQty) : null) : unitPrice;
+  const regularGuess =
+    promo && paidEach != null
+      ? (p.candidates ?? [])
+          .filter((c) => !c.bundleQty)
+          .map((c) => (priceType === 'perkg' ? perKgCentavos(c) : perKgCentavos(c) == null ? c.centavos : null))
+          .filter((c): c is number => c != null && c > paidEach)
+          .sort((a, b) => b - a)[0] ?? null
+      : null;
+  const regularText = regularTyped ?? (regularGuess != null ? plain(regularGuess) : '');
+  const regular = promo && regularText.trim() ? parsePesoInput(regularText) : null;
+  const regularBad = promo && regularText.trim() !== '' && (regular == null || paidEach == null || regular <= paidEach);
+  const saving = !regularBad && regular != null && paidEach != null ? regular - paidEach : null;
+
   const valid =
     !sizeBad &&
+    !regularBad &&
     (priceType === 'each'
       ? priceOk
       : priceType === 'perkg'
@@ -137,6 +160,7 @@ export function ItemEditor(p: Props) {
     [valid, priceType, unitPrice, qty, bQty, bPrice, grams],
   );
   const chosenCandidate = chosen != null ? p.candidates?.[chosen] : undefined;
+
 
   function pick(i: number) {
     const c = p.candidates![i];
@@ -175,6 +199,8 @@ export function ItemEditor(p: Props) {
       editedAfterChoice: chosen != null && edited,
       priceTouched: edited,
       size: sizeText,
+      regularPriceCentavos: promo && !regularBad ? regular : null,
+      promoNote: promo ? dealText.trim().slice(0, 60) || null : null,
     });
   }
 
@@ -383,6 +409,23 @@ export function ItemEditor(p: Props) {
         <input type="checkbox" checked={promo} onChange={(e) => setPromo(e.target.checked)} />
         <span>{S.item.promo}</span>
       </label>
+      {promo && (
+        <div className="promo-details">
+          <label className="field">
+            <span className="label">
+              {priceType === 'perkg' ? S.item.regularLabelPerKg : priceType === 'bundle' ? S.item.regularLabelEach : S.item.regularLabel}
+            </span>
+            <input inputMode="decimal" value={regularText} placeholder="0.00" onChange={(e) => setRegularTyped(e.target.value)} />
+            <span className="hint">
+              {saving != null && saving > 0 && regular ? S.item.youSave(formatPeso(saving), Math.round((saving / regular) * 100)) : S.item.regularHint}
+            </span>
+          </label>
+          <label className="field">
+            <span className="label">{S.item.dealLabel}</span>
+            <input value={dealText} maxLength={60} placeholder={S.item.dealPlaceholder} onChange={(e) => setDealText(e.target.value)} />
+          </label>
+        </div>
+      )}
 
       <div className="sheet-foot">
         <div className="line-total">
@@ -390,7 +433,7 @@ export function ItemEditor(p: Props) {
           <strong>{total != null ? formatPeso(total) : '—'}</strong>
         </div>
         <button className="btn primary" disabled={!valid} onClick={submit}>
-          {valid ? p.submitLabel : sizeBad ? S.item.needSize : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
+          {valid ? p.submitLabel : sizeBad ? S.item.needSize : regularBad ? S.item.needRegular : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
         </button>
         {p.onRemove && (
           <button className="btn danger-link" onClick={p.onRemove}>{S.item.remove}</button>

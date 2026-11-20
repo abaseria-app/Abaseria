@@ -83,6 +83,14 @@ await ok('a shared price can be confirmed', 'authenticated', U2, `insert into pu
 await refused('unknown capture method', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 11500, 'guess')`);
 await ok('re-upload of a known product is ignored, not an error', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Other name') on conflict (barcode) do nothing`);
 await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
+await ok('product for the promo checks', 'authenticated', U1, `insert into public.products (barcode, name) values ('4806502162316', 'Promo test product')`);
+const promoRow = (cid, unit, regular, note, promo = true) => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, is_promo, capture_method, regular_price_centavos, promo_note) values ('${cid}', '4806502162316', '${B1}', '${today}', 'each', ${unit}, ${promo}, 'tag', ${regular}, ${note})`;
+await ok('promo price with its regular price and a note', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000001', 9900, 11500, "'free shaker'"));
+await refused('regular price lower than the promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000002', 9900, 9000, 'null'));
+await refused('regular price on a non-promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000003', 9900, 11500, 'null', false));
+await refused('promo note on a non-promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000004', 9900, 'null', "'free'", false));
+await refused('promo note over 60 characters', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000005', 9900, 'null', "repeat('x', 61)"));
+await ok('latest_prices shows the regular price and note', 'anon', null, `select regular_price_centavos, promo_note from public.latest_prices where barcode = '4806502162316' and regular_price_centavos is not null`, (r) => r.rows[0]?.promo_note === 'free shaker');
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
 // Security review (010): who added a product or store is hidden too; the view is read-only.
