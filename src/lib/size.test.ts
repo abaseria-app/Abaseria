@@ -9,6 +9,9 @@ describe('formatSize', () => {
     expect(formatSize({ amount: '1,5', unit: 'L', pack: 1 })).toBe('1.5L');
     expect(formatSize({ amount: '10', unit: 'pcs', pack: 1 })).toBe('10pcs');
     expect(formatSize({ amount: '113', unit: 'g', pack: 4 })).toBe('4x113g');
+    expect(formatSize({ amount: '13.5', unit: 'oz', pack: 1 })).toBe('13.5oz');
+    expect(formatSize({ amount: '20', unit: 'fl oz', pack: 1 })).toBe('20 fl oz');
+    expect(formatSize({ amount: '12', unit: 'fl oz', pack: 6 })).toBe('6x12 fl oz');
   });
 
   it('refuses amounts that make no sense', () => {
@@ -24,6 +27,9 @@ describe('formatSize', () => {
     expect(parseSize(formatSize({ amount: '1.5', unit: 'L', pack: 1 }))).toEqual({ kind: 'volume', amount: 1500 });
     expect(parseSize(formatSize({ amount: '113', unit: 'g', pack: 4 }))).toEqual({ kind: 'mass', amount: 113 });
     expect(parseSize(formatSize({ amount: '10', unit: 'pcs', pack: 1 }))).toEqual({ kind: 'count', amount: 10 });
+    expect(parseSize(formatSize({ amount: '16', unit: 'oz', pack: 1 }))?.kind).toBe('mass');
+    expect(parseSize(formatSize({ amount: '20', unit: 'fl oz', pack: 1 }))).toEqual({ kind: 'volume', amount: 20 * 29.5735 });
+    expect(parseSize(formatSize({ amount: '12', unit: 'fl oz', pack: 6 }))?.kind).toBe('volume');
   });
 
   it('fits the 40-character limit in the database', () => {
@@ -43,6 +49,16 @@ describe('guessSize', () => {
     expect(guessSize('Tissue 50s')).toEqual({ amount: '50', unit: 'pcs', pack: 1 });
   });
 
+  it('reads ounces as printed, and fluid ounces as a liquid', () => {
+    expect(guessSize('Peanut butter 16oz')).toEqual({ amount: '16', unit: 'oz', pack: 1 });
+    expect(guessSize('SPAM 12 OZ')).toEqual({ amount: '12', unit: 'oz', pack: 1 });
+    expect(guessSize('13.5oz (384g)')).toEqual({ amount: '13.5', unit: 'oz', pack: 1 });
+    expect(guessSize('Gatorade 20.0 fl oz')).toEqual({ amount: '20', unit: 'fl oz', pack: 1 });
+    expect(guessSize('Juice 12 FL. OZ')).toEqual({ amount: '12', unit: 'fl oz', pack: 1 });
+    expect(guessSize('Coffee creamer 16floz')).toEqual({ amount: '16', unit: 'fl oz', pack: 1 });
+    expect(guessSize('Soda 6 x 12 fl oz')).toEqual({ amount: '12', unit: 'fl oz', pack: 6 });
+  });
+
   it('keeps multipacks together', () => {
     expect(guessSize('Lucky Me 4 x 55g')).toEqual({ amount: '55', unit: 'g', pack: 4 });
     expect(guessSize('Nescafe 3in1 10×20g')).toEqual({ amount: '20', unit: 'g', pack: 10 });
@@ -52,7 +68,6 @@ describe('guessSize', () => {
     expect(guessSize('₱115.00')).toBeNull();
     expect(guessSize('Gardenia Classic')).toBeNull();
     expect(guessSize('Item 4800016644818')).toBeNull();
-    expect(guessSize('Peanut butter 16oz')).toBeNull();
     expect(guessSize('Glass 2 large')).toBeNull();
     expect(guessSize(null)).toBeNull();
   });

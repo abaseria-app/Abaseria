@@ -1,9 +1,10 @@
 // Product size as shoppers enter it on the item screen, written the way the products table already stores
-// sizes: compact, no space. "500g", "1kg", "250ml", "1.5L", "10pcs", and multipacks as "4x113g".
+// sizes: compact, no space. "500g", "1kg", "250ml", "1.5L", "13.5oz", "10pcs", and multipacks as "4x113g".
+// Fluid ounces keep their spaces, "20 fl oz", as the imported products already write them.
 // search.ts reads these back (parseSize finds "113g" inside "4x113g"), so search and recipes keep working.
 
-export type SizeUnit = 'g' | 'kg' | 'ml' | 'L' | 'pcs';
-export const SIZE_UNITS: SizeUnit[] = ['g', 'kg', 'ml', 'L', 'pcs'];
+export type SizeUnit = 'g' | 'kg' | 'ml' | 'L' | 'oz' | 'fl oz' | 'pcs';
+export const SIZE_UNITS: SizeUnit[] = ['g', 'kg', 'ml', 'L', 'oz', 'fl oz', 'pcs'];
 
 export interface SizeParts {
   /** As typed, e.g. "1.5". */
@@ -34,7 +35,7 @@ export function formatSize(parts: SizeParts): string | null {
   if (parts.unit === 'pcs' && !Number.isInteger(n)) return null;
   const pack = Math.floor(parts.pack);
   if (!(pack >= 1 && pack <= MAX_PACK)) return null;
-  const one = `${num(n)}${parts.unit}`;
+  const one = parts.unit === 'fl oz' ? `${num(n)} fl oz` : `${num(n)}${parts.unit}`;
   return pack > 1 ? `${pack}x${one}` : one;
 }
 
@@ -42,17 +43,20 @@ const UNIT_WORDS: Record<string, [SizeUnit, number]> = {
   g: ['g', 1], gm: ['g', 1], gms: ['g', 1], gr: ['g', 1], grs: ['g', 1], gram: ['g', 1], grams: ['g', 1],
   kg: ['kg', 1], kgs: ['kg', 1], kilo: ['kg', 1], kilos: ['kg', 1],
   ml: ['ml', 1], cl: ['ml', 10],
+  // Ounces stay ounces: what's printed on the pack is what the shopper checks against.
+  oz: ['oz', 1], ozs: ['oz', 1], floz: ['fl oz', 1],
   l: ['L', 1], li: ['L', 1], ltr: ['L', 1], liter: ['L', 1], liters: ['L', 1], litre: ['L', 1], litres: ['L', 1],
   pc: ['pcs', 1], pcs: ['pcs', 1], piece: ['pcs', 1], pieces: ['pcs', 1], ct: ['pcs', 1], s: ['pcs', 1],
 };
-const WORDS = Object.keys(UNIT_WORDS).sort((a, b) => b.length - a.length).join('|');
+// "fl oz", "fl. oz" and "floz" before plain "oz", so liquids aren't read as weight.
+const WORDS = ['fl\\.?\\s*oz', ...Object.keys(UNIT_WORDS).filter((k) => k !== 'floz').sort((a, b) => b.length - a.length)].join('|');
 const AMOUNT = '(\\d{1,6}(?:[.,]\\d{1,3})?)';
 const MULTI = new RegExp(`(?<![\\d.])(\\d{1,3})\\s*[x×]\\s*${AMOUNT}\\s*(${WORDS})(?![a-z])`, 'i');
 const SINGLE = new RegExp(`(?<![\\d.])${AMOUNT}\\s*(${WORDS})(?![a-z])`, 'i');
 
 /**
  * The first size printed in a text, as form values: "JOY LEMON 250ML" → 250 ml, "Nissin 4 x 55g" → 4 × 55 g.
- * Used to pre-fill the size from the shelf tag or the name. Ounces and pounds are left for the shopper.
+ * Used to pre-fill the size from the shelf tag or the name. "13.5oz (384g)" → 13.5 oz, the first size printed.
  */
 export function guessSize(text: string | null | undefined): SizeParts | null {
   if (!text) return null;
@@ -66,7 +70,7 @@ export function guessSize(text: string | null | undefined): SizeParts | null {
 }
 
 function toParts(amount: string, word: string, pack: number): SizeParts | null {
-  const u = UNIT_WORDS[word.toLowerCase()];
+  const u = UNIT_WORDS[word.toLowerCase().replace(/[.\s]/g, '')];
   const n = parseAmount(amount);
   // "s" alone is only a count after a whole number, as in "50s".
   if (!u || n == null || (u[0] === 'pcs' && !Number.isInteger(n))) return null;

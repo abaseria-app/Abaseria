@@ -61,6 +61,16 @@ describe('parseSize', () => {
     expect(parseSize('10 pcs')).toEqual({ kind: 'count', amount: 10 });
     expect(parseSize('Lucky Me')).toBeNull();
   });
+
+  it('reads ounces as weight and fluid ounces as volume', () => {
+    expect(parseSize('13.5oz (384g)')?.kind).toBe('mass');
+    expect(parseSize('20.0 fl oz')).toEqual({ kind: 'volume', amount: 20 * 29.5735 });
+    expect(parseSize('12 FL. OZ')?.kind).toBe('volume');
+    expect(sameSize(parseSize('20 fl oz')!, parseSize('591ml')!)).toBe(true);
+    expect(sameSize(parseSize('16oz')!, parseSize('454g')!)).toBe(true);
+    expect(parseQuery('gatorade 20 fl oz').sizes).toEqual([{ kind: 'volume', amount: 20 * 29.5735 }]);
+    expect(parseQuery('gatorade 20 fl oz').words).toEqual(['gatorade']);
+  });
   it('compares across units', () => {
     expect(sameSize(parseSize('1L')!, parseSize('1000ml')!)).toBe(true);
     expect(sameSize(parseSize('1kg')!, parseSize('1000 g')!)).toBe(true);

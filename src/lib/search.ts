@@ -78,15 +78,16 @@ const UNITS: Record<string, [SizeKind, number]> = {
   mg: ['mass', 0.001], g: ['mass', 1], gm: ['mass', 1], gms: ['mass', 1], gr: ['mass', 1], gram: ['mass', 1], grams: ['mass', 1],
   kg: ['mass', 1000], kgs: ['mass', 1000], kilo: ['mass', 1000], kilos: ['mass', 1000], oz: ['mass', 28.3495], lb: ['mass', 453.592], lbs: ['mass', 453.592],
   ml: ['volume', 1], cl: ['volume', 10], l: ['volume', 1000], li: ['volume', 1000], ltr: ['volume', 1000], liter: ['volume', 1000],
-  liters: ['volume', 1000], litre: ['volume', 1000], litres: ['volume', 1000],
+  liters: ['volume', 1000], litre: ['volume', 1000], litres: ['volume', 1000], floz: ['volume', 29.5735],
   pc: ['count', 1], pcs: ['count', 1], piece: ['count', 1], pieces: ['count', 1], s: ['count', 1], pack: ['count', 1], packs: ['count', 1],
   sachet: ['count', 1], sachets: ['count', 1], roll: ['count', 1], rolls: ['count', 1], tabs: ['count', 1], ply: ['count', 1],
 };
-const UNIT_RE = Object.keys(UNITS).sort((a, b) => b.length - a.length).join('|');
+// Fluid ounces first, so "20 fl oz" is a volume rather than nothing.
+const UNIT_RE = ['fl\\.?\\s*oz', ...Object.keys(UNITS).filter((k) => k !== 'floz').sort((a, b) => b.length - a.length)].join('|');
 const SIZE_ANYWHERE = new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_RE})(?![a-z])`, 'i');
 
 function toSize(num: string, unit: string): Size | null {
-  const u = UNITS[unit.toLowerCase()];
+  const u = UNITS[unit.toLowerCase().replace(/[.\s]/g, '')];
   const n = Number(num.replace(',', '.'));
   if (!u || !Number.isFinite(n) || n <= 0) return null;
   return { kind: u[0], amount: n * u[1] };
