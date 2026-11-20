@@ -677,3 +677,35 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 /* Item screen: promo details under the Promo toggle. */
 .promo-details { margin: -4px 0 4px 34px; }
 .promo-details .field { margin: 10px 0; }
+
+/* Shopping list (Nov 20, 2026) */
+.list-card { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin: 4px 0 12px; padding: 10px 14px; border-radius: var(--radius); border: 2px solid var(--purple); background: var(--card); color: var(--navy); text-align: left; box-shadow: var(--shadow-card); }
+.list-card > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.list-card small { color: var(--muted); font-size: .85rem; }
+.list-card-go { font-weight: 700; color: var(--purple); white-space: nowrap; }
+.shopping-list .topbar h1 { font-size: 1.15rem; margin: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-pick { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.list-pick select { width: 100%; }
+.list-add .row input { flex: 1; min-width: 0; margin-top: 0; }
+.list-add .row .btn { flex-shrink: 0; }
+.list-search { margin-top: 0; }
+.list-group { margin-top: 16px; }
+.list-group h2 { margin: 0 0 6px; }
+.list-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.list-line { display: flex; align-items: flex-start; gap: 10px; background: var(--card); border-radius: var(--radius); padding: 10px 6px 10px 12px; box-shadow: var(--shadow-card); }
+.list-line .ing-check { margin-top: 2px; }
+.list-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.list-label { font-weight: 600; overflow-wrap: anywhere; }
+.list-text small { color: var(--muted); font-size: .8rem; }
+.list-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+.list-controls .recipe-stepper .chip { width: 44px; min-height: 44px; }
+.list-qty { font-variant-numeric: tabular-nums; }
+.list-priority { min-height: 44px; font-size: .9rem; }
+.list-line.extra { border-left: 4px dashed var(--line); }
+.list-line.done { opacity: .6; }
+.list-line.done .list-label { text-decoration: line-through; }
+.list-remove { font-size: 1.5rem; min-width: 44px; color: var(--muted); }
+.list-manage { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 4px; }
+.list-empty { margin-top: 20px; }
+.recipe-to-list { margin: 4px 0 8px; }
+.recipe-to-list .btn.wide { margin-top: 8px; }

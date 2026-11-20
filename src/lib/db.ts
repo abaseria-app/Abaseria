@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { PriceType } from './money';
 import type { CategoryId, LegacyCategoryId } from './categories';
 import type { BudgetBill, BudgetExpense, BudgetGoal, BudgetIncome, BudgetMonth, BudgetPhoto } from './budget';
+import type { ListItem, ShoppingList } from './lists';
 
 export const STORE_CHAINS = [
   '7-Eleven',
@@ -160,6 +161,8 @@ class AbaseriaDB extends Dexie {
   budgetGoals!: Table<BudgetGoal, number>;
   budgetMonths!: Table<BudgetMonth, string>;
   budgetPhotos!: Table<BudgetPhoto, number>;
+  shoppingLists!: Table<ShoppingList, number>;
+  listItems!: Table<ListItem, number>;
 
   constructor() {
     super(DB_NAME);
@@ -198,6 +201,22 @@ class AbaseriaDB extends Dexie {
       budgetGoals: '++id',
       budgetMonths: 'month',
       budgetPhotos: '++id',
+    });
+    // v5 (Nov 20, 2026): shopping lists (plan: Abaseria_Shopping_List_Plan.md, steps L1, L2, L9). New tables only.
+    this.version(5).stores({
+      trips: '++id, testerId, startedAt, endedAt, branchUuid',
+      items: '++id, tripId, label, createdAt, barcode',
+      events: '++id, tripId, type, createdAt',
+      settings: 'key',
+      branches: '++id, &uuid, chain',
+      budgetExpenses: '++id, date, billId',
+      budgetIncome: '++id, date',
+      budgetBills: '++id',
+      budgetGoals: '++id',
+      budgetMonths: 'month',
+      budgetPhotos: '++id',
+      shoppingLists: '++id, &uuid',
+      listItems: '++id, listId',
     });
   }
 }

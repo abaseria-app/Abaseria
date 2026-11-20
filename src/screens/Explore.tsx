@@ -10,6 +10,8 @@ import { SponsorPopup } from '../components/SponsorPopup';
 import { Budget } from './Budget';
 import { RecipesPanel } from './Recipes';
 import { RECIPES_ON } from '../lib/recipes';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
 
 export type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
 const TABS: Tab[] = ['products', 'recipes', 'budget', 'pantry', 'articles'];
@@ -44,12 +46,14 @@ interface Props {
   onCommunity: () => void;
   onProfile: () => void;
   onRecipe: (slug: string) => void;
+  /** Opens the shopping list screen. */
+  onList: () => void;
   /** Opens on this tab (back from a recipe returns to Recipes). */
   initialTab?: Tab;
 }
 
 /** The screen the app opens to: browse, search, and the way into a trip. Unbuilt sections carry a coming-soon cover. */
-export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile, onRecipe, initialTab }: Props) {
+export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile, onRecipe, onList, initialTab }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'products');
   const [tip, setTip] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -119,6 +123,8 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
 
         {tab === 'products' ? (
           <>
+            <ListCard onOpen={onList} />
+
             <section className="tips" aria-label={S.explore.tipsLabel}>
               <div className="tips-track" ref={tips} onScroll={onTipsScroll}>
                 {S.explore.tips.map((t, i) => (
@@ -199,6 +205,27 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
 
       {sponsor && <SponsorPopup sponsor={sponsor} onClose={closeSponsor} />}
     </main>
+  );
+}
+
+/** The Current shopping list, or a way to make the first one. */
+function ListCard({ onOpen }: { onOpen: () => void }) {
+  const info = useLiveQuery(async () => {
+    const list = (await db.shoppingLists.toArray()).find((l) => l.isCurrent);
+    if (!list) return { name: null, left: 0, total: 0 };
+    const lines = await db.listItems.where('listId').equals(list.id!).toArray();
+    return { name: list.name, left: lines.filter((l) => !l.checkedAt).length, total: lines.length };
+  }, []);
+  if (!info) return null;
+  return (
+    <button className="list-card" onClick={onOpen}>
+      <Icon name="cart" size={26} />
+      <span>
+        <strong>{info.name ?? S.lists.card}</strong>
+        <small>{info.name ? S.lists.cardCount(info.left, info.total) : S.lists.cardEmpty}</small>
+      </span>
+      <span className="list-card-go">{info.name ? S.lists.open : S.lists.cardMake}</span>
+    </button>
   );
 }
 
