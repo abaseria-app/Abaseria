@@ -8,6 +8,9 @@ import { db, recallBarcode, type CaptureMethod, type Item, type Recall } from '.
 import { formatPeso } from '../lib/money';
 import { categoryOf, type CategoryId } from '../lib/categories';
 import { SHARING_ON, isPlaceholderName, productImage, sharedPrice, sharedProduct, type SharedProduct } from '../lib/sync';
+import { loadStorePrices, lowestCurrent } from '../lib/catalog';
+import { dayOf, type PricePoint } from '../lib/search';
+import { priceText } from '../lib/priceText';
 
 /**
  * barcode: live camera looking for a package barcode, no tap needed
@@ -54,6 +57,11 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
   const [image, setImage] = useState<string | null>(null);
   /** The product this barcode belongs to, from this phone (any store) or the shared database. Null when new. */
   const [known, setKnown] = useState<Known | null>(null);
+  /** Every store's latest price for this barcode (this phone's and other shoppers'), for the comparison list. */
+  const [storePrices, setStorePrices] = useState<PricePoint[]>([]);
+  /** This trip's store as the comparison list files it, to mark "This store". */
+  const [hereKey, setHereKey] = useState<string | null>(null);
+  const [today] = useState(() => dayOf(new Date()));
   const videoRef = useRef<HTMLVideoElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -63,6 +71,15 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
   useEffect(() => {
     logEvent('capture_open', tripId, { method: startTyped ? 'typed' : 'barcode' });
   }, [tripId, startTyped]);
+
+  useEffect(() => {
+    if (!branchUuid) return;
+    let live = true;
+    db.branches.where('uuid').equals(branchUuid).first().then((b) => live && b && setHereKey(b.remoteId ?? b.uuid));
+    return () => {
+      live = false;
+    };
+  }, [branchUuid]);
 
   // Live camera for both the barcode and the tag step; the stream is opened once and reused.
   useEffect(() => {
@@ -143,6 +160,13 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
       return;
     }
     setBarcode(code);
+    // Every store's price, for the comparison list. Never holds up the scan; it shows when it arrives.
+    loadStorePrices(code)
+      .then((prices) => {
+        setStorePrices(prices);
+        logEvent('store_prices_shown', tripId, { stores: prices.length });
+      })
+      .catch(() => undefined);
     // Asked right away, in parallel with the price lookup, so recognizing the product adds no wait.
     const remote = SHARING_ON ? sharedProduct(code) : Promise.resolve(null);
     loadImage(code, remote);
@@ -256,7 +280,11 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
   const e = known?.elsewhere;
   const ePrice = e ? (e.priceType === 'perkg' ? `${formatPeso(e.price)}/kg` : formatPeso(e.price)) : '';
   const elsewhereNote = e ? S.capture.pricedElsewhere(ePrice, e.store, shortDate(e.at)) : null;
-  const elsewhereShort = e ? S.capture.lastElsewhere(ePrice, e.store, shortDate(e.at)) : null;
+  // The camera card says where it's cheapest, when that's somewhere else and the price is current.
+  const lowest = lowestCurrent(storePrices, today);
+  const lowestShort = lowest && lowest.storeKey !== hereKey && storePrices.length > 1 ? S.prices.summary(priceText(lowest), lowest.storeLabel) : null;
+  const elsewhereShort = lowestShort ?? (e ? S.capture.lastElsewhere(ePrice, e.store, shortDate(e.at)) : null);
+  const compare = { storePrices, hereKey, today };
 
   // Known at this branch: last name and price, shopper checks the tag and taps Add.
   if (step === 'recall' && recall) {
@@ -267,6 +295,7 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
         title={S.item.addTitle}
         submitLabel={S.item.add}
         initial={last}
+        {...compare}
         recallNote={(recall.shared ? S.item.sharedSeen : S.item.lastSeen)(formatPeso(recall.item.unitPriceCentavos), shortDate(recall.item.createdAt))}
         barcode={barcode}
         recent={recent}
@@ -294,6 +323,7 @@ export function Capture({ tripId, branchUuid, startTyped, startName, recent, fal
         knownName={known?.label ?? (!isTag && startName?.trim() ? startName.trim() : null)}
         knownCategory={known?.category ?? null}
         askSize={!!barcode && !known}
+        {...compare}
         sizeSource={isTag ? (result?.lines.map((l) => l.text).join('\n') ?? null) : null}
         recallNote={elsewhereNote}
         barcode={barcode}

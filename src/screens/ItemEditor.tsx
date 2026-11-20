@@ -5,6 +5,8 @@ import type { PriceCandidate } from '../lib/priceParser';
 import type { Item } from '../lib/db';
 import { CATEGORIES, categoryOf, guessCategory, type CategoryId } from '../lib/categories';
 import { formatBarcode } from '../lib/barcode';
+import { StorePrices } from '../components/StorePrices';
+import type { PricePoint } from '../lib/search';
 import { SIZE_UNITS, formatSize, guessSize, parseAmount, type SizeParts, type SizeUnit } from '../lib/size';
 
 export interface ItemSubmit {
@@ -52,6 +54,12 @@ interface Props {
   askSize?: boolean;
   /** Text to read a starting size from, e.g. the shelf tag's lines. The typed name is read too. */
   sizeSource?: string | null;
+  /** Every store's latest price for this barcode, shown as a comparison list. */
+  storePrices?: PricePoint[];
+  /** The store being shopped, marked in the list. */
+  hereKey?: string | null;
+  /** YYYY-MM-DD on this phone, for greying old prices. */
+  today?: string;
   /** How the price is sold when there's no starting price, e.g. per kilo for meat found by search. */
   startPriceType?: PriceType;
   recent: string[];
@@ -181,6 +189,14 @@ export function ItemEditor(p: Props) {
       {p.notice && <p className="notice">{p.notice}</p>}
       {p.recallNote && <p className="notice">{p.recallNote}</p>}
       {p.barcode && <p className="hint small">{S.item.barcodeLine(formatBarcode(p.barcode))}</p>}
+
+      {/* Other stores' prices. Skipped when the only price is this store's, which the form already shows. */}
+      {p.today && p.storePrices && p.storePrices.length > 0 && !(p.storePrices.length === 1 && p.storePrices[0].storeKey === p.hereKey) && (
+        <section className="compare-prices">
+          <p className="label">{S.prices.title(p.storePrices.length)}</p>
+          <StorePrices prices={p.storePrices} hereKey={p.hereKey} today={p.today} limit={3} className="in-sheet" />
+        </section>
+      )}
 
       {p.candidates && p.candidates.length > 0 && (
         <section>

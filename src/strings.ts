@@ -260,6 +260,15 @@ export const S = {
     thanks: 'Thanks! Trip saved.',
   },
 
+  prices: {
+    title: (n: number) => (n === 1 ? 'Price at 1 store' : `Prices at ${n} stores`),
+    lowest: 'Lowest',
+    here: 'This store',
+    mayHaveChanged: 'may have changed',
+    was: (price: string) => `was ${price}`,
+    showAll: (n: number) => `Show all ${n} stores`,
+    summary: (price: string, store: string) => `Lowest ${price} at ${store}`,
+  },
   search: {
     title: 'Search items',
     open: 'Search items',

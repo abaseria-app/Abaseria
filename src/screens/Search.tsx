@@ -6,6 +6,8 @@ import { formatBarcode } from '../lib/barcode';
 import { CATEGORIES, CATEGORY_BY_ID, type CategoryId } from '../lib/categories';
 import { loadPhoneCatalog, loadSharedCatalog, mergeCatalogs, type SharedState } from '../lib/catalog';
 import { SHARING_ON } from '../lib/sync';
+import { StorePrices } from '../components/StorePrices';
+import { priceText } from '../lib/priceText';
 import {
   NO_FILTERS,
   SORT_KEYS,
@@ -18,7 +20,6 @@ import {
   type Filters,
   type Hit,
   comparable,
-  type PricePoint,
   type Query,
   type SortKey,
 } from '../lib/search';
@@ -236,6 +237,7 @@ export function Search({ onBack, pick, initialCategory }: Props) {
               <ResultRow
                 key={h.item.key}
                 hit={h}
+                today={today}
                 hereKey={pick?.storeKey ?? null}
                 open={!pick && open === h.item.key}
                 onToggle={() => (pick ? pick.onPick(h.item) : setOpen(open === h.item.key ? null : h.item.key))}
@@ -275,15 +277,11 @@ function describe(q: Query): string[] {
 
 const fmtAmount = (n: number, small: string, big: string) => (n >= 1000 ? `${Number((n / 1000).toFixed(3))} ${big}` : `${Number(n.toFixed(1))} ${small}`);
 
-function priceText(p: PricePoint): string {
-  if (p.priceType === 'perkg') return `${formatPeso(p.unitPriceCentavos)}${S.search.perKg}`;
-  if (p.priceType === 'bundle' && p.bundleQty && p.bundlePriceCentavos != null) return S.search.bundle(p.bundleQty, formatPeso(p.bundlePriceCentavos));
-  return formatPeso(p.unitPriceCentavos);
-}
+
 
 const dayText = (iso: string) => dayFmt.format(new Date(`${iso}T12:00:00`));
 
-function ResultRow({ hit, hereKey, open, onToggle }: { hit: Hit; hereKey: string | null; open: boolean; onToggle: () => void }) {
+function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey: string | null; open: boolean; onToggle: () => void; today: string }) {
   const { item, prices } = hit;
   // Adding to a trip: this store's price is the one that matters; the cheapest elsewhere is only a hint.
   const here = hereKey ? (prices.find((p) => p.storeKey === hereKey) ?? null) : null;
@@ -324,23 +322,7 @@ function ResultRow({ hit, hereKey, open, onToggle }: { hit: Hit; hereKey: string
           </span>
         )}
       </button>
-      {open && prices.length > 0 && (
-        <ul className="store-prices">
-          {prices.map((p) => (
-            <li key={p.storeKey}>
-              <span>
-                <strong>{p.storeLabel}</strong>
-                <small>
-                  {dayText(p.seenOn)} · {p.source === 'phone' ? S.search.mine : S.search.shared}
-                  {p.isPromo ? ` · ${S.search.promo}` : ''}
-                  {p.priceType === 'bundle' && p.bundleQty ? ` · ${S.search.each(formatPeso(Math.round((p.bundlePriceCentavos ?? 0) / p.bundleQty)))}` : ''}
-                </small>
-              </span>
-              <strong>{priceText(p)}</strong>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && prices.length > 0 && <StorePrices prices={prices} hereKey={hereKey} today={today} />}
     </li>
   );
 }

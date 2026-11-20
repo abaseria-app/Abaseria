@@ -11,7 +11,7 @@ import { db, storeName } from './db';
 import { categoryOf, toCategory, type CategoryId } from './categories';
 import { dbConfig, getSupabase } from './supabase';
 import { IMAGE_BUCKET, SHARING_ON, isPlaceholderName, localDay } from './sync';
-import type { CatalogItem, PricePoint } from './search';
+import { comparable, type CatalogItem, type PricePoint } from './search';
 
 /** Shared lookups give up after this long and the screen keeps showing this phone's items. */
 export const CATALOG_TIMEOUT_MS = 10_000;
@@ -97,6 +97,9 @@ export interface LatestPriceRow {
   bundle_price_centavos: number | null;
   is_promo: boolean;
 }
+/** Columns read from latest_prices. */
+export const LATEST_PRICE_COLS = 'barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo';
+
 export interface BranchRow {
   id: string;
   chain: string;
@@ -207,11 +210,7 @@ export async function loadSharedCatalog(): Promise<{ state: SharedState; items: 
     };
     const [products, prices, branches] = await Promise.all([
       all<ProductRow>('products', 'barcode, name, size, category, image_path', ['barcode']),
-      all<LatestPriceRow>(
-        'latest_prices',
-        'barcode, branch_id, seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo',
-        ['barcode', 'branch_id'],
-      ),
+      all<LatestPriceRow>('latest_prices', LATEST_PRICE_COLS, ['barcode', 'branch_id']),
       all<BranchRow>('branches', 'id, chain, name', ['id']),
     ]);
     const imageUrl = (path: string) => client.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
@@ -224,4 +223,68 @@ export async function loadSharedCatalog(): Promise<{ state: SharedState; items: 
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// One product's prices at every store (scan screen comparison)
+
+/** Prices older than this are shown greyed out with "may have changed", and never marked lowest. */
+export const STALE_DAYS = 30;
+
+/** Cheapest first (per piece or per kilo), newest first on a tie. */
+export function sortByPrice(prices: PricePoint[]): PricePoint[] {
+  return [...prices].sort((a, b) => comparable(a) - comparable(b) || b.seenOn.localeCompare(a.seenOn));
+}
+
+/** True when the price was seen more than STALE_DAYS before `today` (YYYY-MM-DD). */
+export function isStale(p: Pick<PricePoint, 'seenOn'>, today: string): boolean {
+  const days = (Date.parse(`${today}T12:00:00`) - Date.parse(`${p.seenOn}T12:00:00`)) / 86_400_000;
+  return days > STALE_DAYS;
+}
+
+/** The price to mark "lowest": the cheapest that isn't stale. Null when there's nothing current to compare. */
+export function lowestCurrent(prices: PricePoint[], today: string): PricePoint | null {
+  return sortByPrice(prices.filter((p) => !isStale(p, today)))[0] ?? null;
+}
+
+/**
+ * Every store's latest price for one barcode: this phone's own and, when sharing is on and the phone is
+ * online, other shoppers'. The shared part gives up after `timeoutMs` so a scan is never held up by it.
+ */
+export async function loadStorePrices(barcode: string, timeoutMs = 2500): Promise<PricePoint[]> {
+  const [items, trips, branches] = await Promise.all([
+    db.items.where('barcode').equals(barcode).toArray(),
+    db.trips.toArray(),
+    db.branches.toArray(),
+  ]);
+  const phone = buildPhoneCatalog(items, trips, branches);
+  let shared: CatalogItem[] = [];
+  if (SHARING_ON && dbConfig && !(typeof navigator !== 'undefined' && navigator.onLine === false)) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const client = await getSupabase();
+      if (client) {
+        const { data: prices, error } = await client
+          .from('latest_prices')
+          .select(LATEST_PRICE_COLS)
+          .eq('barcode', barcode)
+          .limit(100)
+          .retry(false)
+          .abortSignal(ctrl.signal);
+        if (!error && prices?.length) {
+          const ids = [...new Set((prices as unknown as LatestPriceRow[]).map((p) => p.branch_id))];
+          const { data: rows } = await client.from('branches').select('id, chain, name').in('id', ids).retry(false).abortSignal(ctrl.signal);
+          const stub: ProductRow = { barcode, name: '', size: null, category: null, image_path: null };
+          shared = buildSharedCatalog([stub], prices as unknown as LatestPriceRow[], (rows ?? []) as BranchRow[], () => '');
+        }
+      }
+    } catch {
+      /* offline or slow: this phone's prices still show */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  const merged = mergeCatalogs(phone.filter((c) => c.barcode === barcode), shared);
+  return sortByPrice(merged.find((c) => c.barcode === barcode)?.prices ?? []);
 }

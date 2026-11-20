@@ -659,3 +659,17 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .size-row .size-amount { flex: 1 1 auto; min-width: 0; }
 .size-row .size-pack { width: 64px; flex: none; text-align: center; }
 .size-units .chip { min-height: 44px; min-width: 52px; }
+
+/* Store price comparison: scan screen, item sheet and search results. */
+.store-prices .store-price { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
+.store-prices .store-price strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.store-prices .store-price s { color: var(--muted); font-size: .8rem; }
+.store-prices li.stale { opacity: .55; }
+.store-prices li.lowest .store-price strong { color: var(--navy); }
+.store-prices em { font-style: normal; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-left: 6px; padding: 1px 6px; border-radius: 999px; vertical-align: 2px; }
+.store-prices .lowest-tag { background: var(--leaf); color: var(--navy); }
+.store-prices .here-tag { background: var(--line); color: var(--navy); }
+.store-prices.in-sheet { padding: 0 12px; margin: 4px 0 6px; border-radius: 12px; }
+.store-prices.in-sheet li:first-child { border-top: 0; }
+.compare-prices { margin: 8px 0 4px; }
+.show-all-prices { margin: 0 0 8px; }

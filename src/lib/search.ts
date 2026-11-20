@@ -28,6 +28,10 @@ export interface PricePoint {
   bundleQty: number | null;
   bundlePriceCentavos: number | null;
   isPromo: boolean;
+  /** Price before the promo, in the same terms as unitPriceCentavos (per piece or per kilo). Null when not known. */
+  regularPriceCentavos?: number | null;
+  /** What the promo is, as the shopper wrote it, e.g. "free shaker". */
+  promoNote?: string | null;
   /** 'phone' = logged on this phone. 'shared' = from other shoppers through the shared database. */
   source: 'phone' | 'shared';
 }
