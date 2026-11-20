@@ -219,6 +219,7 @@ export const S = {
     sizeUnits: { g: 'g', kg: 'kg', ml: 'ml', L: 'L', oz: 'oz', 'fl oz': 'fl oz', pcs: 'pcs' } as Record<'g' | 'kg' | 'ml' | 'L' | 'oz' | 'fl oz' | 'pcs', string>,
     sizeAmount: 'Size amount',
     sizeMultipack: 'Multipack?',
+    sizePackNeeded: 'How many are in the pack? Type the number before ×.',
     sizePackOf: 'Pack of',
     sizePackEach: 'each',
     sizeSaved: (s: string) => `Will save as ${s}`,

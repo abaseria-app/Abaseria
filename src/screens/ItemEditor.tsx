@@ -136,6 +136,8 @@ export function ItemEditor(p: Props) {
   // Size: the guess (from the name, else the tag) follows along until the shopper touches the size field.
   const [sizeTyped, setSizeTyped] = useState<SizeParts | null>(init?.size ? (guessSize(init.size) ?? null) : null);
   const [packOpen, setShowPack] = useState((sizeTyped?.pack ?? 1) > 1);
+  // The pack-count box keeps exactly what's typed (empty, "1" on the way to "12"); null = show the guess.
+  const [packText, setPackText] = useState<string | null>(null);
   const sizeGuess = askSize && !sizeTyped ? (guessSize(label) ?? guessSize(p.sizeSource)) : null;
   const sizeParts: SizeParts = sizeTyped ?? sizeGuess ?? { amount: '', unit: 'g', pack: 1 };
   const sizeText = askSize ? formatSize(sizeParts) : null;
@@ -143,7 +145,16 @@ export function ItemEditor(p: Props) {
   const sizeBad = askSize && sizeParts.amount.trim() !== '' && sizeText == null;
   const setSize = (change: Partial<SizeParts>) => setSizeTyped({ ...sizeParts, ...change });
   // A guessed multipack ("6 x 240ML" on the tag) shows its count too, so it can be checked.
-  const showPack = packOpen || sizeParts.pack > 1;
+  const showPack = packOpen || sizeParts.pack > 1 || kindPicked === 'multipack';
+  const openPack = () => {
+    setShowPack(true);
+    setPackText('');
+  };
+  const closePack = () => {
+    setShowPack(false);
+    setPackText(null);
+    if (sizeParts.pack > 1) setSize({ pack: 1 });
+  };
   // Kind follows the size ("6 × 330 ml" is a multipack) until the shopper picks one.
   const kind: ProductKind = kindPicked ?? (sizeParts.pack > 1 ? 'multipack' : 'single');
   // One-tap brand suggestions from the name: its first word and first two words ("Del", "Del Monte").
@@ -321,9 +332,17 @@ export function ItemEditor(p: Props) {
                   className="size-pack"
                   aria-label={S.item.sizePackOf}
                   inputMode="numeric"
-                  value={sizeParts.pack > 1 ? String(sizeParts.pack) : ''}
-                  placeholder="4"
-                  onChange={(e) => setSize({ pack: Math.max(1, Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 1) })}
+                  value={packText ?? (sizeParts.pack > 1 ? String(sizeParts.pack) : '')}
+                  placeholder="6"
+                  autoFocus={packText === ''}
+                  onChange={(e) => {
+                    const t = e.target.value.replace(/\D/g, '').slice(0, 3);
+                    setShowPack(true);
+                    setPackText(t);
+                    // Typing a count means it's a multipack; "One item" closes the box if that was a mistake.
+                    setKindPicked('multipack');
+                    setSize({ pack: Number(t) >= 1 ? Number(t) : 1 });
+                  }}
                 />
                 <span aria-hidden="true">×</span>
               </>
@@ -345,13 +364,15 @@ export function ItemEditor(p: Props) {
               </button>
             ))}
             {!showPack && (
-              <button className="chip ghost" onClick={() => { setShowPack(true); setSize({ pack: Math.max(2, sizeParts.pack) }); }}>
+              <button className="chip ghost" onClick={() => { openPack(); setKindPicked('multipack'); }}>
                 {S.item.sizeMultipack}
               </button>
             )}
           </div>
           <span className="hint">
-            {sizeText
+            {kind === 'multipack' && sizeParts.pack < 2
+              ? S.item.sizePackNeeded
+              : sizeText
               ? S.item.sizeSaved(sizeText)
               : sizeParts.unit === 'pcs' && parseAmount(sizeParts.amount) != null
                 ? S.item.sizeHintPcs
@@ -372,8 +393,8 @@ export function ItemEditor(p: Props) {
                 className={kind === k ? 'on' : ''}
                 onClick={() => {
                   setKindPicked(k);
-                  if (k === 'multipack') { setShowPack(true); if (sizeParts.pack < 2) setSize({ pack: 2 }); }
-                  if (k !== 'multipack' && sizeParts.pack > 1) { setShowPack(false); setSize({ pack: 1 }); }
+                  if (k === 'multipack' && sizeParts.pack < 2) openPack();
+                  if (k !== 'multipack') closePack();
                 }}
               >
                 {S.item.kinds[k]}
