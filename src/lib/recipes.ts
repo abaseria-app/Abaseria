@@ -14,6 +14,7 @@
 import { getSetting, setSetting } from './db';
 import { dbConfig, getSupabase } from './supabase';
 import { comparable, fold, parseSize, type CatalogItem, type PricePoint, type Size, type SizeKind } from './search';
+import type { CategoryId } from './categories';
 
 // ---------------------------------------------------------------------------------------------------------
 // Lists (same as abaseria.com/recipes, and the checks in migration 021)
@@ -178,6 +179,9 @@ export type LineStatus = 'priced' | 'noPrice' | 'unmatched' | 'toTaste';
 
 export interface PricedOption {
   productName: string;
+  /** The product's barcode and category, so "Add to list" can carry them. Null barcode for named-only items. */
+  barcode: string | null;
+  category: CategoryId;
   size: string | null;
   storeKey: string;
   storeLabel: string;
@@ -258,6 +262,8 @@ export function priceOption(need: Size, item: CatalogItem, p: PricePoint, link: 
   if (!(shelf > 0)) return null;
   const base = {
     productName: item.name,
+    barcode: item.barcode,
+    category: item.category,
     size: item.size,
     storeKey: p.storeKey,
     storeLabel: p.storeLabel,
@@ -512,8 +518,8 @@ export function buildBook(recipes: RecipeRow[], ingredients: IngredientRow[], im
 // ---------------------------------------------------------------------------------------------------------
 // Loading and saving
 
-/** Recipes are on in the dev app; the live app keeps the coming-soon cover until migration 021 is on prod. */
-export const RECIPES_ON = dbConfig?.target === 'dev';
+/** Recipes are on wherever there's a database. Migration 021 and the first recipes went on prod Nov 20, 2026. */
+export const RECIPES_ON = dbConfig != null;
 export const RECIPE_IMAGE_BUCKET = 'recipe-images';
 const BOOK_KEY = 'recipeBook';
 const SAVED_KEY = 'savedRecipes';

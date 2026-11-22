@@ -219,6 +219,7 @@ export const S = {
     sizeUnits: { g: 'g', kg: 'kg', ml: 'ml', L: 'L', oz: 'oz', 'fl oz': 'fl oz', pcs: 'pcs' } as Record<'g' | 'kg' | 'ml' | 'L' | 'oz' | 'fl oz' | 'pcs', string>,
     sizeAmount: 'Size amount',
     sizeMultipack: 'Multipack?',
+    sizePackNeeded: 'How many are in the pack? Type the number before ×.',
     sizePackOf: 'Pack of',
     sizePackEach: 'each',
     sizeSaved: (s: string) => `Will save as ${s}`,
@@ -395,8 +396,8 @@ export const S = {
     // Nov 14: trips are saved only on the phone, by design. Say plainly what erases them; Abaseria itself never does.
     tripsOnPhone: (sharing: boolean) =>
       sharing
-        ? 'Your trips and budget are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them, along with any prices not yet shared.'
-        : 'Your trips and budget are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them.',
+        ? 'Your trips, budget and shopping lists are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them, along with any prices not yet shared.'
+        : 'Your trips, budget and shopping lists are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them.',
     back: 'Back',
     about: 'About',
     aboutText: 'Abaseria test prototype. Everything stays on this phone. Text reading uses Tesseract (Apache 2.0).',
@@ -915,5 +916,63 @@ export const S = {
     deleteAllAsk: 'Delete every answer above? Your switches stay as they are.',
     deleteAllYes: 'Yes, delete them',
     deleted: 'Your answers are deleted.',
+  },
+
+  // Shopping lists (Nov 20). Kept on the phone only. Priority words are Tagalog by Brad's Nov 18 decision.
+  lists: {
+    back: 'Back',
+    title: 'Shopping list',
+    card: 'Shopping list',
+    cardEmpty: 'Make a list before you go. Add items yourself or send a recipe’s ingredients to it.',
+    cardMake: 'Make a list',
+    cardCount: (left: number, total: number) =>
+      total === 0 ? 'Nothing on it yet' : left === 0 ? `All ${total} ticked` : `${left} of ${total} still to get`,
+    open: 'Open',
+    which: 'List',
+    current: 'Current',
+    currentTag: (name: string) => `${name} (current)`,
+    makeCurrent: 'Make this my current list',
+    isCurrent: 'This is your current list. Recipes add to it.',
+    newList: 'New list',
+    newName: 'Name of the new list',
+    newPlaceholder: 'Lingguhan, Sweldo stock-up, Noche Buena',
+    create: 'Make list',
+    rename: 'Rename',
+    renameLabel: 'List name',
+    save: 'Save',
+    cancel: 'Cancel',
+    deleteList: 'Delete this list',
+    deleteAsk: (name: string) => `Delete “${name}” and everything on it? This can’t be undone.`,
+    deleteYes: 'Yes, delete it',
+    addLabel: 'Add an item',
+    addPlaceholder: 'bigas 5 kg, itlog, toyo',
+    add: 'Add',
+    searchProducts: 'Search products',
+    empty: 'Nothing on this list yet. Type an item above, search products, or open a recipe and tap “Add ingredients to list”.',
+    must: 'Kailangan',
+    extra: 'Kung may sobra',
+    priorityAria: (label: string, must: boolean) => `${label}: ${must ? 'must have' : 'only if there’s extra'}. Tap to change.`,
+    tickAria: (label: string) => `Got ${label}`,
+    fewer: 'One fewer',
+    more: 'One more',
+    remove: 'Remove',
+    removeAria: (label: string) => `Remove ${label}`,
+    ticked: (n: number) => `In the basket (${n})`,
+    clearTicked: 'Clear ticked items',
+    cleared: (n: number) => `Removed ${n} ticked ${n === 1 ? 'item' : 'items'}.`,
+    count: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
+    added: (name: string) => `Added to ${name}.`,
+    onPhone: 'Lists are saved only on this phone. Uninstalling the app, clearing Chrome’s data or changing phones erases them.',
+    // From a recipe (L9)
+    fromRecipe: 'Add ingredients to list',
+    fromRecipeHint: 'Ticked “already have” items are left off.',
+    fromRecipeNone: 'Everything is ticked “already have”, so there’s nothing to add.',
+    fromRecipeDone: (added: number, merged: number, name: string) => {
+      const parts = [];
+      if (added) parts.push(`${added} added`);
+      if (merged) parts.push(`${merged} combined with what was already there`);
+      return `${parts.join(', ')} on ${name}.`;
+    },
+    openList: 'Open list',
   },
 };
