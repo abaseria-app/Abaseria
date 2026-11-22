@@ -61,6 +61,14 @@ await refused('logged-out phone adds a branch', 'anon', null, `insert into publi
 await ok('signed-in phone adds a product', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4800016644818', 'Test product', '250 ml')`);
 // 008: a bad check digit or a missing barcode is accepted and flagged for review (Nov 9 import rule).
 // 014: phones need a real barcode; imports (server key, here postgres) and staff keep the Nov 9 rule.
+await refused('phone adds a size over 40 characters', 'authenticated', U1, `insert into public.products (barcode, name, size) values ('4806502162316', 'Long size', repeat('9', 41))`);
+await ok('phone adds a multipack with its brand', 'authenticated', U1, `insert into public.products (barcode, name, size, brand, kind) values ('4800361002998', 'Del Monte Pineapple Juice 6-pack', '6x240ml', 'Del Monte', 'multipack')`);
+await ok('phone adds a bundle with its contents', 'authenticated', U1, `insert into public.products (barcode, name, brand, kind, contents) values ('4800024555014', 'Protein starter kit', 'Optimum', 'bundle', 'Whey 1kg + shaker')`);
+await refused('contents on a product that isn’t a bundle', 'authenticated', U1, `insert into public.products (barcode, name, kind, contents) values ('4800888180018', 'Odd', 'single', 'stuff')`);
+await refused('an unknown product kind', 'authenticated', U1, `insert into public.products (barcode, name, kind) values ('4800888180018', 'Odd', 'crate')`);
+await refused('a blank brand', 'authenticated', U1, `insert into public.products (barcode, name, brand) values ('4800888180018', 'Odd', '   ')`);
+await ok('the same product with a valid kind and brand goes in (so the three above failed on their rule)', 'authenticated', U1, `insert into public.products (barcode, name, brand, kind) values ('4800888180018', 'Odd', 'Odd Co', 'single')`);
+await ok('a new product is single unless said otherwise', 'anon', null, `select kind from public.products where barcode = '4800016644818'`, (r) => r.rows[0]?.kind === 'single');
 await refused('phone adds a bad check digit', 'authenticated', U1, `insert into public.products (barcode, name) values ('4800016644819', 'Bad digit')`);
 await refused('phone adds a product with no barcode', 'authenticated', U1, `insert into public.products (barcode, name) values (null, 'No code')`);
 await refused('phone adds text as a barcode', 'authenticated', U1, `insert into public.products (barcode, name) values ('hello', 'Junk')`);
@@ -82,6 +90,14 @@ await ok('a shared price can be confirmed', 'authenticated', U2, `insert into pu
 await refused('unknown capture method', 'authenticated', U2, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values (gen_random_uuid(), '4800016644818', '${B1}', '${today}', 'each', 11500, 'guess')`);
 await ok('re-upload of a known product is ignored, not an error', 'authenticated', U2, `insert into public.products (barcode, name) values ('4800016644818', 'Other name') on conflict (barcode) do nothing`);
 await ok('re-upload of a sighting is ignored, not an error', 'authenticated', U1, `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, capture_method) values ('c0000000-0000-4000-8000-000000000001', '4800016644818', '${B1}', '${today}', 'each', 11500, 'tag') on conflict (client_id) do nothing`);
+await ok('product for the promo checks', 'authenticated', U1, `insert into public.products (barcode, name) values ('4806502162316', 'Promo test product')`);
+const promoRow = (cid, unit, regular, note, promo = true) => `insert into public.price_sightings (client_id, barcode, branch_id, seen_on, price_type, unit_price_centavos, is_promo, capture_method, regular_price_centavos, promo_note) values ('${cid}', '4806502162316', '${B1}', '${today}', 'each', ${unit}, ${promo}, 'tag', ${regular}, ${note})`;
+await ok('promo price with its regular price and a note', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000001', 9900, 11500, "'free shaker'"));
+await refused('regular price lower than the promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000002', 9900, 9000, 'null'));
+await refused('regular price on a non-promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000003', 9900, 11500, 'null', false));
+await refused('promo note on a non-promo price', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000004', 9900, 'null', "'free'", false));
+await refused('promo note over 60 characters', 'authenticated', U1, promoRow('d0000000-0000-4000-8000-000000000005', 9900, 'null', "repeat('x', 61)"));
+await ok('latest_prices shows the regular price and note', 'anon', null, `select regular_price_centavos, promo_note from public.latest_prices where barcode = '4806502162316' and regular_price_centavos is not null`, (r) => r.rows[0]?.promo_note === 'free shaker');
 await ok('logged-out phone reads latest price', 'anon', null, `select unit_price_centavos from public.latest_prices where barcode = '4800016644818'`, (r) => r.rows[0]?.unit_price_centavos === 11500);
 await refused('contributor column hidden', 'anon', null, `select contributor from public.price_sightings`);
 // Security review (010): who added a product or store is hidden too; the view is read-only.
@@ -307,7 +323,7 @@ await ok('2nd-visit answers saved', 'authenticated', U1, basics);
 await ok('...birthday locked by the database', 'authenticated', U1, `select birthday_locked_at from public.shopper_profiles`, (r) => r.rows[0]?.birthday_locked_at != null);
 await ok('3rd-visit answers saved', 'authenticated', U1,
   `update public.shopper_profiles set household_size_band = '3-4', has_kids_under_12 = 'yes', has_senior_60plus = 'no_answer',
-     payday_pattern = 'kinsenas_katapusan', grocery_budget_band = '6000_9999' where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
+     payday_pattern = 'kinsenas_katapusan', grocery_budget_pesos = 6000 where user_id = '${U1}'`, (r) => (r.affectedRows ?? 0) === 1);
 await ok('shopper reads own profile', 'authenticated', U1, `select gender, household_size_band from public.shopper_profiles`,
   (r) => r.rows.length === 1 && r.rows[0].gender === 'woman' && r.rows[0].household_size_band === '3-4');
 await ok('my_consents shows the current switches', 'authenticated', U1, `select purpose, granted from public.my_consents order by purpose`,
@@ -395,6 +411,82 @@ catch (e) { pass++; console.log('PASS guest uploads a photo ::', e.message); }
 check('guest sees no photos', (await asGuest(`select name from storage.objects where bucket_id = 'profile-photos'`)).rows.length === 0);
 await refused('product images still need the server key', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('product-images', '${U1}/photo')`);
 await ok('shopper deletes own photo', 'authenticated', U1, `delete from storage.objects where bucket_id = 'profile-photos' and name = '${U1}/photo'`, (r) => (r.affectedRows ?? 0) === 1);
+
+// 019: nickname. U1's profile switch is off by now (turned off above), U3 is a fresh shopper.
+await ok('U3 turns the profile switch on', 'authenticated', U3, sw('profile', true));
+await ok('nickname saved', 'authenticated', U3, `insert into public.shopper_profiles (nickname) values ('Jovie')`);
+await ok('...and read back', 'authenticated', U3, `select nickname from public.shopper_profiles`, (r) => r.rows[0]?.nickname === 'Jovie');
+await ok('nickname changed', 'authenticated', U3, `update public.shopper_profiles set nickname = 'Ate Jo' where user_id = '${U3}'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('nickname over 30 characters', 'authenticated', U3, `update public.shopper_profiles set nickname = '${'x'.repeat(31)}' where user_id = '${U3}'`);
+await refused('nickname with spaces around it', 'authenticated', U3, `update public.shopper_profiles set nickname = ' Jo ' where user_id = '${U3}'`);
+await refused('nickname with markup', 'authenticated', U3, `update public.shopper_profiles set nickname = '<b>Jo</b>' where user_id = '${U3}'`);
+await refused('empty nickname', 'authenticated', U3, `update public.shopper_profiles set nickname = '' where user_id = '${U3}'`);
+await ok('another shopper can’t read it', 'authenticated', U1, `select nickname from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows.length === 0);
+await refused('logged-out phone can’t read it', 'anon', null, `select nickname from public.shopper_profiles`);
+await ok('switching off deletes the nickname too', 'authenticated', U3, sw('profile', false));
+
+// 020: monthly grocery budget in pesos. U3 turns the profile back on for these.
+await ok('profile back on for the budget checks', 'authenticated', U3, sw('profile', true));
+await ok('budget ₱1,000 saved', 'authenticated', U3, `insert into public.shopper_profiles (grocery_budget_pesos) values (1000)`);
+await ok('budget ₱15,000 saved', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 15000 where user_id = '${U3}'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('...and read back', 'authenticated', U3, `select grocery_budget_pesos b from public.shopper_profiles`, (r) => r.rows[0]?.b === 15000);
+await refused('budget between steps (₱6,500)', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 6500 where user_id = '${U3}'`);
+await refused('budget above the wheel (₱16,000)', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 16000 where user_id = '${U3}'`);
+await refused('budget of zero', 'authenticated', U3, `update public.shopper_profiles set grocery_budget_pesos = 0 where user_id = '${U3}'`);
+await check('old budget range column is gone', (await db.query(`select 1 from information_schema.columns where table_name = 'shopper_profiles' and column_name = 'grocery_budget_band'`)).rows.length === 0);
+await ok('switching off deletes the budget too', 'authenticated', U3, sw('profile', false));
+await ok('...nothing left', 'authenticated', U3, `select * from public.shopper_profiles`, (r) => r.rows.length === 0);
+await ok('...gone', 'postgres', null, `select count(*)::int n from public.shopper_profiles where user_id = '${U3}'`, (r) => r.rows[0]?.n === 0);
+
+// 021: recipes. UA is an Admin; UP a new Product Manager, UC a new Collector (data_entry), U1 a shopper.
+const UC = 'aaaaaaaa-0000-4000-8000-00000000000c', UP = 'aaaaaaaa-0000-4000-8000-00000000000e';
+await db.exec(`insert into auth.users values ('${UC}'), ('${UP}');
+               insert into public.staff (user_id, role) values ('${UC}', 'data_entry'), ('${UP}', 'product_manager');`);
+const pid = Number((await one(`select id from public.products where barcode = '4800016644818'`)).id);
+const recipe = (slug, status = 'draft') => `insert into public.recipes (slug, title_en, category, servings, status) values ('${slug}', 'Test ${slug}', 'chicken', 4, '${status}')`;
+await ok('Collector adds a soy sauce ingredient', 'authenticated', UC, `insert into public.ingredients (name_en, unit_kind) values ('Soy sauce', 'volume')`);
+await refused('same ingredient name, other capitals', 'authenticated', UC, `insert into public.ingredients (name_en, unit_kind) values ('SOY SAUCE', 'volume')`);
+await refused('shopper adds an ingredient', 'authenticated', U1, `insert into public.ingredients (name_en, unit_kind) values ('Vinegar', 'volume')`);
+const ing = Number((await one(`select id from public.ingredients where name_en = 'Soy sauce'`)).id);
+await ok('Collector links a product', 'authenticated', UC, `insert into public.ingredient_products (ingredient_id, product_id, is_default) values (${ing}, ${pid}, true)`);
+await refused('Collector marks a link sponsored', 'authenticated', UC, `update public.ingredient_products set is_sponsored = true where ingredient_id = ${ing}`);
+await refused('Collector adds a sponsored link', 'authenticated', UC, `insert into public.ingredient_products (ingredient_id, product_id, is_sponsored) values (${ing}, ${pid}, true)`);
+await ok('logged-out phone reads ingredient links', 'anon', null, `select product_id, is_default from public.ingredient_products`, (r) => r.rows.length === 1 && r.rows[0].is_default === true);
+await ok('Collector adds a draft recipe', 'authenticated', UC, recipe('chicken-adobo'));
+await ok('...stamped with who added it', 'postgres', null, `select created_by from public.recipes where slug = 'chicken-adobo'`, (r) => r.rows[0]?.created_by === UC);
+await refused('Collector adds a published recipe', 'authenticated', UC, recipe('pork-sinigang', 'published'));
+const rid = Number((await one(`select id from public.recipes where slug = 'chicken-adobo'`)).id);
+await ok('Collector adds a priced line', 'authenticated', UC, `insert into public.recipe_ingredients (recipe_id, position, display_text, qty, unit, ingredient_id) values (${rid}, 1, '1/2 cup toyo', 0.5, 'cup', ${ing})`);
+await ok('Collector adds a to-taste line', 'authenticated', UC, `insert into public.recipe_ingredients (recipe_id, position, display_text, unit) values (${rid}, 2, 'Salt to taste', 'to_taste')`);
+await refused('to-taste line with an amount', 'authenticated', UC, `insert into public.recipe_ingredients (recipe_id, position, display_text, qty, unit) values (${rid}, 3, 'Salt', 1, 'to_taste')`);
+await refused('unknown unit', 'authenticated', UC, `insert into public.recipe_ingredients (recipe_id, position, display_text, qty, unit) values (${rid}, 3, 'Oil', 1, 'glug')`);
+await refused('bad slug', 'authenticated', UC, recipe('Chicken Adobo!'));
+await refused('unknown category', 'authenticated', UC, `insert into public.recipes (slug, title_en, category, servings) values ('x', 'X', 'lamb', 2)`);
+await refused('unknown diet', 'authenticated', UC, `insert into public.recipes (slug, title_en, category, servings, diets) values ('y', 'Y', 'pork', 2, array['paleo'])`);
+await ok('Collector sends it for review', 'authenticated', UC, `update public.recipes set status = 'pending' where id = ${rid}`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('Collector publishes it', 'authenticated', UC, `update public.recipes set status = 'published' where id = ${rid}`);
+await ok('logged-out phone can\'t see a pending recipe', 'anon', null, `select id from public.recipes`, (r) => r.rows.length === 0);
+await ok('...or its lines', 'anon', null, `select id from public.recipe_ingredients`, (r) => r.rows.length === 0);
+await ok('shopper can\'t see it either', 'authenticated', U1, `select id from public.recipes`, (r) => r.rows.length === 0);
+await ok('staff can', 'authenticated', UP, `select id from public.recipes`, (r) => r.rows.length === 1);
+await refused('shopper edits a recipe', 'authenticated', U1, `update public.recipes set title_en = 'x' where id = ${rid}`);
+await refused('shopper adds a line', 'authenticated', U1, `insert into public.recipe_ingredients (recipe_id, position, display_text, unit) values (${rid}, 4, 'x', 'to_taste')`);
+await ok('Product Manager publishes it', 'authenticated', UP, `update public.recipes set status = 'published' where id = ${rid}`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('...published_at set, created_by kept', 'postgres', null, `select published_at, created_by from public.recipes where id = ${rid}`, (r) => r.rows[0]?.published_at != null && r.rows[0]?.created_by === UC);
+await ok('logged-out phone reads the published recipe', 'anon', null, `select slug, title_en, servings from public.recipes`, (r) => r.rows.length === 1 && r.rows[0].slug === 'chicken-adobo');
+await ok('...and its 2 lines', 'anon', null, `select display_text from public.recipe_ingredients where recipe_id = ${rid}`, (r) => r.rows.length === 2);
+await refused('logged-out phone reads who added it', 'anon', null, `select created_by from public.recipes`);
+await refused('Collector edits it once published', 'authenticated', UC, `update public.recipes set title_en = 'Changed' where id = ${rid}`);
+await refused('...or its lines', 'authenticated', UC, `update public.recipe_ingredients set display_text = 'Changed' where recipe_id = ${rid}`);
+await refused('Collector deletes a recipe', 'authenticated', UC, `delete from public.recipes where id = ${rid}`);
+await ok('import with the server key publishes directly', 'postgres', null, recipe('pork-sinigang', 'published'));
+await ok('...a second one', 'postgres', null, recipe('ginisang-monggo', 'published'));
+await refused('Product Manager deletes two at once', 'authenticated', UP, `delete from public.recipes where slug in ('pork-sinigang', 'ginisang-monggo')`);
+await ok('...both still there', 'postgres', null, `select count(*)::int n from public.recipes`, (r) => r.rows[0]?.n === 3);
+await ok('Product Manager deletes one', 'authenticated', UP, `delete from public.recipes where slug = 'pork-sinigang'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('Admin deletes two at once', 'authenticated', UA, `delete from public.recipes where slug in ('chicken-adobo', 'ginisang-monggo')`, (r) => (r.affectedRows ?? 0) === 2);
+await ok('...lines go with the recipe', 'postgres', null, `select count(*)::int n from public.recipe_ingredients`, (r) => r.rows[0]?.n === 0);
+await refused('phone uploads a recipe image', 'authenticated', UA, `insert into storage.objects (bucket_id, name) values ('recipe-images', 'x.webp')`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

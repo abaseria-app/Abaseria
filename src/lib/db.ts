@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie';
 import type { PriceType } from './money';
 import type { CategoryId, LegacyCategoryId } from './categories';
+import type { BudgetBill, BudgetExpense, BudgetGoal, BudgetIncome, BudgetMonth, BudgetPhoto } from './budget';
+import type { ListItem, ShoppingList } from './lists';
 
 export const STORE_CHAINS = [
   '7-Eleven',
@@ -102,7 +104,23 @@ export interface Item {
   createdAt: string;
   /** Made just before this item's price is first uploaded; the shared database ignores a second upload with the same id. */
   shareId?: string | null;
+  /**
+   * Pack size the shopper entered for a product nobody had named, e.g. "250ml" or "4x113g" (see size.ts).
+   * Goes into the new product row when the trip is shared. Not indexed, so no database version change.
+   */
+  size?: string | null;
+  /** Promo only: the price before the promo, same terms as unitPriceCentavos (per piece or per kilo). */
+  regularPriceCentavos?: number | null;
+  /** Promo only: what the deal is, e.g. "free shaker". */
+  promoNote?: string | null;
+  /** New products only (go into the product row when shared): brand as printed, kind, and a bundle's contents. */
+  brand?: string | null;
+  kind?: ProductKind | null;
+  contents?: string | null;
 }
+
+/** 'single' one item; 'multipack' several of the same under one barcode; 'bundle' different items under one barcode. */
+export type ProductKind = 'single' | 'multipack' | 'bundle';
 
 export interface AppEvent {
   id?: number;
@@ -137,6 +155,14 @@ class AbaseriaDB extends Dexie {
   events!: Table<AppEvent, number>;
   settings!: Table<Setting, string>;
   branches!: Table<Branch, number>;
+  budgetExpenses!: Table<BudgetExpense, number>;
+  budgetIncome!: Table<BudgetIncome, number>;
+  budgetBills!: Table<BudgetBill, number>;
+  budgetGoals!: Table<BudgetGoal, number>;
+  budgetMonths!: Table<BudgetMonth, string>;
+  budgetPhotos!: Table<BudgetPhoto, number>;
+  shoppingLists!: Table<ShoppingList, number>;
+  listItems!: Table<ListItem, number>;
 
   constructor() {
     super(DB_NAME);
@@ -161,6 +187,36 @@ class AbaseriaDB extends Dexie {
       events: '++id, tripId, type, createdAt',
       settings: 'key',
       branches: '++id, &uuid, chain',
+    });
+    // v4 (Nov 18, 2026): the household budget on the Budget tab. New tables only; trips and items are untouched.
+    this.version(4).stores({
+      trips: '++id, testerId, startedAt, endedAt, branchUuid',
+      items: '++id, tripId, label, createdAt, barcode',
+      events: '++id, tripId, type, createdAt',
+      settings: 'key',
+      branches: '++id, &uuid, chain',
+      budgetExpenses: '++id, date, billId',
+      budgetIncome: '++id, date',
+      budgetBills: '++id',
+      budgetGoals: '++id',
+      budgetMonths: 'month',
+      budgetPhotos: '++id',
+    });
+    // v5 (Nov 20, 2026): shopping lists (plan: Abaseria_Shopping_List_Plan.md, steps L1, L2, L9). New tables only.
+    this.version(5).stores({
+      trips: '++id, testerId, startedAt, endedAt, branchUuid',
+      items: '++id, tripId, label, createdAt, barcode',
+      events: '++id, tripId, type, createdAt',
+      settings: 'key',
+      branches: '++id, &uuid, chain',
+      budgetExpenses: '++id, date, billId',
+      budgetIncome: '++id, date',
+      budgetBills: '++id',
+      budgetGoals: '++id',
+      budgetMonths: 'month',
+      budgetPhotos: '++id',
+      shoppingLists: '++id, &uuid',
+      listItems: '++id, listId',
     });
   }
 }

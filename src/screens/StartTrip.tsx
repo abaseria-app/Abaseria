@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { S } from '../strings';
 import { branchesByRecent, branchLabel, db, getSetting, newUuid, setSetting, STORE_CHAINS, type Branch } from '../lib/db';
 import { parsePesoInput } from '../lib/money';
+import { MonthlyBudgetHint } from '../components/MonthlyBudgetHint';
 import { logEvent } from '../lib/events';
 import {
   formatDistance,
@@ -302,6 +303,7 @@ export function StartTrip({ testMode, onStarted, onBack }: Props) {
         <span className="label">{S.start.budgetLabel}</span>
         <input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder={S.start.budgetPlaceholder} />
       </label>
+      <MonthlyBudgetHint onUse={setBudget} />
 
       {testMode && (
         <section className="test-box">

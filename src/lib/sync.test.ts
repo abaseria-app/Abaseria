@@ -134,6 +134,19 @@ describe('helpers', () => {
     expect(row).toMatchObject({ price_type: 'bundle', bundle_qty: 3, bundle_price_centavos: 10000, unit_price_centavos: 3333 });
   });
 
+  it('sends the regular price and deal only on a promo, and only when the regular price is higher', () => {
+    const row = (over: Partial<Item>) => sync.sightingRow({ ...item(over), shareId: 's' }, 'b');
+    expect(row({ isPromo: true, unitPriceCentavos: 9900, regularPriceCentavos: 11500, promoNote: '  free shaker ' })).toMatchObject({
+      is_promo: true, regular_price_centavos: 11500, promo_note: 'free shaker',
+    });
+    expect(row({ isPromo: false, regularPriceCentavos: 11500, promoNote: 'free' })).toMatchObject({ regular_price_centavos: null, promo_note: null });
+    expect(row({ isPromo: true, unitPriceCentavos: 9900, regularPriceCentavos: 9900 }).regular_price_centavos).toBeNull();
+    expect(row({ isPromo: true, promoNote: '   ' }).promo_note).toBeNull();
+    expect(row({ isPromo: true, promoNote: 'x'.repeat(80) }).promo_note).toHaveLength(60);
+    // Bundles: the regular price is per piece, compared with the bundle split evenly.
+    expect(row({ isPromo: true, priceType: 'bundle', unitPriceCentavos: 3333, bundleQty: 3, bundlePriceCentavos: 10000, regularPriceCentavos: 3900 }).regular_price_centavos).toBe(3900);
+  });
+
   it('spots names the app made up', () => {
     expect(sync.isPlaceholderName('Item •03')).toBe(true);
     expect(sync.isPlaceholderName('Joy Lemon')).toBe(false);
@@ -289,7 +302,14 @@ describe('productImage', () => {
   });
 
   it('never sends an image when the app adds a product', () => {
-    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'category']);
+    expect(Object.keys(sync.productRow(item({ thumb: 'data:image/jpeg;base64,x' })))).toEqual(['barcode', 'name', 'size', 'brand', 'kind', 'contents', 'category']);
+    expect(sync.productRow(item({})).size).toBeNull();
+    expect(sync.productRow(item({ size: '4x113g' })).size).toBe('4x113g');
+    expect(sync.productRow(item({ size: '  ' })).size).toBeNull();
+    expect(sync.productRow(item({})).kind).toBe('single');
+    expect(sync.productRow(item({ brand: ' Del Monte ', kind: 'multipack', contents: 'ignored' }))).toMatchObject({ brand: 'Del Monte', kind: 'multipack', contents: null });
+    expect(sync.productRow(item({ kind: 'bundle', contents: ' Whey 1kg + shaker ' }))).toMatchObject({ kind: 'bundle', contents: 'Whey 1kg + shaker' });
+    expect(sync.productRow(item({ brand: '   ' })).brand).toBeNull();
   });
 
   it('uploads one of the 16 categories, or none when the item is unsorted', () => {

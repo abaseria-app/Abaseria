@@ -70,6 +70,7 @@ export function Login({ finishing, error }: Props) {
         <EmailCodeSignIn onBack={() => setWithEmail(false)} />
       ) : (
         <div className="login-buttons">
+
           {inApp ? (
             <>
               <p className="login-inapp" role="note">{S.inApp.why(S.inApp.apps[inApp])}</p>

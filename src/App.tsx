@@ -11,16 +11,20 @@ import { Settings } from './screens/Settings';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
 import { Search } from './screens/Search';
-import { Explore } from './screens/Explore';
+import { Explore, type Tab as ExploreTab } from './screens/Explore';
+import { RecipeDetail } from './screens/Recipes';
+import { ShoppingListScreen } from './screens/ShoppingList';
 import { ComingSoon, type SoonFeature } from './screens/ComingSoon';
 import { Profile } from './screens/Profile';
+import { QuestionFlow } from './components/QuestionFlow';
+import { markShown, recordVisit, type QuestionSet } from './lib/visits';
 import type { CategoryId } from './lib/categories';
 import { Login } from './screens/Login';
 import { NoticeBanner } from './components/NoticeBanner';
 import { dismissNotice, loadNotices, type Notice } from './lib/notices';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
-type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile';
+type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile' | 'recipe' | 'list';
 /** Screens a back button can return to. */
 type Base = 'explore' | 'home';
 
@@ -41,6 +45,26 @@ export default function App() {
   const [searchCategory, setSearchCategory] = useState<CategoryId | null>(null);
   const [soon, setSoon] = useState<SoonFeature>('community');
   const [notices, setNotices] = useState<Notice[]>([]);
+  // The recipe open on the recipe screen, and which Explore tab to come back to.
+  const [recipeSlug, setRecipeSlug] = useState<string | null>(null);
+  const [exploreTab, setExploreTab] = useState<ExploreTab>('products');
+  // Where the shopping list's Back goes: Explore, or the recipe it was opened from.
+  const [listBack, setListBack] = useState<'explore' | 'recipe'>('explore');
+  // Profile questions due on this visit (2nd: about you, 3rd: household). Counted when the app comes to the front.
+  const [due, setDue] = useState<{ id: string; set: QuestionSet | null } | null>(null);
+  const accountId = account?.id;
+  // Bumped when the visit popups close, so the Profile tab underneath shows the new answers.
+  const [profileVersion, setProfileVersion] = useState(0);
+
+  useEffect(() => {
+    if (!accountId) return;
+    const check = () => {
+      if (document.visibilityState === 'visible') recordVisit(accountId).then((set) => setDue({ id: accountId, set })).catch(() => undefined);
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, [accountId]);
 
   // Notices from Abaseria (incl. a breach notice): checked on open and whenever the app comes back to the front.
   useEffect(() => {
@@ -138,10 +162,25 @@ export default function App() {
       }}
     />
   );
+  // Never over a trip, the cashier or sign-in: only where the shopper is browsing.
+  const askNow = account && due?.id === account.id && (route === 'explore' || route === 'profile') ? due.set : null;
+  const questions = askNow && account && (
+    <QuestionFlow
+      key={askNow}
+      set={askNow}
+      suggestedName={account.name}
+      onShown={() => void markShown(account.id, askNow)}
+      onClose={() => {
+        setDue(null);
+        setProfileVersion((v) => v + 1);
+      }}
+    />
+  );
   return (
     <>
       {banner}
       {screen()}
+      {questions}
     </>
   );
 
@@ -154,6 +193,17 @@ export default function App() {
       case 'explore':
         return (
           <Explore
+            key={exploreTab}
+            initialTab={exploreTab}
+            onRecipe={(slug) => {
+              setRecipeSlug(slug);
+              setExploreTab('recipes');
+              setRoute('recipe');
+            }}
+            onList={() => {
+              setListBack('explore');
+              setRoute('list');
+            }}
             activeTripId={tripId}
             onScan={() => scan('explore')}
             onSearch={(category) => search('explore', category)}
@@ -167,7 +217,10 @@ export default function App() {
           <ComingSoon
             key={soon}
             feature={soon}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCart={() => setRoute('home')}
             onScan={() => scan('explore')}
             onCommunity={() => openSoon('community')}
@@ -177,8 +230,12 @@ export default function App() {
       case 'profile':
         return (
           <Profile
+            key={profileVersion}
             account={account}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCart={() => setRoute('home')}
             onScan={() => scan('explore')}
             onCommunity={() => openSoon('community')}
@@ -194,7 +251,10 @@ export default function App() {
             onContinue={() => setRoute('shop')}
             onSettings={() => setRoute('settings')}
             onSearch={() => search('home')}
-            onExplore={() => setRoute('explore')}
+            onExplore={() => {
+              setExploreTab('products');
+              setRoute('explore');
+            }}
             onCommunity={() => openSoon('community')}
             onProfile={() => setRoute('profile')}
           />
@@ -256,6 +316,27 @@ export default function App() {
         return <OcrCheck onBack={() => setRoute('settings')} />;
       case 'results':
         return <Results onBack={() => setRoute('settings')} />;
+      case 'recipe':
+        return (
+          <RecipeDetail
+            key={recipeSlug ?? ''}
+            slug={recipeSlug ?? ''}
+            onBack={() => setRoute('explore')}
+            onOpenList={() => {
+              setListBack('recipe');
+              setRoute('list');
+            }}
+          />
+        );
+      case 'list':
+        return (
+          <ShoppingListScreen
+            onBack={() => {
+              if (listBack === 'explore') setExploreTab('products');
+              setRoute(listBack);
+            }}
+          />
+        );
       case 'search':
         return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
     }

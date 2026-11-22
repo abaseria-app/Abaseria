@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Branch, Item, Trip } from './db';
-import { buildPhoneCatalog, buildSharedCatalog, mergeCatalogs } from './catalog';
-import { NO_FILTERS, searchCatalog } from './search';
+import { buildPhoneCatalog, buildSharedCatalog, isStale, lowestCurrent, mergeCatalogs, sortByPrice } from './catalog';
+import { NO_FILTERS, searchCatalog, type PricePoint } from './search';
 
 const branch = (uuid: string, name: string, remoteId: string | null = null): Branch => ({
   id: 1, uuid, chain: 'Puregold', name, lat: null, lng: null, createdAt: '2026-10-01T00:00:00Z', remoteId,
@@ -95,5 +95,31 @@ describe('mergeCatalogs', () => {
     const hits = searchCatalog(merged, '1.5 liter', NO_FILTERS, 'best', '2026-11-06');
     expect(hits.map((h) => h.item.barcode)).toEqual(['4801981116072']);
     expect(searchCatalog(merged, '4807', NO_FILTERS, 'best', '2026-11-06').map((h) => h.item.barcode)).toEqual(['4807770270017']);
+  });
+});
+
+describe('store price comparison', () => {
+  const pp = (storeKey: string, centavos: number, seenOn: string, extra: Partial<PricePoint> = {}): PricePoint => ({
+    storeKey, storeLabel: storeKey, seenOn, priceType: 'each', unitPriceCentavos: centavos, bundleQty: null, bundlePriceCentavos: null,
+    isPromo: false, source: 'shared', ...extra,
+  });
+  const today = '2026-11-20';
+
+  it('sorts cheapest first, comparing bundles per piece and newest first on a tie', () => {
+    const list = sortByPrice([
+      pp('a', 12000, '2026-11-18'),
+      pp('b', 0, '2026-11-18', { priceType: 'bundle', bundleQty: 3, bundlePriceCentavos: 30000 }),
+      pp('c', 11500, '2026-11-01'),
+      pp('d', 11500, '2026-11-19'),
+    ]);
+    expect(list.map((p) => p.storeKey)).toEqual(['b', 'd', 'c', 'a']);
+  });
+
+  it('never calls a price older than 30 days the lowest', () => {
+    const list = [pp('old', 9000, '2026-10-01'), pp('now', 11500, '2026-11-19'), pp('dear', 13000, '2026-11-15')];
+    expect(isStale(list[0], today)).toBe(true);
+    expect(isStale(pp('edge', 1, '2026-10-21'), today)).toBe(false);
+    expect(lowestCurrent(list, today)?.storeKey).toBe('now');
+    expect(lowestCurrent([pp('old', 9000, '2026-09-01')], today)).toBeNull();
   });
 });

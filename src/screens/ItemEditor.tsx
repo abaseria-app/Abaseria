@@ -2,9 +2,12 @@ import { useMemo, useState } from 'react';
 import { S } from '../strings';
 import { formatKg, formatPeso, lineTotal, parseKgInput, parsePesoInput, type PriceType } from '../lib/money';
 import type { PriceCandidate } from '../lib/priceParser';
-import type { Item } from '../lib/db';
+import type { Item, ProductKind } from '../lib/db';
 import { CATEGORIES, categoryOf, guessCategory, type CategoryId } from '../lib/categories';
 import { formatBarcode } from '../lib/barcode';
+import { StorePrices } from '../components/StorePrices';
+import type { PricePoint } from '../lib/search';
+import { SIZE_UNITS, formatSize, guessSize, parseAmount, type SizeParts, type SizeUnit } from '../lib/size';
 
 export interface ItemSubmit {
   label: string;
@@ -26,6 +29,16 @@ export interface ItemSubmit {
   barcode?: string | null;
   /** Filled in by the capture screen, not the editor. */
   thumb?: string | null;
+  /** Pack size, e.g. "250ml" or "4x113g". Null when not asked or left empty. */
+  size: string | null;
+  /** Promo only: the price before the promo, per piece (bundles too) or per kilo. */
+  regularPriceCentavos: number | null;
+  /** Promo only: what the deal is. */
+  promoNote: string | null;
+  /** New products only: brand, kind and a bundle's contents. Null when the product was already known. */
+  brand: string | null;
+  kind: ProductKind | null;
+  contents: string | null;
 }
 
 interface Props {
@@ -42,6 +55,19 @@ interface Props {
   /** Shown above the form, e.g. where a recalled price came from. */
   recallNote?: string | null;
   barcode?: string | null;
+  /**
+   * Show the size field. The capture screen sets this when a barcode was scanned and neither this phone nor the
+   * shared database recognized it, so the size can go into the new product row.
+   */
+  askSize?: boolean;
+  /** Text to read a starting size from, e.g. the shelf tag's lines. The typed name is read too. */
+  sizeSource?: string | null;
+  /** Every store's latest price for this barcode, shown as a comparison list. */
+  storePrices?: PricePoint[];
+  /** The store being shopped, marked in the list. */
+  hereKey?: string | null;
+  /** YYYY-MM-DD on this phone, for greying old prices. */
+  today?: string;
   /** How the price is sold when there's no starting price, e.g. per kilo for meat found by search. */
   startPriceType?: PriceType;
   recent: string[];
@@ -55,6 +81,17 @@ interface Props {
 }
 
 const plain = (c: number) => (c / 100).toFixed(2);
+
+/**
+ * Tag text is often all capitals: "DEL MONTE" → "Del Monte". A single short word ("CDO", "NAN", "C2") stays as it
+ * is, since many local brands really are written that way; the one-word chip keeps that version on offer.
+ */
+const unshout = (s: string) => {
+  const words = s.split(' ');
+  const shouting = s === s.toUpperCase() && /[A-Z]{2}/.test(s);
+  if (!shouting || (words.length === 1 && s.length <= 3)) return s;
+  return words.map((w) => (w.length >= 3 && /^[A-Z]/.test(w) ? w.charAt(0) + w.slice(1).toLowerCase() : w)).join(' ');
+};
 
 /** A tag price read as per kilo or per 100 g, as a per-kilo price. Null for ordinary prices. */
 const perKgCentavos = (c: PriceCandidate | undefined) =>
@@ -86,19 +123,74 @@ export function ItemEditor(p: Props) {
   );
   const category = pickedCategory ?? guessCategory(label || p.fallbackName);
   const [promo, setPromo] = useState(init?.isPromo ?? !!p.promoHint);
+  // Regular price: the tag's higher price is the guess until the shopper types one. Null = follow the guess.
+  const [regularTyped, setRegularTyped] = useState<string | null>(init?.regularPriceCentavos != null ? plain(init.regularPriceCentavos) : null);
+  const [dealText, setDealText] = useState(init?.promoNote ?? '');
   const [showPriceInput, setShowPriceInput] = useState(!p.candidates || p.candidates.length === 0);
+
+  // New-product details (brand, size, kind) show for a barcode nobody has named, and stay editable on that item.
+  const askSize = !!p.askSize || !!init?.size || !!init?.brand || (!!init?.kind && init.kind !== 'single');
+  const [brandText, setBrandText] = useState(init?.brand ?? '');
+  const [kindPicked, setKindPicked] = useState<ProductKind | null>(init?.kind && init.kind !== 'single' ? init.kind : null);
+  const [contentsText, setContentsText] = useState(init?.contents ?? '');
+  // Size: the guess (from the name, else the tag) follows along until the shopper touches the size field.
+  const [sizeTyped, setSizeTyped] = useState<SizeParts | null>(init?.size ? (guessSize(init.size) ?? null) : null);
+  const [packOpen, setShowPack] = useState((sizeTyped?.pack ?? 1) > 1);
+  // The pack-count box keeps exactly what's typed (empty, "1" on the way to "12"); null = show the guess.
+  const [packText, setPackText] = useState<string | null>(null);
+  const sizeGuess = askSize && !sizeTyped ? (guessSize(label) ?? guessSize(p.sizeSource)) : null;
+  const sizeParts: SizeParts = sizeTyped ?? sizeGuess ?? { amount: '', unit: 'g', pack: 1 };
+  const sizeText = askSize ? formatSize(sizeParts) : null;
+  // Something typed that can't be saved holds the Add button, the same as a missing price.
+  const sizeBad = askSize && sizeParts.amount.trim() !== '' && sizeText == null;
+  const setSize = (change: Partial<SizeParts>) => setSizeTyped({ ...sizeParts, ...change });
+  // A guessed multipack ("6 x 240ML" on the tag) shows its count too, so it can be checked.
+  const showPack = packOpen || sizeParts.pack > 1 || kindPicked === 'multipack';
+  const openPack = () => {
+    setShowPack(true);
+    setPackText('');
+  };
+  const closePack = () => {
+    setShowPack(false);
+    setPackText(null);
+    if (sizeParts.pack > 1) setSize({ pack: 1 });
+  };
+  // Kind follows the size ("6 × 330 ml" is a multipack) until the shopper picks one.
+  const kind: ProductKind = kindPicked ?? (sizeParts.pack > 1 ? 'multipack' : 'single');
+  // One-tap brand suggestions from the name: its first word and first two words ("Del", "Del Monte").
+  const nameWords = (label.trim() || '').split(/\s+/).filter(Boolean);
+  const brandChips = askSize && !brandText.trim() && nameWords.length >= 2
+    ? [...new Set([nameWords[0], nameWords.slice(0, 2).join(' ')].map(unshout))].filter((b) => b.length <= 60)
+    : [];
 
   const unitPrice = parsePesoInput(priceText);
   const bPrice = parsePesoInput(bundlePriceText);
   const bQty = Number(bundleQty) || 0;
   const grams = parseKgInput(weightText);
   const priceOk = unitPrice != null && unitPrice > 0;
+  // The price paid in the same terms as the regular price: per piece (a bundle split evenly) or per kilo.
+  const paidEach = priceType === 'bundle' ? (bPrice != null && bQty >= 2 ? Math.round(bPrice / bQty) : null) : unitPrice;
+  const regularGuess =
+    promo && paidEach != null
+      ? (p.candidates ?? [])
+          .filter((c) => !c.bundleQty)
+          .map((c) => (priceType === 'perkg' ? perKgCentavos(c) : perKgCentavos(c) == null ? c.centavos : null))
+          .filter((c): c is number => c != null && c > paidEach)
+          .sort((a, b) => b - a)[0] ?? null
+      : null;
+  const regularText = regularTyped ?? (regularGuess != null ? plain(regularGuess) : '');
+  const regular = promo && regularText.trim() ? parsePesoInput(regularText) : null;
+  const regularBad = promo && regularText.trim() !== '' && (regular == null || paidEach == null || regular <= paidEach);
+  const saving = !regularBad && regular != null && paidEach != null ? regular - paidEach : null;
+
   const valid =
-    priceType === 'each'
+    !sizeBad &&
+    !regularBad &&
+    (priceType === 'each'
       ? priceOk
       : priceType === 'perkg'
         ? priceOk && grams != null
-        : bPrice != null && bPrice > 0 && bQty >= 2;
+        : bPrice != null && bPrice > 0 && bQty >= 2);
   const total = useMemo(
     () =>
       valid
@@ -107,6 +199,7 @@ export function ItemEditor(p: Props) {
     [valid, priceType, unitPrice, qty, bQty, bPrice, grams],
   );
   const chosenCandidate = chosen != null ? p.candidates?.[chosen] : undefined;
+
 
   function pick(i: number) {
     const c = p.candidates![i];
@@ -144,6 +237,12 @@ export function ItemEditor(p: Props) {
       chosenRank: chosen != null ? chosen + 1 : 'typed',
       editedAfterChoice: chosen != null && edited,
       priceTouched: edited,
+      size: sizeText,
+      brand: askSize ? brandText.trim().slice(0, 60) || null : null,
+      kind: askSize ? kind : null,
+      contents: askSize && kind === 'bundle' ? contentsText.trim().slice(0, 200) || null : null,
+      regularPriceCentavos: promo && !regularBad ? regular : null,
+      promoNote: promo ? dealText.trim().slice(0, 60) || null : null,
     });
   }
 
@@ -158,6 +257,14 @@ export function ItemEditor(p: Props) {
       {p.notice && <p className="notice">{p.notice}</p>}
       {p.recallNote && <p className="notice">{p.recallNote}</p>}
       {p.barcode && <p className="hint small">{S.item.barcodeLine(formatBarcode(p.barcode))}</p>}
+
+      {/* Other stores' prices. Skipped when the only price is this store's, which the form already shows. */}
+      {p.today && p.storePrices && p.storePrices.length > 0 && !(p.storePrices.length === 1 && p.storePrices[0].storeKey === p.hereKey) && (
+        <section className="compare-prices">
+          <p className="label">{S.prices.title(p.storePrices.length)}</p>
+          <StorePrices prices={p.storePrices} hereKey={p.hereKey} today={p.today} limit={3} className="in-sheet" />
+        </section>
+      )}
 
       {p.candidates && p.candidates.length > 0 && (
         <section>
@@ -199,6 +306,109 @@ export function ItemEditor(p: Props) {
             <button key={r} className="chip" onClick={() => setLabel(r)}>{r}</button>
           ))}
         </div>
+      )}
+
+      {askSize && (
+        <label className="field brand-field">
+          <span className="label">{S.item.brandLabel}</span>
+          <input value={brandText} maxLength={60} placeholder={S.item.brandPlaceholder} autoComplete="off" onChange={(e) => setBrandText(e.target.value)} />
+        </label>
+      )}
+      {brandChips.length > 0 && (
+        <div className="chips brand-chips">
+          {brandChips.map((b) => (
+            <button key={b} className="chip" onClick={() => setBrandText(b)}>{b}</button>
+          ))}
+        </div>
+      )}
+
+      {askSize && (
+        <section className="field size-field">
+          <span className="label">{S.item.sizeLabel}</span>
+          <div className="row size-row">
+            {showPack && (
+              <>
+                <input
+                  className="size-pack"
+                  aria-label={S.item.sizePackOf}
+                  inputMode="numeric"
+                  value={packText ?? (sizeParts.pack > 1 ? String(sizeParts.pack) : '')}
+                  placeholder="6"
+                  autoFocus={packText === ''}
+                  onChange={(e) => {
+                    const t = e.target.value.replace(/\D/g, '').slice(0, 3);
+                    setShowPack(true);
+                    setPackText(t);
+                    // Typing a count means it's a multipack; "One item" closes the box if that was a mistake.
+                    setKindPicked('multipack');
+                    setSize({ pack: Number(t) >= 1 ? Number(t) : 1 });
+                  }}
+                />
+                <span aria-hidden="true">×</span>
+              </>
+            )}
+            <input
+              className="size-amount"
+              aria-label={S.item.sizeAmount}
+              inputMode="decimal"
+              value={sizeParts.amount}
+              placeholder="250"
+              onChange={(e) => setSize({ amount: e.target.value.replace(/[^\d.,]/g, '').slice(0, 10) })}
+            />
+            {showPack && <span className="hint">{S.item.sizePackEach}</span>}
+          </div>
+          <div className="chips size-units" role="radiogroup" aria-label={S.item.sizeLabel}>
+            {SIZE_UNITS.map((u: SizeUnit) => (
+              <button key={u} role="radio" aria-checked={sizeParts.unit === u} className={`chip ${sizeParts.unit === u ? 'on' : ''}`} onClick={() => setSize({ unit: u })}>
+                {S.item.sizeUnits[u]}
+              </button>
+            ))}
+            {!showPack && (
+              <button className="chip ghost" onClick={() => { openPack(); setKindPicked('multipack'); }}>
+                {S.item.sizeMultipack}
+              </button>
+            )}
+          </div>
+          <span className="hint">
+            {kind === 'multipack' && sizeParts.pack < 2
+              ? S.item.sizePackNeeded
+              : sizeText
+              ? S.item.sizeSaved(sizeText)
+              : sizeParts.unit === 'pcs' && parseAmount(sizeParts.amount) != null
+                ? S.item.sizeHintPcs
+                : S.item.sizeHint}
+          </span>
+        </section>
+      )}
+
+      {askSize && (
+        <section className="field kind-field">
+          <span className="label">{S.item.kindLabel}</span>
+          <div className="seg" role="radiogroup" aria-label={S.item.kindLabel}>
+            {(['single', 'multipack', 'bundle'] as ProductKind[]).map((k) => (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={kind === k}
+                className={kind === k ? 'on' : ''}
+                onClick={() => {
+                  setKindPicked(k);
+                  if (k === 'multipack' && sizeParts.pack < 2) openPack();
+                  if (k !== 'multipack') closePack();
+                }}
+              >
+                {S.item.kinds[k]}
+              </button>
+            ))}
+          </div>
+          <span className="hint">{S.item.kindHint[kind]}</span>
+          {kind === 'bundle' && (
+            <label className="field">
+              <span className="label">{S.item.contentsLabel}</span>
+              <input value={contentsText} maxLength={200} placeholder={S.item.contentsPlaceholder} onChange={(e) => setContentsText(e.target.value)} />
+            </label>
+          )}
+        </section>
       )}
 
       <div className="chips cat-chips" role="radiogroup" aria-label={S.item.category}>
@@ -295,6 +505,23 @@ export function ItemEditor(p: Props) {
         <input type="checkbox" checked={promo} onChange={(e) => setPromo(e.target.checked)} />
         <span>{S.item.promo}</span>
       </label>
+      {promo && (
+        <div className="promo-details">
+          <label className="field">
+            <span className="label">
+              {priceType === 'perkg' ? S.item.regularLabelPerKg : priceType === 'bundle' ? S.item.regularLabelEach : S.item.regularLabel}
+            </span>
+            <input inputMode="decimal" value={regularText} placeholder="0.00" onChange={(e) => setRegularTyped(e.target.value)} />
+            <span className="hint">
+              {saving != null && saving > 0 && regular ? S.item.youSave(formatPeso(saving), Math.round((saving / regular) * 100)) : S.item.regularHint}
+            </span>
+          </label>
+          <label className="field">
+            <span className="label">{S.item.dealLabel}</span>
+            <input value={dealText} maxLength={60} placeholder={S.item.dealPlaceholder} onChange={(e) => setDealText(e.target.value)} />
+          </label>
+        </div>
+      )}
 
       <div className="sheet-foot">
         <div className="line-total">
@@ -302,7 +529,7 @@ export function ItemEditor(p: Props) {
           <strong>{total != null ? formatPeso(total) : '—'}</strong>
         </div>
         <button className="btn primary" disabled={!valid} onClick={submit}>
-          {valid ? p.submitLabel : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
+          {valid ? p.submitLabel : sizeBad ? S.item.needSize : regularBad ? S.item.needRegular : priceType === 'perkg' && priceOk ? S.item.needWeight : S.item.needPrice}
         </button>
         {p.onRemove && (
           <button className="btn danger-link" onClick={p.onRemove}>{S.item.remove}</button>

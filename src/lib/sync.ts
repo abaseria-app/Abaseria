@@ -68,6 +68,8 @@ export interface SightingRow {
   bundle_price_centavos: number | null;
   is_promo: boolean;
   capture_method: CaptureMethod;
+  regular_price_centavos: number | null;
+  promo_note: string | null;
 }
 
 export function sightingRow(item: Item & { shareId: string }, branchId: string): SightingRow {
@@ -87,11 +89,23 @@ export function sightingRow(item: Item & { shareId: string }, branchId: string):
     bundle_price_centavos: bundle ? item.bundlePriceCentavos! : null,
     is_promo: item.isPromo,
     capture_method: item.captureMethod,
+    // The database refuses a regular price that isn't above the price paid, so anything else stays on the phone.
+    regular_price_centavos:
+      item.isPromo && item.regularPriceCentavos != null && item.regularPriceCentavos > Math.round(unit) && item.regularPriceCentavos <= 10_000_000
+        ? Math.round(item.regularPriceCentavos)
+        : null,
+    promo_note: item.isPromo ? item.promoNote?.trim().slice(0, 60) || null : null,
   };
 }
 
 export function productRow(item: Item) {
-  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), category: sharedCategory(categoryOf(item)) };
+  // Size only counts for a brand-new product: products that already exist are skipped on upload, never changed.
+  const size = item.size?.trim().slice(0, 40) || null;
+  const brand = item.brand?.trim().slice(0, 60) || null;
+  const kind = item.kind === 'multipack' || item.kind === 'bundle' ? item.kind : 'single';
+  // The database only takes contents on a bundle.
+  const contents = kind === 'bundle' ? item.contents?.trim().slice(0, 200) || null : null;
+  return { barcode: item.barcode!, name: item.label.trim().slice(0, 120), size, brand, kind, contents, category: sharedCategory(categoryOf(item)) };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -333,7 +347,7 @@ export async function sharedPrice(barcode: string, branchUuid: string | null | u
     const [price, product] = await Promise.all([
       client
         .from('latest_prices')
-        .select('seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo')
+        .select('seen_on, price_type, unit_price_centavos, bundle_qty, bundle_price_centavos, is_promo, regular_price_centavos, promo_note')
         .eq('barcode', barcode)
         .eq('branch_id', branchId)
         .limit(1)
@@ -353,6 +367,8 @@ export async function sharedPrice(barcode: string, branchUuid: string | null | u
       bundleQty: p.bundle_qty,
       bundlePriceCentavos: p.bundle_price_centavos,
       isPromo: p.is_promo,
+      regularPriceCentavos: p.regular_price_centavos ?? null,
+      promoNote: p.promo_note ?? null,
       quantity: 1,
       weightGrams: null,
       lineTotalCentavos: 0,

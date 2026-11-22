@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { birthYears, consentsFromRows, explainError } from './profile';
+import { BUDGET_PESOS, birthYears, cleanNickname, consentsFromRows, explainError, formatBudget } from './profile';
 
 describe('birthYears', () => {
   it('starts at the newest year that is certainly 18+', () => {
@@ -41,5 +41,32 @@ describe('explainError', () => {
     expect(explainError({ message: 'TypeError: Failed to fetch' })).toBe('offline');
     expect(explainError({ message: 'something else' })).toBe('failed');
     expect(explainError(null)).toBe('failed');
+  });
+});
+
+describe('cleanNickname', () => {
+  it('trims, squeezes spaces and drops markup characters', () => {
+    expect(cleanNickname('  Ate   Jo  ')).toBe('Ate Jo');
+    expect(cleanNickname('<b>Jovie</b>')).toBe('bJovie/b');
+    expect(cleanNickname('   ')).toBeNull();
+  });
+  it('keeps at most 30 characters', () => {
+    expect(cleanNickname('x'.repeat(40))).toHaveLength(30);
+  });
+  it('keeps Filipino names intact', () => {
+    expect(cleanNickname('Ma. Señora Ñiña')).toBe('Ma. Señora Ñiña');
+  });
+});
+
+describe('budget wheel', () => {
+  it('runs ₱1,000 to ₱15,000 in ₱1,000 steps, matching migration 020', () => {
+    expect(BUDGET_PESOS).toHaveLength(15);
+    expect(BUDGET_PESOS[0]).toBe(1000);
+    expect(BUDGET_PESOS.at(-1)).toBe(15000);
+    expect(BUDGET_PESOS.every((v) => v % 1000 === 0)).toBe(true);
+  });
+  it('reads the top as ₱15,000+', () => {
+    expect(formatBudget(6000)).toBe('₱6,000');
+    expect(formatBudget(15000)).toBe('₱15,000+');
   });
 });

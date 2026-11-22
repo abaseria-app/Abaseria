@@ -3,8 +3,10 @@
 // Everything here lives in the database (migrations 015-017), never on the phone: the Profile screen loads it
 // when opened and saves each change straight away. The database enforces the rules (own row only, real
 // accounts only, answers need the profile switch, birth year locked once saved, under 18 refused); this file
-// only shapes requests and turns database answers into something the screen can show.
+// only shapes requests and turns database answers into something the screen can show. One exception: the budget
+// answer sets the starting monthly grocery budget on the phone (monthlyBudget.ts), which budgets already are.
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { followProfileBudget } from './monthlyBudget';
 import { getSupabase } from './supabase';
 
 /** Which privacy notice the shopper saw when they flipped a switch. Bump when the notice changes. */
@@ -18,9 +20,12 @@ export const GENDERS = ['woman', 'man', 'another', 'no_answer'] as const;
 export const HOUSEHOLD_SIZES = ['1', '2', '3-4', '5-6', '7+', 'no_answer'] as const;
 export const YES_NO = ['yes', 'no', 'no_answer'] as const;
 export const PAYDAYS = ['kinsenas_katapusan', 'weekly', 'monthly', 'daily_irregular', 'no_answer'] as const;
-export const BUDGETS = ['under_3000', '3000_5999', '6000_9999', '10000_14999', '15000_plus', 'no_answer'] as const;
+/** Monthly grocery budget wheel: ₱1,000 to ₱15,000 in ₱1,000 steps; the top reads "₱15,000+" (migration 020). */
+export const BUDGET_PESOS = Array.from({ length: 15 }, (_, i) => (i + 1) * 1000);
+export const formatBudget = (pesos: number) => `₱${pesos.toLocaleString('en-PH')}${pesos >= 15000 ? '+' : ''}`;
 
 export interface Profile {
+  nickname: string | null;
   birth_year: number | null;
   birthday_locked_at: string | null;
   gender: (typeof GENDERS)[number] | null;
@@ -30,21 +35,21 @@ export interface Profile {
   has_kids_under_12: (typeof YES_NO)[number] | null;
   has_senior_60plus: (typeof YES_NO)[number] | null;
   payday_pattern: (typeof PAYDAYS)[number] | null;
-  grocery_budget_band: (typeof BUDGETS)[number] | null;
+  grocery_budget_pesos: number | null;
 }
 
 /** The answers the screen can edit with chips, in the order they're shown. */
-export type ChoiceField = 'gender' | 'household_size_band' | 'has_kids_under_12' | 'has_senior_60plus' | 'payday_pattern' | 'grocery_budget_band';
+export type ChoiceField = 'gender' | 'household_size_band' | 'has_kids_under_12' | 'has_senior_60plus' | 'payday_pattern';
 export const CHOICES: Record<ChoiceField, readonly string[]> = {
   gender: GENDERS,
   household_size_band: HOUSEHOLD_SIZES,
   has_kids_under_12: YES_NO,
   has_senior_60plus: YES_NO,
   payday_pattern: PAYDAYS,
-  grocery_budget_band: BUDGETS,
 };
 
 export const EMPTY_PROFILE: Profile = {
+  nickname: null,
   birth_year: null,
   birthday_locked_at: null,
   gender: null,
@@ -54,11 +59,11 @@ export const EMPTY_PROFILE: Profile = {
   has_kids_under_12: null,
   has_senior_60plus: null,
   payday_pattern: null,
-  grocery_budget_band: null,
+  grocery_budget_pesos: null,
 };
 
 const PROFILE_COLUMNS =
-  'birth_year, birthday_locked_at, gender, province_code, city_code, household_size_band, has_kids_under_12, has_senior_60plus, payday_pattern, grocery_budget_band';
+  'nickname, birth_year, birthday_locked_at, gender, province_code, city_code, household_size_band, has_kids_under_12, has_senior_60plus, payday_pattern, grocery_budget_pesos';
 
 /**
  * Birth years the app offers: from the year that is certainly 18+ (this year minus 19) back 100 years.
@@ -125,7 +130,9 @@ export async function loadProfile(): Promise<Loaded> {
   ]);
   if (cons.error) fail(cons.error);
   if (prof.error) fail(prof.error);
-  return { consents: consentsFromRows(cons.data), profile: { ...EMPTY_PROFILE, ...((prof.data as Partial<Profile> | null) ?? {}) } };
+  const profile = { ...EMPTY_PROFILE, ...((prof.data as Partial<Profile> | null) ?? {}) };
+  void followProfileBudget(profile.grocery_budget_pesos);
+  return { consents: consentsFromRows(cons.data), profile };
 }
 
 /** Flips one switch. The database turns offers and research off itself when profile goes off. */
@@ -136,7 +143,20 @@ export async function setConsent(purpose: Purpose, granted: boolean): Promise<Lo
   return loadProfile();
 }
 
-export type Answer = Partial<Pick<Profile, 'birth_year' | 'gender' | 'province_code' | 'city_code' | ChoiceField>>;
+export type Answer = Partial<Pick<Profile, 'nickname' | 'birth_year' | 'grocery_budget_pesos' | 'gender' | 'province_code' | 'city_code' | ChoiceField>>;
+
+/** A nickname the database will accept (migration 019), or null if there's nothing usable. */
+export function cleanNickname(raw: string): string | null {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+  const s = raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
+  return s || null;
+}
+
+/** The monthly grocery budget on the phone follows the budget answer (see monthlyBudget.ts). */
+function saved(profile: Profile): Profile {
+  void followProfileBudget(profile.grocery_budget_pesos);
+  return profile;
+}
 
 /** Saves (or clears, with null) answers: changes the shopper's row, or adds it the first time. */
 export async function saveAnswers(answer: Answer): Promise<Profile> {
@@ -146,9 +166,9 @@ export async function saveAnswers(answer: Answer): Promise<Profile> {
   if (!upd.data?.length) {
     const ins = await c.from('shopper_profiles').insert(answer).select(PROFILE_COLUMNS).single();
     if (ins.error) fail(ins.error);
-    return { ...EMPTY_PROFILE, ...(ins.data as Partial<Profile>) };
+    return saved({ ...EMPTY_PROFILE, ...(ins.data as Partial<Profile>) });
   }
-  return { ...EMPTY_PROFILE, ...(upd.data[0] as Partial<Profile>) };
+  return saved({ ...EMPTY_PROFILE, ...(upd.data[0] as Partial<Profile>) });
 }
 
 /** Deletes every answer (the switches stay as they are). */
@@ -156,4 +176,5 @@ export async function deleteAnswers(): Promise<void> {
   const c = await client();
   const { error } = await c.from('shopper_profiles').delete().not('user_id', 'is', null);
   if (error) fail(error);
+  void followProfileBudget(null);
 }

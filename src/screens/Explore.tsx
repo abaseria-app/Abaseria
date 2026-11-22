@@ -7,9 +7,16 @@ import { Icon, SoonBadge, type IconName } from '../components/Icon';
 import { BottomNav } from '../components/BottomNav';
 import { MrecSlot, TopBannerSlot, ADS_PREVIEW } from '../components/AdSlot';
 import { SponsorPopup } from '../components/SponsorPopup';
+import { Budget } from './Budget';
+import { RecipesPanel } from './Recipes';
+import { RECIPES_ON } from '../lib/recipes';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
 
-type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
+export type Tab = 'products' | 'recipes' | 'budget' | 'pantry' | 'articles';
 const TABS: Tab[] = ['products', 'recipes', 'budget', 'pantry', 'articles'];
+/** Tabs that are built. The rest carry a coming-soon cover. */
+const LIVE: Tab[] = ['products', 'budget', ...(RECIPES_ON ? (['recipes'] as Tab[]) : [])];
 
 const CATEGORY_ICON: Record<CategoryId, IconName> = {
   'pantry staples': 'dry',
@@ -38,11 +45,16 @@ interface Props {
   onCart: () => void;
   onCommunity: () => void;
   onProfile: () => void;
+  onRecipe: (slug: string) => void;
+  /** Opens the shopping list screen. */
+  onList: () => void;
+  /** Opens on this tab (back from a recipe returns to Recipes). */
+  initialTab?: Tab;
 }
 
 /** The screen the app opens to: browse, search, and the way into a trip. Unbuilt sections carry a coming-soon cover. */
-export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile }: Props) {
-  const [tab, setTab] = useState<Tab>('products');
+export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, onProfile, onRecipe, onList, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'products');
   const [tip, setTip] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
@@ -88,7 +100,7 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
         <img className="explore-logo" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt={S.appName} />
         {TABS.map((t) => {
           const label = S.explore.tabs[t];
-          const soon = t !== 'products';
+          const soon = !LIVE.includes(t);
           return (
             <button key={t} className={`explore-tab ${tab === t ? 'on' : ''}`} aria-pressed={tab === t} aria-label={soon ? S.explore.soonAria(label) : label} onClick={() => setTab(t)}>
               <Icon name={t} size={28} stroke={1.9} />
@@ -100,15 +112,19 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
       </nav>
 
       <div className="explore-body">
-        <button className="search-open" onClick={() => onSearch()} aria-label={S.search.open}>
-          <Icon name="search" size={22} stroke={2.5} />
-          <span>{S.search.openHint}</span>
-        </button>
+        {tab !== 'budget' && !(tab === 'recipes' && RECIPES_ON) && (
+          <button className="search-open" onClick={() => onSearch()} aria-label={S.search.open}>
+            <Icon name="search" size={22} stroke={2.5} />
+            <span>{S.search.openHint}</span>
+          </button>
+        )}
 
         {notice && <p className="toast">{notice}</p>}
 
         {tab === 'products' ? (
           <>
+            <ListCard onOpen={onList} />
+
             <section className="tips" aria-label={S.explore.tipsLabel}>
               <div className="tips-track" ref={tips} onScroll={onTipsScroll}>
                 {S.explore.tips.map((t, i) => (
@@ -168,15 +184,22 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
               </div>
             </section>
           </>
+        ) : tab === 'budget' ? (
+          <Budget />
+        ) : tab === 'recipes' && RECIPES_ON ? (
+          <RecipesPanel onOpen={onRecipe} />
         ) : (
-          <SoonPanel tab={tab} onBack={() => setTab('products')} onCart={onCart} />
+          <SoonPanel tab={tab} onBack={() => setTab('products')} />
         )}
       </div>
 
-      <button className="chat-fab" aria-label={S.explore.chat} onClick={() => setNotice(S.explore.chatSoon)}>
-        <Icon name="chat" size={28} />
-        <SoonBadge />
-      </button>
+      {/* Not on Budget: it would sit over the Mark paid buttons. */}
+      {tab !== 'budget' && (
+        <button className="chat-fab" aria-label={S.explore.chat} onClick={() => setNotice(S.explore.chatSoon)}>
+          <Icon name="chat" size={28} />
+          <SoonBadge />
+        </button>
+      )}
 
       <BottomNav current="explore" onExplore={() => setTab('products')} onCart={onCart} onScan={onScan} onCommunity={onCommunity} onProfile={onProfile} />
 
@@ -185,7 +208,28 @@ export function Explore({ activeTripId, onScan, onSearch, onCart, onCommunity, o
   );
 }
 
-function SoonPanel({ tab, onBack, onCart }: { tab: Tab; onBack: () => void; onCart: () => void }) {
+/** The Current shopping list, or a way to make the first one. */
+function ListCard({ onOpen }: { onOpen: () => void }) {
+  const info = useLiveQuery(async () => {
+    const list = (await db.shoppingLists.toArray()).find((l) => l.isCurrent);
+    if (!list) return { name: null, left: 0, total: 0 };
+    const lines = await db.listItems.where('listId').equals(list.id!).toArray();
+    return { name: list.name, left: lines.filter((l) => !l.checkedAt).length, total: lines.length };
+  }, []);
+  if (!info) return null;
+  return (
+    <button className="list-card" onClick={onOpen}>
+      <Icon name="cart" size={26} />
+      <span>
+        <strong>{info.name ?? S.lists.card}</strong>
+        <small>{info.name ? S.lists.cardCount(info.left, info.total) : S.lists.cardEmpty}</small>
+      </span>
+      <span className="list-card-go">{info.name ? S.lists.open : S.lists.cardMake}</span>
+    </button>
+  );
+}
+
+function SoonPanel({ tab, onBack }: { tab: Tab; onBack: () => void }) {
   return (
     <section className="soon-panel">
       <div className="soon-skeleton" aria-hidden="true">
@@ -199,15 +243,9 @@ function SoonPanel({ tab, onBack, onCart }: { tab: Tab; onBack: () => void; onCa
         <span className="soon-pill">{S.soon.badge}</span>
         <h2>{S.soon.titles[tab]}</h2>
         <p>{S.soon.bodies[tab] ?? S.soon.body}</p>
-        {tab === 'budget' ? (
-          <button className="btn secondary" onClick={onCart}>
-            {S.soon.openCart}
-          </button>
-        ) : (
-          <button className="btn secondary" onClick={onBack}>
-            {S.soon.backToProducts}
-          </button>
-        )}
+        <button className="btn secondary" onClick={onBack}>
+          {S.soon.backToProducts}
+        </button>
       </div>
     </section>
   );

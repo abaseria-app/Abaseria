@@ -191,9 +191,14 @@ export async function exportCsvFiles(): Promise<'shared' | 'downloaded'> {
     new File([eventCsv], `events-${stamp}.csv`, { type: 'text/csv' }),
     new File([itemCsv], `items-${stamp}.csv`, { type: 'text/csv' }),
   ];
+  return shareOrDownload(files, 'Abaseria test data');
+}
+
+/** The phone's share sheet when it can share files, otherwise a download for each file. */
+export async function shareOrDownload(files: File[], title: string): Promise<'shared' | 'downloaded'> {
   if (navigator.canShare?.({ files })) {
     try {
-      await navigator.share({ files, title: 'Abaseria test data' });
+      await navigator.share({ files, title });
       return 'shared';
     } catch (e) {
       if ((e as Error).name === 'AbortError') return 'shared';

@@ -67,6 +67,16 @@ export default defineConfig(({ mode }) => {
               handler: 'CacheFirst',
               options: { cacheName: live ? 'ocr-core' : 'ocr-core-dev', expiration: { maxEntries: 6 } },
             },
+            {
+              // Recipe pictures: kept after the first view so saved recipes show their photo offline.
+              urlPattern: /\/storage\/v1\/object\/public\/recipe-images\//,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: live ? 'recipe-images' : 'recipe-images-dev',
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 60 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
           ],
         },
       }),
