@@ -709,3 +709,16 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .list-empty { margin-top: 20px; }
 .recipe-to-list { margin: 4px 0 8px; }
 .recipe-to-list .btn.wide { margin-top: 8px; }
+
+/* Settings → Send feedback (Nov 20) */
+.feedback .card { background: var(--card); border-radius: var(--radius); padding: 12px 14px 14px; margin: 12px 0; box-shadow: var(--shadow-card); }
+.feedback .card h2 { margin: 0 0 6px; font-size: 1.05rem; }
+.feedback .field span { font-weight: 600; }
+.feedback textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 1rem; resize: vertical; }
+.feedback textarea:focus { outline: none; border-color: var(--purple); }
+.feedback .count { display: block; text-align: right; margin-top: 4px; }
+.feedback .hint.warn { margin: 8px 0 0; }
+.feedback-shot { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.feedback-shot img { max-width: 100%; max-height: 50dvh; border-radius: 12px; border: 2px solid var(--line); }
+.feedback-done { text-align: center; }
+.settings .feedback-entry .btn.wide { margin-top: 8px; }

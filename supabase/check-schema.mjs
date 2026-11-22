@@ -488,5 +488,60 @@ await ok('Admin deletes two at once', 'authenticated', UA, `delete from public.r
 await ok('...lines go with the recipe', 'postgres', null, `select count(*)::int n from public.recipe_ingredients`, (r) => r.rows[0]?.n === 0);
 await refused('phone uploads a recipe image', 'authenticated', UA, `insert into storage.objects (bucket_id, name) values ('recipe-images', 'x.webp')`);
 
+// 024: tester feedback. U1 and U3 are shoppers, UP a Product Manager, UA an Admin, UG a guest session.
+const SHOT = (u, id = 'b1b2c3d4-0000-4000-8000-000000000001', ext = 'webp') => `${u}/${id}.${ext}`;
+const fb = (kind, msg, cols = '', vals = '') => `insert into public.feedback (kind, message, app_env${cols ? ', ' + cols : ''}) values ('${kind}', '${msg}', 'dev'${vals ? ', ' + vals : ''})`;
+const fbAlerts = await events('tester_feedback');
+await ok('screenshot bucket is private with limits', 'postgres', null, `select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'feedback-screenshots'`,
+  (r) => r.rows[0]?.public === false && Number(r.rows[0]?.file_size_limit) === 1048576 && r.rows[0]?.allowed_mime_types?.length === 2);
+await ok('shopper uploads a screenshot', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(U1)}')`);
+await ok('shopper uploads a JPEG screenshot', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(U1, 'b1b2c3d4-0000-4000-8000-000000000002', 'jpg')}')`);
+await refused('shopper uploads into another shopper’s folder', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(U3)}')`);
+await refused('shopper uploads a file with a made-up name', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${U1}/bug.webp')`);
+await refused('shopper uploads a PNG name', 'authenticated', U1, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(U1, 'b1b2c3d4-0000-4000-8000-000000000003', 'png')}')`);
+await refused('logged-out phone uploads a screenshot', 'anon', null, `insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(U1, 'b1b2c3d4-0000-4000-8000-000000000004')}')`);
+try { await asGuest(`insert into storage.objects (bucket_id, name) values ('feedback-screenshots', '${SHOT(UG)}')`); fail++; console.log('FAIL guest uploads a screenshot was allowed'); }
+catch (e) { pass++; console.log('PASS guest uploads a screenshot ::', e.message); }
+await refused('shopper replaces a screenshot', 'authenticated', U1, `update storage.objects set name = name where bucket_id = 'feedback-screenshots'`);
+await refused('shopper deletes a screenshot', 'authenticated', U1, `delete from storage.objects where bucket_id = 'feedback-screenshots'`);
+await ok('shopper sees own screenshots', 'authenticated', U1, `select name from storage.objects where bucket_id = 'feedback-screenshots'`, (r) => r.rows.length === 2);
+await ok('another shopper sees none', 'authenticated', U3, `select name from storage.objects where bucket_id = 'feedback-screenshots'`, (r) => r.rows.length === 0);
+await ok('staff see them all', 'authenticated', UP, `select name from storage.objects where bucket_id = 'feedback-screenshots'`, (r) => r.rows.length === 2);
+await ok('shopper sends a problem with a screenshot', 'authenticated', U1, fb('problem', 'Wrong price on Lucky Me at Puregold Imus', 'area, screenshot_path, app_build, device, screen', `'scan', '${SHOT(U1)}', 'abc1234 2026-11-20', 'Android 14; POCO C61', '360x800 @2'`));
+await ok('...stamped as theirs, status new', 'postgres', null, `select user_id, status, handled_by from public.feedback`, (r) => r.rows.length === 1 && r.rows[0].user_id === U1 && r.rows[0].status === 'new' && r.rows[0].handled_by === null);
+await ok('...and Brad gets an alert with only the id', 'postgres', null, `select detail from security.events where kind = 'tester_feedback' order by id desc limit 1`,
+  (r) => r.rows[0]?.detail?.feedback_id != null && r.rows[0]?.detail?.message === undefined);
+check('one alert per message', (await events('tester_feedback')) === fbAlerts + 1);
+await ok('a suggestion with no screenshot or area', 'authenticated', U3, fb('suggestion', 'Dark mode please'));
+await refused('unknown kind', 'authenticated', U1, fb('rant', 'Hello there'));
+await refused('unknown area', 'authenticated', U1, fb('comment', 'Hello there', 'area', `'checkout'`));
+await refused('message too short', 'authenticated', U1, fb('comment', ' a '));
+await refused('message over 2,000 characters', 'authenticated', U1, `insert into public.feedback (kind, message, app_env) values ('comment', repeat('x', 2001), 'dev')`);
+await refused('screenshot from another shopper’s folder', 'authenticated', U3, fb('problem', 'Look at this', 'screenshot_path', `'${SHOT(U1)}'`));
+await refused('feedback sent as someone else', 'authenticated', U3, `insert into public.feedback (user_id, kind, message, app_env) values ('${U1}', 'comment', 'Not me', 'dev')`);
+await refused('shopper sets the status', 'authenticated', U1, `insert into public.feedback (kind, message, app_env, status) values ('comment', 'Fixed already', 'dev', 'fixed')`);
+await refused('logged-out phone sends feedback', 'anon', null, fb('comment', 'Hello there'));
+try { await asGuest(fb('comment', 'Hello there')); fail++; console.log('FAIL guest sends feedback was allowed'); }
+catch (e) { pass++; console.log('PASS guest sends feedback ::', e.message); }
+await ok('shopper reads only their own', 'authenticated', U1, `select kind from public.feedback`, (r) => r.rows.length === 1 && r.rows[0].kind === 'problem');
+await refused('logged-out phone reads feedback', 'anon', null, `select id from public.feedback`);
+check('guest reads no feedback', (await asGuest(`select id from public.feedback`)).rows.length === 0);
+await refused('shopper edits their message', 'authenticated', U1, `update public.feedback set message = 'changed'`);
+await refused('shopper marks it fixed', 'authenticated', U1, `update public.feedback set status = 'fixed'`);
+await refused('shopper deletes it', 'authenticated', U1, `delete from public.feedback`);
+await ok('staff read everyone’s', 'authenticated', UP, `select id from public.feedback`, (r) => r.rows.length === 2);
+await ok('Product Manager marks one seen with a note', 'authenticated', UP, `update public.feedback set status = 'seen', staff_note = 'Checking Puregold price' where kind = 'problem'`, (r) => (r.affectedRows ?? 0) === 1);
+await ok('...stamped with who and when', 'postgres', null, `select handled_by, handled_at from public.feedback where kind = 'problem'`, (r) => r.rows[0]?.handled_by === UP && r.rows[0]?.handled_at != null);
+await refused('staff rewrite the message', 'authenticated', UP, `update public.feedback set message = 'changed'`);
+await refused('unknown status', 'authenticated', UP, `update public.feedback set status = 'maybe'`);
+await refused('Product Manager deletes feedback', 'authenticated', UP, `delete from public.feedback`);
+await ok('Admin deletes one', 'authenticated', UA, `delete from public.feedback where kind = 'suggestion'`, (r) => (r.affectedRows ?? 0) === 1);
+await refused('Product Manager deletes a screenshot', 'authenticated', UP, `delete from storage.objects where bucket_id = 'feedback-screenshots'`);
+await ok('Admin deletes a screenshot', 'authenticated', UA, `delete from storage.objects where bucket_id = 'feedback-screenshots' and name = '${SHOT(U1, 'b1b2c3d4-0000-4000-8000-000000000002', 'jpg')}'`, (r) => (r.affectedRows ?? 0) === 1);
+await db.exec(`insert into public.feedback (user_id, kind, message, app_env) select '${U3}', 'comment', 'Bulk ' || g, 'dev' from generate_series(1, 19) g`);
+await ok('20th message today still goes', 'authenticated', U3, fb('comment', 'Number twenty'));
+await refused('21st message today refused', 'authenticated', U3, fb('comment', 'Number twenty-one'));
+await ok('feedback rows go with the account (cascade)', 'postgres', null, `select confdeltype from pg_constraint where conrelid = 'public.feedback'::regclass and contype = 'f' and conkey = array[(select attnum from pg_attribute where attrelid = 'public.feedback'::regclass and attname = 'user_id')]`, (r) => r.rows[0]?.confdeltype === 'c');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

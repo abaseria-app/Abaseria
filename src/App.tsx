@@ -8,6 +8,7 @@ import { StartTrip } from './screens/StartTrip';
 import { Shopping } from './screens/Shopping';
 import { Cashier } from './screens/Cashier';
 import { Settings } from './screens/Settings';
+import { Feedback } from './screens/Feedback';
 import { OcrCheck } from './screens/OcrCheck';
 import { Results } from './screens/Results';
 import { Search } from './screens/Search';
@@ -24,7 +25,7 @@ import { NoticeBanner } from './components/NoticeBanner';
 import { dismissNotice, loadNotices, type Notice } from './lib/notices';
 import { LOGIN_REQUIRED, initAuth, onAccountChange, readReturn, savedAccount, type Account } from './lib/auth';
 
-type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile' | 'recipe' | 'list';
+type Route = 'loading' | 'login' | 'explore' | 'home' | 'start' | 'shop' | 'cashier' | 'settings' | 'ocrcheck' | 'results' | 'search' | 'soon' | 'profile' | 'recipe' | 'list' | 'feedback';
 /** Screens a back button can return to. */
 type Base = 'explore' | 'home';
 
@@ -309,9 +310,12 @@ export default function App() {
             }}
             onOcrCheck={() => setRoute('ocrcheck')}
             onResults={() => setRoute('results')}
+            onFeedback={() => setRoute('feedback')}
             onBack={() => setRoute('home')}
           />
         );
+      case 'feedback':
+        return <Feedback onBack={() => setRoute('settings')} />;
       case 'ocrcheck':
         return <OcrCheck onBack={() => setRoute('settings')} />;
       case 'results':

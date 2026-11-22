@@ -81,6 +81,7 @@ In the repo: Settings → Pages → Source: **GitHub Actions**.
 | `src/lib/thumb.ts` | Shrinks the product's reference image (from the shared database) to the list thumbnail kept on the phone |
 | `src/lib/location.ts` | One location reading at trip start → nearest saved branch. The reading is never stored |
 | `.env.development` | Dev database address and publishable key (abaseria-dev) |
+| `src/lib/feedback.ts`, `src/screens/Feedback.tsx` | Settings → Send feedback: kind, area, message and an optional screenshot (shrunk and stripped on the phone) to `public.feedback` (migration 024); each one emails Brad |
 | `src/lib/sync.ts` | Uploading finished trips and looking up other shoppers' prices |
 | `src/lib/search.ts` | Item search: reads names, barcodes, prices and sizes from one box; filters and sorting |
 | `src/lib/catalog.ts` | The list search looks through: this phone's items merged with shared products and prices |
