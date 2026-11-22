@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './db';
 import {
-  addLines, allLists, clearTicked, createList, currentList, deleteList, ensureCurrentList, formatGrams, listLines,
+  addLines, addToCurrent, allLists, catalogLine, clearTicked, createList, currentList, deleteList, ensureCurrentList, formatGrams, listLines,
+  openQuantities,
   recipeLines, renameList, setCurrent, toggleLine, updateLine,
 } from './lists';
 import { costRecipe, type Ingredient, type Recipe, type RecipeLine } from './recipes';
@@ -204,4 +205,61 @@ it('formats grams for the list', () => {
   expect(formatGrams(40)).toBe('40 g');
   expect(formatGrams(1000)).toBe('1 kg');
   expect(formatGrams(1550)).toBe('1.6 kg');
+});
+
+describe('adding from product search', () => {
+  const soy = { name: 'Datu Puti Soy Sauce', size: '385ml', barcode: '4801668100219', category: 'cooking essentials & condiments' as const };
+
+  it('names the line with its size, once', () => {
+    expect(catalogLine(soy).label).toBe('Datu Puti Soy Sauce 385ml');
+    expect(catalogLine({ ...soy, name: 'Datu Puti Soy Sauce 385ml' }).label).toBe('Datu Puti Soy Sauce 385ml');
+    expect(catalogLine({ ...soy, size: null }).label).toBe('Datu Puti Soy Sauce');
+  });
+
+  it('makes a Current list when there is none and adds to it', async () => {
+    const r = await addToCurrent(catalogLine(soy));
+    expect(r?.list.name).toBe('Shopping list');
+    expect(r?.merged).toBe(false);
+    const lines = await listLines(r!.list.id!);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ barcode: soy.barcode, quantity: 1, source: 'search', category: 'cooking essentials & condiments' });
+  });
+
+  it('adds to the Current list, not another one', async () => {
+    const a = await createList('Lingguhan');
+    await createList('Noche Buena', false);
+    const r = await addToCurrent(catalogLine(soy));
+    expect(r?.list.id).toBe(a.id);
+  });
+
+  it('adds one more pack instead of a second line, and counts open packs', async () => {
+    const a = await createList('Lingguhan');
+    await addToCurrent(catalogLine(soy));
+    const r = await addToCurrent(catalogLine(soy));
+    expect(r).toMatchObject({ merged: true, quantity: 2 });
+    expect(await listLines(a.id!)).toHaveLength(1);
+    expect((await openQuantities(a.id!)).get(`b:${soy.barcode}`)).toBe(2);
+  });
+
+  it('starts a new line when the one on the list is already ticked', async () => {
+    const a = await createList('Lingguhan');
+    const first = await addToCurrent(catalogLine(soy));
+    const line = (await listLines(a.id!))[0];
+    await toggleLine(line.id!);
+    expect((await openQuantities(a.id!)).has(`b:${soy.barcode}`)).toBe(false);
+    const again = await addToCurrent(catalogLine(soy));
+    expect(again?.merged).toBe(false);
+    expect(await listLines(a.id!)).toHaveLength(2);
+    expect(first?.list.id).toBe(a.id);
+  });
+
+  it('undo removes a new line and puts a merged line back to its old amount', async () => {
+    const a = await createList('Lingguhan');
+    const first = await addToCurrent(catalogLine(soy));
+    const second = await addToCurrent(catalogLine(soy));
+    await second!.undo();
+    expect((await listLines(a.id!))[0].quantity).toBe(1);
+    await first!.undo();
+    expect(await listLines(a.id!)).toHaveLength(0);
+  });
 });
