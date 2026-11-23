@@ -288,8 +288,11 @@ function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey:
   const best = here ?? hit.best;
   const cat = CATEGORY_BY_ID[item.category];
   const meta = [item.size, cat.label].filter(Boolean).join(' · ');
+  const srp = item.srpCentavos ?? null;
   const where = !best
-    ? S.search.noPrice
+    ? srp != null
+      ? S.search.srpEstimate
+      : S.search.noPrice
     : here
       ? `${S.search.here} · ${dayText(here.seenOn)}`
       : hereKey
@@ -313,6 +316,12 @@ function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey:
           <small className="result-where">{where}</small>
           {item.barcode && <small className="item-code">{formatBarcode(item.barcode)}</small>}
         </span>
+        {!best && srp != null && (
+          <span className="result-price srp">
+            <strong>{formatPeso(srp)}</strong>
+            <small className="srp-tag">{S.search.srp}</small>
+          </span>
+        )}
         {best && (
           <span className="result-price">
             {/* Bundles show the per-piece price big (it's what the list sorts by) and the deal underneath. */}
@@ -322,6 +331,7 @@ function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey:
           </span>
         )}
       </button>
+      {open && best && srp != null && <p className="srp-line">{S.search.srpAlso(formatPeso(srp))}</p>}
       {open && prices.length > 0 && <StorePrices prices={prices} hereKey={hereKey} today={today} />}
     </li>
   );

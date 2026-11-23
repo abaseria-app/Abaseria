@@ -111,6 +111,11 @@ export interface BranchRow {
   chain: string;
   name: string;
 }
+/** One row of reference_prices (migration 025): the SRP for a barcode. */
+export interface SrpRow {
+  barcode: string;
+  srp_centavos: number;
+}
 
 const asCategory = (c: string | null, name: string): CategoryId => toCategory(c, name);
 
@@ -120,6 +125,7 @@ export function buildSharedCatalog(
   prices: LatestPriceRow[],
   branches: BranchRow[],
   imageUrl: (path: string) => string,
+  srp: SrpRow[] = [],
 ): CatalogItem[] {
   const label = new Map(branches.map((b) => [b.id, b.chain === 'Other' ? b.name : `${b.chain} ${b.name}`]));
   const out = new Map<string, CatalogItem>();
@@ -150,6 +156,10 @@ export function buildSharedCatalog(
       promoNote: r.promo_note ?? null,
       source: 'shared',
     });
+  }
+  for (const r of srp) {
+    const it = out.get(r.barcode);
+    if (it && r.srp_centavos > 0) it.srpCentavos = r.srp_centavos;
   }
   for (const it of out.values()) it.prices.sort((a, b) => b.seenOn.localeCompare(a.seenOn));
   return [...out.values()];
@@ -216,13 +226,16 @@ export async function loadSharedCatalog(): Promise<{ state: SharedState; items: 
       }
       return rows;
     };
-    const [products, prices, branches] = await Promise.all([
+    const [products, prices, branches, srp] = await Promise.all([
       all<ProductRow>('products', 'barcode, name, size, category, image_path', ['barcode']),
       all<LatestPriceRow>('latest_prices', LATEST_PRICE_COLS, ['barcode', 'branch_id']),
       all<BranchRow>('branches', 'id, chain, name', ['id']),
+      // SRPs are a bonus: a project without migration 025 (the live one, until it's added) or a slow answer
+      // must never stop products and prices from loading.
+      all<SrpRow>('reference_prices', 'barcode, srp_centavos', ['barcode']).catch(() => [] as SrpRow[]),
     ]);
     const imageUrl = (path: string) => client.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
-    return { state: 'ok', items: buildSharedCatalog(products, prices, branches, imageUrl) };
+    return { state: 'ok', items: buildSharedCatalog(products, prices, branches, imageUrl, srp) };
   } catch (e) {
     const aborted = ctrl.signal.aborted;
     const msg = e instanceof Error ? e.message : String(e);
