@@ -300,6 +300,9 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .result-row .item-name small.result-where { color: var(--navy); font-weight: 600; font-size: .85rem; }
 .result-row .item-name small.item-code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .result-row .result-price small { color: var(--muted); font-size: .8rem; }
+.result-row .result-price.srp strong { color: var(--navy); }
+.result-row .result-price small.srp-tag { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.srp-line { margin: .25rem 1rem .5rem; color: var(--muted); font-size: .85rem; }
 .result-row .result-price small.promo-tag { color: var(--red); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
 .result-row.open { border-radius: 12px 12px 0 0; margin-bottom: 0; }
 .store-prices { list-style: none; margin: 0 0 8px; padding: 2px 14px 8px 82px; background: var(--card); border-radius: 0 0 12px 12px; box-shadow: var(--shadow-card); }

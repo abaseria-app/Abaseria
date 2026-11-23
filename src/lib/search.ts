@@ -48,6 +48,12 @@ export interface CatalogItem {
   image: string | null;
   /** The latest price at each store, newest first. */
   prices: PricePoint[];
+  /**
+   * SRP: a typical price for the product, in centavos, from the shared database (reference_prices).
+   * An estimate to show when no store price is known. Never a store's price: it never joins `prices`,
+   * never counts as a sighting, and search filters and sorting ignore it.
+   */
+  srpCentavos?: number | null;
 }
 
 /** The price of one piece (bundle split evenly) or of one kilo. Used for every comparison. */
