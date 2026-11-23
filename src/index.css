@@ -300,8 +300,20 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .result-row .item-name small.result-where { color: var(--navy); font-weight: 600; font-size: .85rem; }
 .result-row .item-name small.item-code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .result-row .result-price small { color: var(--muted); font-size: .8rem; }
+.result-row .result-price.srp strong { color: var(--navy); }
+.result-row .result-price small.srp-tag { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.srp-line { margin: .25rem 1rem .5rem; color: var(--muted); font-size: .85rem; }
 .result-row .result-price small.promo-tag { color: var(--red); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
 .result-row.open { border-radius: 12px 12px 0 0; margin-bottom: 0; }
+/* Search → shopping list (Nov 22): the add button sits beside the row, outside it, so a tap never opens the row. */
+.result-line { display: flex; gap: 6px; align-items: stretch; }
+.result-line .result-row { flex: 1; min-width: 0; }
+.list-add-btn { flex: none; width: 56px; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 12px; border: 2px solid var(--purple); background: var(--card); color: var(--purple); font-weight: 700; font-size: 1.15rem; box-shadow: var(--shadow-card); }
+.list-add-btn small { font-size: .72rem; font-weight: 600; }
+.list-add-btn.on { background: var(--lilac); }
+.result-row.open + .list-add-btn { margin-bottom: 0; }
+.list-toast { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 20; max-width: 528px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--navy); color: var(--on-navy); padding: 8px 8px 8px 14px; border-radius: 12px; box-shadow: var(--shadow-card); font-weight: 600; }
+.list-toast .link { color: var(--yellow); }
 .store-prices { list-style: none; margin: 0 0 8px; padding: 2px 14px 8px 82px; background: var(--card); border-radius: 0 0 12px 12px; box-shadow: var(--shadow-card); }
 .store-prices li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .store-prices li span { display: flex; flex-direction: column; min-width: 0; }
@@ -722,3 +734,5 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--lin
 .feedback-shot img { max-width: 100%; max-height: 50dvh; border-radius: 12px; border: 2px solid var(--line); }
 .feedback-done { text-align: center; }
 .settings .feedback-entry .btn.wide { margin-top: 8px; }
+
+.screen.search.has-toast { padding-bottom: 104px; }

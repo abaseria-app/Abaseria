@@ -123,3 +123,40 @@ describe('store price comparison', () => {
     expect(lowestCurrent([pp('old', 9000, '2026-09-01')], today)).toBeNull();
   });
 });
+
+describe('SRP (reference price)', () => {
+  const products = [
+    { barcode: '4807770270017', name: 'Lucky Me! Pancit Canton Chilimansi', size: '60g', category: 'pantry staples', image_path: null },
+    { barcode: '4801981116072', name: 'Coke Original 1.5L', size: '1.5L', category: null, image_path: null },
+  ];
+  const one = [{ barcode: '4807770270017', branch_id: 'b1', seen_on: '2026-11-05', price_type: 'each' as const, unit_price_centavos: 1700, bundle_qty: null, bundle_price_centavos: null, is_promo: false }];
+  const branches = [{ id: 'b1', chain: 'SM Supermarket', name: 'Imus' }];
+
+  it('attaches the SRP to its product and never adds it to the store prices', () => {
+    const cat = buildSharedCatalog(products, one, branches, (p) => p, [{ barcode: '4807770270017', srp_centavos: 1800 }]);
+    const canton = cat.find((c) => c.barcode === '4807770270017')!;
+    expect(canton.srpCentavos).toBe(1800);
+    expect(canton.prices).toHaveLength(1);
+    expect(canton.prices[0].unitPriceCentavos).toBe(1700);
+  });
+
+  it('leaves products without an SRP alone, and ignores SRPs for unknown barcodes or non-positive values', () => {
+    const cat = buildSharedCatalog(products, [], branches, (p) => p, [
+      { barcode: '9999999999999', srp_centavos: 500 },
+      { barcode: '4801981116072', srp_centavos: 0 },
+    ]);
+    expect(cat.every((c) => c.srpCentavos == null)).toBe(true);
+  });
+
+  it('works with no SRP list at all (a project without migration 025)', () => {
+    const cat = buildSharedCatalog(products, one, branches, (p) => p);
+    expect(cat).toHaveLength(2);
+    expect(cat[0].srpCentavos).toBeUndefined();
+  });
+
+  it('keeps the SRP when merging with this phone’s list', () => {
+    const shared = buildSharedCatalog(products, [], branches, (p) => p, [{ barcode: '4801981116072', srp_centavos: 6500 }]);
+    const merged = mergeCatalogs([], shared);
+    expect(merged.find((c) => c.barcode === '4801981116072')!.srpCentavos).toBe(6500);
+  });
+});
