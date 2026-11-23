@@ -3,6 +3,7 @@
 // Decided Nov 18: lists stay on this phone only (D1); several named lists, one of them Current (D2);
 // each line is Kailangan (must have) or Kung may sobra (if there's extra) (D4); lines are ticked by hand.
 // Not in this build: estimates (L4), ticking by scanning on a trip (L5), share and paste (L6).
+// Nov 22: any product search result can go straight onto the Current list (addToCurrent).
 //
 // A recipe's ingredients land on the Current list (L9). The same product or name already on the list and not yet
 // ticked gets the amounts added together, so adobo and ginisang corned beef make one garlic line, not two.
@@ -10,6 +11,7 @@
 import { db, newUuid } from './db';
 import { CATEGORY_IDS, guessCategory, type CategoryId } from './categories';
 import { lineAmount, type LineCost, type Recipe } from './recipes';
+import type { CatalogItem } from './search';
 
 export type Priority = 'must' | 'extra';
 export type ListSource = 'typed' | 'search' | 'recipe';
@@ -64,7 +66,7 @@ const now = () => new Date().toISOString();
 const clean = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, max);
 
 /** Same product (barcode) or, without one, same name. */
-export const lineKey = (l: Pick<ListItem, 'barcode' | 'label'>) => (l.barcode ? `b:${l.barcode}` : `n:${l.label.toLowerCase()}`);
+export const lineKey = (l: { barcode?: string | null; label: string }) => (l.barcode ? `b:${l.barcode}` : `n:${l.label.toLowerCase()}`);
 
 // ---------------------------------------------------------------------------------------------------------
 // Lists
@@ -230,6 +232,55 @@ export async function clearTicked(listId: number): Promise<number> {
   const ticked = (await db.listItems.where('listId').equals(listId).toArray()).filter((l) => l.checkedAt);
   await db.listItems.bulkDelete(ticked.map((l) => l.id!));
   return ticked.length;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// From product search (Nov 22, 2026)
+
+/** A search result as a list line: name with its size ("Datu Puti Soy Sauce 385ml"), barcode and category. */
+export function catalogLine(item: Pick<CatalogItem, 'name' | 'size' | 'barcode' | 'category'>): NewLine {
+  const label = item.size && !item.name.includes(item.size) ? `${item.name} ${item.size}` : item.name;
+  return { label, barcode: item.barcode, category: item.category, source: 'search' };
+}
+
+/** Packs of each product or name on a list that aren't ticked yet, by lineKey. Weighed lines count as 1. */
+export async function openQuantities(listId: number): Promise<Map<string, number>> {
+  const lines = (await db.listItems.where('listId').equals(listId).toArray()).filter((l) => !l.checkedAt);
+  return new Map(lines.map((l) => [lineKey(l), l.quantity]));
+}
+
+export interface AddedToList {
+  list: ShoppingList;
+  /** True when the product was already on the list (one more pack was added to that line). */
+  merged: boolean;
+  /** Packs on that line now. */
+  quantity: number;
+  /** Puts the list back the way it was before this add. */
+  undo: () => Promise<void>;
+}
+
+/**
+ * Adds one line to the Current list (made as "Shopping list" if the phone has none). Adding a product that's
+ * already there and not ticked adds one more pack to that line instead of a second line.
+ */
+export async function addToCurrent(n: NewLine): Promise<AddedToList | null> {
+  const list = await ensureCurrentList();
+  const probe = toItem(list.id!, n, 0);
+  if (!probe) return null;
+  const before = (await db.listItems.where('listId').equals(list.id!).toArray()).find((l) => !l.checkedAt && lineKey(l) === lineKey(probe));
+  const snapshot = before ? { quantity: before.quantity, weightGrams: before.weightGrams, priority: before.priority, note: before.note } : null;
+  await addLines(list.id!, [n]);
+  const after = (await db.listItems.where('listId').equals(list.id!).toArray()).find((l) => !l.checkedAt && lineKey(l) === lineKey(probe));
+  if (!after) return null;
+  return {
+    list,
+    merged: !!before,
+    quantity: after.quantity,
+    undo: async () => {
+      if (snapshot) await db.listItems.update(after.id!, snapshot);
+      else await db.listItems.delete(after.id!);
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------

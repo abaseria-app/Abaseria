@@ -49,8 +49,8 @@ export default function App() {
   // The recipe open on the recipe screen, and which Explore tab to come back to.
   const [recipeSlug, setRecipeSlug] = useState<string | null>(null);
   const [exploreTab, setExploreTab] = useState<ExploreTab>('products');
-  // Where the shopping list's Back goes: Explore, or the recipe it was opened from.
-  const [listBack, setListBack] = useState<'explore' | 'recipe'>('explore');
+  // Where the shopping list's Back goes: Explore, the recipe it was opened from, or Search.
+  const [listBack, setListBack] = useState<'explore' | 'recipe' | 'search'>('explore');
   // Profile questions due on this visit (2nd: about you, 3rd: household). Counted when the app comes to the front.
   const [due, setDue] = useState<{ id: string; set: QuestionSet | null } | null>(null);
   const accountId = account?.id;
@@ -342,7 +342,17 @@ export default function App() {
           />
         );
       case 'search':
-        return <Search key={searchCategory ?? 'all'} initialCategory={searchCategory} onBack={() => setRoute(back)} />;
+        return (
+          <Search
+            key={searchCategory ?? 'all'}
+            initialCategory={searchCategory}
+            onBack={() => setRoute(back)}
+            onOpenList={() => {
+              setListBack('search');
+              setRoute('list');
+            }}
+          />
+        );
     }
   }
 }

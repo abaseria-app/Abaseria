@@ -6,7 +6,7 @@ import { S } from '../strings';
 import { db } from '../lib/db';
 import { CATEGORY_BY_ID } from '../lib/categories';
 import {
-  addLines, allLists, clearTicked, createList, deleteList, formatGrams, MAX_NAME, MAX_QUANTITY, removeLine, renameList,
+  addLines, allLists, catalogLine, clearTicked, createList, deleteList, formatGrams, MAX_NAME, MAX_QUANTITY, removeLine, renameList,
   setCurrent, sortLines, toggleLine, updateLine, type ListItem,
 } from '../lib/lists';
 import type { CatalogItem } from '../lib/search';
@@ -48,8 +48,7 @@ export function ShoppingListScreen({ onBack }: { onBack: () => void }) {
 
   async function addPicked(item: CatalogItem) {
     const target = list ?? (await createList(S.lists.title, true));
-    const label = item.size && !item.name.includes(item.size) ? `${item.name} ${item.size}` : item.name;
-    await addLines(target.id!, [{ label, barcode: item.barcode, category: item.category, source: 'search' }]);
+    await addLines(target.id!, [catalogLine(item)]);
     setMode('view');
     setToast(S.lists.added(target.name));
   }

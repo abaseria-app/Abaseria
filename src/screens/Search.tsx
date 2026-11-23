@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { S } from '../strings';
 import { getSetting, setSetting } from '../lib/db';
 import { formatPeso, parsePesoInput } from '../lib/money';
@@ -8,6 +9,7 @@ import { loadPhoneCatalog, loadSharedCatalog, mergeCatalogs, type SharedState } 
 import { SHARING_ON } from '../lib/sync';
 import { StorePrices } from '../components/StorePrices';
 import { priceText } from '../lib/priceText';
+import { addToCurrent, catalogLine, currentList, lineKey, openQuantities, type AddedToList } from '../lib/lists';
 import {
   NO_FILTERS,
   SORT_KEYS,
@@ -32,6 +34,8 @@ interface Props {
    * Picking an item to add to the trip (from the shopping list). Tapping a row picks it instead of opening it,
    * rows show this store's price first, and a button at the bottom types a new item in.
    */
+  /** Browsing: "Open list" on the added-to-list message. */
+  onOpenList?: () => void;
   pick?: {
     /** This trip's store, as catalog prices file it. Null when unknown. */
     storeKey: string | null;
@@ -45,7 +49,7 @@ interface Props {
 const PAGE = 60;
 const dayFmt = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' });
 
-export function Search({ onBack, pick, initialCategory }: Props) {
+export function Search({ onBack, pick, initialCategory, onOpenList }: Props) {
   const [text, setText] = useState('');
   const [filters, setFilters] = useState<Filters>(initialCategory ? { ...NO_FILTERS, categories: [initialCategory] } : NO_FILTERS);
   const [sort, setSort] = useState<SortKey>('best');
@@ -57,6 +61,25 @@ export function Search({ onBack, pick, initialCategory }: Props) {
   const [minText, setMinText] = useState('');
   const [maxText, setMaxText] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  // Browsing only (Nov 22): each row can go onto the Current list. Shows how many are on it, not yet ticked.
+  const onList = useLiveQuery(async () => {
+    if (pick) return null;
+    const list = await currentList();
+    return list ? openQuantities(list.id!) : new Map<string, number>();
+  }, [!!pick]);
+  const [added, setAdded] = useState<{ name: string; result: AddedToList } | null>(null);
+
+  useEffect(() => {
+    if (!added) return;
+    const t = setTimeout(() => setAdded(null), 5000);
+    return () => clearTimeout(t);
+  }, [added]);
+
+  async function addToList(item: CatalogItem) {
+    const line = catalogLine(item);
+    const result = await addToCurrent(line);
+    if (result) setAdded({ name: line.label, result });
+  }
 
   function retryShared() {
     setShared(null);
@@ -109,7 +132,7 @@ export function Search({ onBack, pick, initialCategory }: Props) {
   const looking = describe(query);
 
   return (
-    <main className="screen search">
+    <main className={`screen search ${added ? 'has-toast' : ''}`}>
       <header className="topbar">
         <button className="link" onClick={onBack}>{pick ? S.search.cancel : S.search.back}</button>
         <h1>{pick ? S.search.pickTitle : S.search.title}</h1>
@@ -241,6 +264,8 @@ export function Search({ onBack, pick, initialCategory }: Props) {
                 hereKey={pick?.storeKey ?? null}
                 open={!pick && open === h.item.key}
                 onToggle={() => (pick ? pick.onPick(h.item) : setOpen(open === h.item.key ? null : h.item.key))}
+                listQty={onList ? (onList.get(lineKey(catalogLine(h.item))) ?? 0) : null}
+                onAddToList={() => void addToList(h.item)}
               />
             ))}
           </ul>
@@ -250,6 +275,33 @@ export function Search({ onBack, pick, initialCategory }: Props) {
             </button>
           )}
         </>
+      )}
+
+      {added && (
+        <div className="list-toast" role="status">
+          <span>
+            {added.result.merged
+              ? S.search.listMore(added.result.quantity, added.name, added.result.list.name)
+              : S.search.listAdded(added.name, added.result.list.name)}
+          </span>
+          <span className="row">
+            <button
+              className="link"
+              onClick={() => {
+                const r = added.result;
+                setAdded(null);
+                void r.undo();
+              }}
+            >
+              {S.search.undo}
+            </button>
+            {onOpenList && (
+              <button className="link" onClick={onOpenList}>
+                {S.search.openList}
+              </button>
+            )}
+          </span>
+        </div>
       )}
 
       {pick && (
@@ -281,7 +333,18 @@ const fmtAmount = (n: number, small: string, big: string) => (n >= 1000 ? `${Num
 
 const dayText = (iso: string) => dayFmt.format(new Date(`${iso}T12:00:00`));
 
-function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey: string | null; open: boolean; onToggle: () => void; today: string }) {
+interface RowProps {
+  hit: Hit;
+  hereKey: string | null;
+  open: boolean;
+  onToggle: () => void;
+  today: string;
+  /** Packs of this item on the Current list, not ticked. Null hides the add button (picking for a trip). */
+  listQty: number | null;
+  onAddToList: () => void;
+}
+
+function ResultRow({ hit, hereKey, open, onToggle, today, listQty, onAddToList }: RowProps) {
   const { item, prices } = hit;
   // Adding to a trip: this store's price is the one that matters; the cheapest elsewhere is only a hint.
   const here = hereKey ? (prices.find((p) => p.storeKey === hereKey) ?? null) : null;
@@ -302,35 +365,47 @@ function ResultRow({ hit, hereKey, open, onToggle, today }: { hit: Hit; hereKey:
       : `${best.storeLabel} · ${dayText(best.seenOn)}`;
   return (
     <li>
-      <button className={`item-row result-row ${open ? 'open' : ''}`} aria-expanded={open} onClick={onToggle}>
-        {item.image ? (
-          <img className="item-thumb" src={item.image} alt="" loading="lazy" />
-        ) : (
-          <span className="item-thumb blank" style={{ background: cat.color, color: cat.ink }} aria-hidden="true">
-            {item.name.trim().charAt(0).toUpperCase() || '•'}
+      <div className="result-line">
+        <button className={`item-row result-row ${open ? 'open' : ''}`} aria-expanded={open} onClick={onToggle}>
+          {item.image ? (
+            <img className="item-thumb" src={item.image} alt="" loading="lazy" />
+          ) : (
+            <span className="item-thumb blank" style={{ background: cat.color, color: cat.ink }} aria-hidden="true">
+              {item.name.trim().charAt(0).toUpperCase() || '•'}
+            </span>
+          )}
+          <span className="item-name">
+            {item.name}
+            <small>{meta}</small>
+            <small className="result-where">{where}</small>
+            {item.barcode && <small className="item-code">{formatBarcode(item.barcode)}</small>}
           </span>
+          {!best && srp != null && (
+            <span className="result-price srp">
+              <strong>{formatPeso(srp)}</strong>
+              <small className="srp-tag">{S.search.srp}</small>
+            </span>
+          )}
+          {best && (
+            <span className="result-price">
+              {/* Bundles show the per-piece price big (it's what the list sorts by) and the deal underneath. */}
+              <strong>{best.priceType === 'bundle' ? formatPeso(comparable(best)) : priceText(best)}</strong>
+              {best.priceType === 'bundle' && <small>{priceText(best)}</small>}
+              {best.isPromo && <small className="promo-tag">{S.search.promo}</small>}
+            </span>
+          )}
+        </button>
+        {listQty != null && (
+          <button
+            className={`list-add-btn ${listQty ? 'on' : ''}`}
+            aria-label={listQty ? S.search.onListAria(item.name, listQty) : S.search.addListAria(item.name)}
+            onClick={onAddToList}
+          >
+            <span aria-hidden="true">{listQty ? `✓ ${listQty}` : '＋'}</span>
+            <small aria-hidden="true">{listQty ? S.search.onList : S.search.addList}</small>
+          </button>
         )}
-        <span className="item-name">
-          {item.name}
-          <small>{meta}</small>
-          <small className="result-where">{where}</small>
-          {item.barcode && <small className="item-code">{formatBarcode(item.barcode)}</small>}
-        </span>
-        {!best && srp != null && (
-          <span className="result-price srp">
-            <strong>{formatPeso(srp)}</strong>
-            <small className="srp-tag">{S.search.srp}</small>
-          </span>
-        )}
-        {best && (
-          <span className="result-price">
-            {/* Bundles show the per-piece price big (it's what the list sorts by) and the deal underneath. */}
-            <strong>{best.priceType === 'bundle' ? formatPeso(comparable(best)) : priceText(best)}</strong>
-            {best.priceType === 'bundle' && <small>{priceText(best)}</small>}
-            {best.isPromo && <small className="promo-tag">{S.search.promo}</small>}
-          </span>
-        )}
-      </button>
+      </div>
       {open && best && srp != null && <p className="srp-line">{S.search.srpAlso(formatPeso(srp))}</p>}
       {open && prices.length > 0 && <StorePrices prices={prices} hereKey={hereKey} today={today} />}
     </li>
